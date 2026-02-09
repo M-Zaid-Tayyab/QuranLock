@@ -1,39 +1,63 @@
 {
   "expo": {
-    "name": "QuranLock",
+    "name": "Quran Lock",
     "slug": "QuranLock",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "orientation": "portrait",
-    "icon": "./src/assets/images/logo.png",
+    "icon": "./src/assets/images/icon.png",
     "scheme": "quranlock",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.zaid.dev.QuranLock"
+      "bundleIdentifier": "com.zaid.dev.QuranLock",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./src/assets/images/logo.png",
-        "backgroundImage": "./src/assets/images/logo.png",
-        "monochromeImage": "./src/assets/images/logo.png"
+        "foregroundImage": "./src/assets/images/icon.png",
+        "backgroundImage": "./src/assets/images/icon.png",
+        "monochromeImage": "./src/assets/images/icon.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.zaid.dev.QuranLock"
     },
     "web": {
       "output": "static",
-      "favicon": "./src/assets/images/logo.png",
+      "favicon": "./src/assets/images/icon.png",
       "bundler": "metro"
     },
     "plugins": [
       "expo-router",
       "expo-dev-client",
+      "expo-updates",
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": true,
+          "useSQLCipher": true,
+          "android": {
+            "enableFTS": false,
+            "useSQLCipher": false
+          },
+          "ios": {
+            "customBuildFlags": [
+              "-DSQLITE_ENABLE_DBSTAT_VTAB=1 -DSQLITE_ENABLE_SNAPSHOT=1"
+            ]
+          }
+        }
+      ],
       [
         "expo-splash-screen",
         {
-          "image": "./src/assets/images/logo.png",
+          "image": "./src/assets/images/icon.png",
           "imageWidth": 200,
           "resizeMode": "contain"
         }
@@ -48,11 +72,75 @@
             "./src/assets/fonts/SF-Pro-Text-Bold.ttf"
           ]
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ],
+      [
+        "react-native-device-activity",
+        {
+          "appleTeamId": "YOUR_APPLE_TEAM_ID",
+          "appGroup": "group.com.zaid.dev.QuranLock"
+        }
       ]
     ],
+    "updates": {
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/9da479ae-b25a-430c-abaf-9fd080a4c021"
+    },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.zaid.dev.QuranLock.ShieldConfiguration",
+                  "targetName": "ShieldConfiguration",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.zaid.dev.QuranLock"
+                    ]
+                  }
+                },
+                {
+                  "bundleIdentifier": "com.zaid.dev.QuranLock.ShieldAction",
+                  "targetName": "ShieldAction",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.zaid.dev.QuranLock"
+                    ]
+                  }
+                },
+                {
+                  "bundleIdentifier": "com.zaid.dev.QuranLock.ActivityMonitorExtension",
+                  "targetName": "ActivityMonitorExtension",
+                  "entitlements": {
+                    "com.apple.developer.family-controls": true,
+                    "com.apple.security.application-groups": [
+                      "group.com.zaid.dev.QuranLock"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "9da479ae-b25a-430c-abaf-9fd080a4c021"
+      }
     }
   }
 }
