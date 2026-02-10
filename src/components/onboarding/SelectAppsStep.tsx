@@ -41,7 +41,7 @@ export function SelectAppsStep({
       sheetRef.current?.present();
     }, 450);
     return () => clearTimeout(timer);
-  }, []);
+  }, [autoOpen]);
 
   if (Platform.OS !== "ios") {
     return (

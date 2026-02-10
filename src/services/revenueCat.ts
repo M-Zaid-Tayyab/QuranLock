@@ -1,10 +1,10 @@
+import { Platform } from "react-native";
 import Purchases, {
   LOG_LEVEL,
   PACKAGE_TYPE,
   PurchasesOffering,
   PurchasesPackage,
 } from "react-native-purchases";
-import { Platform } from "react-native";
 
 export const getRevenueCatApiKey = () => {
   if (Platform.OS === "ios") {
@@ -26,15 +26,18 @@ export const configureRevenueCat = async (appUserId?: string) => {
   return true;
 };
 
-export const getCurrentOffering = async (): Promise<PurchasesOffering | null> => {
-  const offerings = await Purchases.getOfferings();
-  return offerings.current ?? null;
-};
+export const getCurrentOffering =
+  async (): Promise<PurchasesOffering | null> => {
+    const offerings = await Purchases.getOfferings();
+    console.log("offerings", offerings);
+    return offerings.current ?? null;
+  };
 
 export const pickPackage = (
   offering: PurchasesOffering | null,
   type: PACKAGE_TYPE,
-) => offering?.availablePackages.find((pkg) => pkg.packageType === type) ?? null;
+) =>
+  offering?.availablePackages.find((pkg) => pkg.packageType === type) ?? null;
 
 export const purchaseSelectedPackage = async (pkg: PurchasesPackage) =>
   Purchases.purchasePackage(pkg);

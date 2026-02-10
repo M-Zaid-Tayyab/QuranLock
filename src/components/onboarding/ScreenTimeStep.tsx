@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Platform,
   Text,
   View,
@@ -15,7 +16,13 @@ import Animated, {
 
 const AuthorizationStatus = { notDetermined: 0, denied: 1, approved: 2 } as const;
 
-export function ScreenTimeStep() {
+interface ScreenTimeStepProps {
+  onAuthorizationChange?: (approved: boolean) => void;
+}
+
+export function ScreenTimeStep({
+  onAuthorizationChange,
+}: ScreenTimeStepProps = {}) {
   const [authStatus, setAuthStatus] = useState<number | null>(null);
   const [requesting, setRequesting] = useState(false);
   const hasRequested = useRef(false);
@@ -24,6 +31,26 @@ export function ScreenTimeStep() {
     if (Platform.OS !== "ios") return;
     setAuthStatus(getAuthStatus());
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        setAuthStatus(getAuthStatus());
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!onAuthorizationChange) return;
+    if (Platform.OS !== "ios") {
+      onAuthorizationChange(true);
+      return;
+    }
+    if (authStatus == null) return;
+    onAuthorizationChange(authStatus === AuthorizationStatus.approved);
+  }, [authStatus, onAuthorizationChange]);
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;

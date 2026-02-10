@@ -1,20 +1,12 @@
 import { colors } from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { Option, OptionItem } from "./OptionItem";
 import Animated, {
   Easing,
   FadeInDown,
 } from "react-native-reanimated";
-
-export interface QuestionCardData {
-  question: string;
-  subtitle: string;
-  icon: string;
-  iconColor: string;
-  options: Option[];
-}
 
 interface QuestionCardSingleProps {
   question: string;

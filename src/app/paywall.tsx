@@ -1,5 +1,5 @@
-import { colors } from "@/constants/colors";
 import { PrimaryButton } from "@/components/common/PrimaryButton";
+import { colors } from "@/constants/colors";
 import {
   getCurrentOffering,
   pickPackage,
@@ -10,7 +10,7 @@ import { useUserStore } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { PACKAGE_TYPE, PurchasesPackage } from "react-native-purchases";
 
 type PlanOption = "weekly" | "annual";
@@ -37,11 +37,9 @@ export default function PaywallScreen() {
   );
 
   useEffect(() => {
-    let mounted = true;
     setLoading(true);
     getCurrentOffering()
       .then((offering) => {
-        if (!mounted) return;
         if (!offering) {
           setOfferingError("No offerings available yet.");
           return;
@@ -52,16 +50,13 @@ export default function PaywallScreen() {
         setAnnualPackage(annual);
         setOfferingError(null);
       })
-      .catch(() => {
-        if (!mounted) return;
+      .catch((error) => {
+        console.error(error);
         setOfferingError("Unable to load subscriptions.");
       })
       .finally(() => {
-        if (mounted) setLoading(false);
+        setLoading(false);
       });
-    return () => {
-      mounted = false;
-    };
   }, []);
 
   useEffect(() => {
@@ -76,11 +71,8 @@ export default function PaywallScreen() {
       const info = await purchaseSelectedPackage(selectedPackage);
       const entitlementId =
         process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID ?? "pro";
-      const customerInfo =
-        "customerInfo" in info ? info.customerInfo : info;
-      const isActive = Boolean(
-        customerInfo.entitlements.active[entitlementId],
-      );
+      const customerInfo = "customerInfo" in info ? info.customerInfo : info;
+      const isActive = Boolean(customerInfo.entitlements.active[entitlementId]);
       setIsPremium(isActive);
       if (isActive) {
         router.back();
@@ -126,21 +118,21 @@ export default function PaywallScreen() {
       <Pressable
         onPress={() => setSelectedPlan(id)}
         className={`flex-1 rounded-2xl border px-4 py-4 ${
-          isSelected ? "border-accent bg-accent/10" : "border-outline bg-surface"
+          isSelected
+            ? "border-accent bg-accent/10"
+            : "border-outline bg-surface"
         }`}
       >
         <View className="flex-row items-center justify-between">
-        <Text className="text-base font-sfPro-semibold text-foreground">
-          {id === "annual" ? "Yearly" : "Weekly"}
-        </Text>
+          <Text className="text-base font-sfPro-semibold text-foreground">
+            {id === "annual" ? "Yearly" : "Weekly"}
+          </Text>
           <View
             className={`h-5 w-5 items-center justify-center rounded-full border ${
               isSelected ? "border-accent" : "border-outline"
             }`}
           >
-            {isSelected && (
-              <View className="h-3 w-3 rounded-full bg-accent" />
-            )}
+            {isSelected && <View className="h-3 w-3 rounded-full bg-accent" />}
           </View>
         </View>
         <Text className="mt-2 text-3xl font-sfPro-bold text-foreground">
@@ -151,7 +143,9 @@ export default function PaywallScreen() {
             {perWeek} per week
           </Text>
         ) : null}
-        <Text className="mt-3 text-sm font-sfPro text-muted">{description}</Text>
+        <Text className="mt-3 text-sm font-sfPro text-muted">
+          {description}
+        </Text>
         {badge ? (
           <View className="mt-3 self-start rounded-full bg-accent/20 px-3 py-1">
             <Text className="text-[10px] font-sfPro-semibold text-accent">
@@ -299,20 +293,20 @@ export default function PaywallScreen() {
             </View>
           </View>
 
-        <View className="gap-3">
-          {offeringError && (
-            <Text className="text-center text-sm font-sfPro text-error">
-              {offeringError}
-            </Text>
-          )}
+          <View className="gap-3">
+            {offeringError && (
+              <Text className="text-center text-sm font-sfPro text-error">
+                {offeringError}
+              </Text>
+            )}
 
-          <PrimaryButton
-            title={actionLabel}
-            isLoading={loading || purchasing}
-            disabled={!selectedPackage}
-            onPress={handlePurchase}
-            className="w-full"
-          />
+            <PrimaryButton
+              title={actionLabel}
+              isLoading={loading || purchasing}
+              disabled={!selectedPackage}
+              onPress={handlePurchase}
+              className="w-full"
+            />
 
             <Pressable
               onPress={handleRestore}
