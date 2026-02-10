@@ -1,13 +1,19 @@
-import { StreakRow } from "@/components/home";
 import { PrimaryButton } from "@/components/common/PrimaryButton";
+import { StreakRow } from "@/components/home";
 import { colors } from "@/constants/colors";
-import { getAuthStatus, requestAuthorization } from "@/services/deviceActivity";
+import { PAYWALL_SOURCES } from "@/constants/entitlements";
 import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
+import { getAuthStatus, requestAuthorization } from "@/services/deviceActivity";
+import {
+  canAddFocusSchedule,
+  canOpenQuran,
+  openPaywallForBlockedDecision,
+} from "@/services/entitlements";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import * as Notifications from "expo-notifications";
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 
@@ -26,6 +32,11 @@ export default function HomeScreen() {
   const [requestingScreenTime, setRequestingScreenTime] = useState(false);
 
   const name = useUserStore((s) => s.name);
+  const isPremium = useUserStore((s) => s.isPremium);
+  const completedUnlockSessions = useUserStore(
+    (s) => s.completedUnlockSessions,
+  );
+  const focusScheduleCount = useUserStore((s) => s.focusSchedules.length);
   const hasSelectedApps = useUserStore((s) => s.hasSelectedApps);
   const { statuses } = useFocusScheduleStatus();
 
@@ -66,7 +77,9 @@ export default function HomeScreen() {
     (entry) => entry.status === "pending",
   );
   const isBlockingActive =
-    hasPendingSchedules && requiredMinutes > 0 && accumulatedMinutes < requiredMinutes;
+    hasPendingSchedules &&
+    requiredMinutes > 0 &&
+    accumulatedMinutes < requiredMinutes;
   const remainingSeconds = Math.max(
     0,
     Math.ceil((requiredMinutes - accumulatedMinutes) * 60),
@@ -84,6 +97,35 @@ export default function HomeScreen() {
     const displayHour = hour % 12 === 0 ? 12 : hour % 12;
     return `${displayHour}:${minute.toString().padStart(2, "0")} ${suffix}`;
   };
+
+  const handleOpenQuran = useCallback(() => {
+    const gate = canOpenQuran({ isPremium, completedUnlockSessions });
+    if (gate.allowed) {
+      router.push("/verse");
+      return;
+    }
+    openPaywallForBlockedDecision(
+      router,
+      gate,
+      PAYWALL_SOURCES.HOME_READ_QURAN,
+    );
+  }, [completedUnlockSessions, isPremium, router]);
+
+  const handleOpenFocusTimes = useCallback(() => {
+    const gate = canAddFocusSchedule({ isPremium, focusScheduleCount });
+    if (gate.allowed) {
+      router.push({
+        pathname: "/onboarding",
+        params: { mode: "edit-times", from: "home" },
+      });
+      return;
+    }
+    openPaywallForBlockedDecision(
+      router,
+      gate,
+      PAYWALL_SOURCES.HOME_SET_FOCUS_TIMES,
+    );
+  }, [focusScheduleCount, isPremium, router]);
 
   return (
     <View className="flex-1 bg-background py-safe">
@@ -132,7 +174,7 @@ export default function HomeScreen() {
 
           <PrimaryButton
             title="Bismillah, Let's Read"
-            onPress={() => router.push("/verse")}
+            onPress={handleOpenQuran}
             className="mt-5"
           />
 
@@ -145,10 +187,8 @@ export default function HomeScreen() {
                 />
               </View>
               <Text className="mt-2 text-center text-xs font-sfPro text-muted">
-                {Math.floor(accumulatedMinutes)} min done ·{" "}
-                {remainingMinutes}:{remainingSecondsPart
-                  .toString()
-                  .padStart(2, "0")} left
+                {Math.floor(accumulatedMinutes)} min done · {remainingMinutes}:
+                {remainingSecondsPart.toString().padStart(2, "0")} left
               </Text>
             </View>
           )}
@@ -264,12 +304,7 @@ export default function HomeScreen() {
               </View>
             </View>
             <Pressable
-              onPress={() =>
-                router.push({
-                  pathname: "/onboarding",
-                  params: { mode: "edit-times", from: "home" },
-                })
-              }
+              onPress={handleOpenFocusTimes}
               className="mt-4 rounded-full bg-primary px-4 py-2"
             >
               <Text className="text-center text-sm font-sfPro-semibold text-primaryForeground">
@@ -279,60 +314,70 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {hasSelectedApps && orderedSchedules.length > 0 && !isBlockingActive && (
-          <View className="mb-6 rounded-2xl border border-outline bg-surface px-5 py-5">
-            <Text className="font-sfPro-semibold text-foreground">
-              Focus times
-            </Text>
-            <View className="mt-3 flex-row flex-wrap gap-2">
-              {orderedSchedules.map((entry) => (
-                <View
-                  key={entry.schedule.id}
-                  className="rounded-full border border-outline bg-backgroundElevated px-3 py-2"
-                >
-                  <Text className="text-xs font-sfPro text-foreground">
-                    {entry.schedule.label} ·{" "}
-                    {formatTime(entry.schedule.hour, entry.schedule.minute)} ·{" "}
-                    {entry.schedule.durationMinutes}m
-                  </Text>
-                  <Text
-                    className={`mt-1 text-[10px] font-sfPro-semibold ${
-                      entry.status === "pending"
-                        ? "text-warning"
-                        : entry.status === "completed"
-                          ? "text-success"
-                          : "text-muted"
-                    }`}
+        {hasSelectedApps &&
+          orderedSchedules.length > 0 &&
+          !isBlockingActive && (
+            <View className="mb-6 rounded-2xl border border-outline bg-surface px-5 py-5">
+              <Text className="font-sfPro-semibold text-foreground">
+                Focus times
+              </Text>
+              <View className="mt-3 flex-row flex-wrap gap-2">
+                {orderedSchedules.map((entry) => (
+                  <View
+                    key={entry.schedule.id}
+                    className="rounded-full border border-outline bg-backgroundElevated px-4 justify-center items-center py-2"
                   >
-                    {entry.status === "pending"
-                      ? "Blocked now"
-                      : entry.status === "completed"
-                        ? "Completed"
-                        : "Upcoming"}
-                  </Text>
-                </View>
-              ))}
+                    <Text className="text-xs font-sfPro text-foreground">
+                      {entry.schedule.label} ·{" "}
+                      {formatTime(entry.schedule.hour, entry.schedule.minute)} ·{" "}
+                      {entry.schedule.durationMinutes}m
+                    </Text>
+                    <Text
+                      className={`mt-1 text-[10px] font-sfPro-semibold ${
+                        entry.status === "pending"
+                          ? "text-warning"
+                          : entry.status === "completed"
+                            ? "text-success"
+                            : "text-muted"
+                      }`}
+                    >
+                      {entry.status === "pending"
+                        ? "Blocked now"
+                        : entry.status === "completed"
+                          ? "Completed"
+                          : "Upcoming"}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+              <View className="mt-4 flex-row items-center gap-3">
+                <Ionicons
+                  name="apps-outline"
+                  size={18}
+                  color={colors.primary}
+                />
+                <Text className="text-sm font-sfPro text-foreground">
+                  Apps selected for blocking
+                </Text>
+              </View>
+              <View className="mt-2 flex-row items-center gap-3">
+                <Ionicons
+                  name="shield-checkmark-outline"
+                  size={18}
+                  color={colors.secondary}
+                />
+                <Text className="text-sm font-sfPro text-foreground">
+                  Shield activates at your chosen times
+                </Text>
+              </View>
+              <View className="mt-2 flex-row items-center gap-3">
+                <Ionicons name="book-outline" size={18} color={colors.accent} />
+                <Text className="text-sm font-sfPro text-foreground">
+                  Quran unlocks your apps
+                </Text>
+              </View>
             </View>
-            <View className="mt-4 flex-row items-center gap-3">
-              <Ionicons name="apps-outline" size={18} color={colors.primary} />
-              <Text className="text-sm font-sfPro text-foreground">
-                Apps selected for blocking
-              </Text>
-            </View>
-            <View className="mt-2 flex-row items-center gap-3">
-              <Ionicons name="shield-checkmark-outline" size={18} color={colors.secondary} />
-              <Text className="text-sm font-sfPro text-foreground">
-                Shield activates at your chosen times
-              </Text>
-            </View>
-            <View className="mt-2 flex-row items-center gap-3">
-              <Ionicons name="book-outline" size={18} color={colors.accent} />
-              <Text className="text-sm font-sfPro text-foreground">
-                Quran unlocks your apps
-              </Text>
-            </View>
-          </View>
-        )}
+          )}
 
         <View className="mb-4 flex-row items-center justify-between">
           <Text className="text-lg font-sfPro-semibold text-foreground">

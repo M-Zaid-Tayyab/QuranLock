@@ -1,3 +1,7 @@
+import {
+  SUBSCRIPTION_TIERS,
+  type SubscriptionTier,
+} from "@/constants/entitlements";
 import { STORE_KEYS } from "@/constants/storeKeys";
 import { zustandStorage } from "@/storage";
 import { create } from "zustand";
@@ -17,6 +21,8 @@ export interface UserState {
   translationEnabled: boolean;
   quranFontScale: number;
   isPremium: boolean;
+  subscriptionTier: SubscriptionTier;
+  completedUnlockSessions: number;
 }
 
 export interface FocusSchedule {
@@ -42,6 +48,8 @@ interface UserActions {
   setTranslationEnabled: (value: boolean) => void;
   setQuranFontScale: (value: number) => void;
   setIsPremium: (value: boolean) => void;
+  setSubscriptionTier: (value: SubscriptionTier) => void;
+  incrementCompletedUnlockSessions: () => void;
 }
 
 const initialState: UserState = {
@@ -58,6 +66,8 @@ const initialState: UserState = {
   translationEnabled: false,
   quranFontScale: 1,
   isPremium: false,
+  subscriptionTier: SUBSCRIPTION_TIERS.FREE,
+  completedUnlockSessions: 0,
 };
 
 export const useUserStore = create<UserState & UserActions>()(
@@ -79,7 +89,22 @@ export const useUserStore = create<UserState & UserActions>()(
       setTranslationEnabled: (translationEnabled) =>
         set({ translationEnabled }),
       setQuranFontScale: (quranFontScale) => set({ quranFontScale }),
-      setIsPremium: (isPremium) => set({ isPremium }),
+      setIsPremium: (isPremium) =>
+        set({
+          isPremium,
+          subscriptionTier: isPremium
+            ? SUBSCRIPTION_TIERS.PRO
+            : SUBSCRIPTION_TIERS.FREE,
+        }),
+      setSubscriptionTier: (subscriptionTier) =>
+        set({
+          subscriptionTier,
+          isPremium: subscriptionTier === SUBSCRIPTION_TIERS.PRO,
+        }),
+      incrementCompletedUnlockSessions: () =>
+        set((state) => ({
+          completedUnlockSessions: state.completedUnlockSessions + 1,
+        })),
     }),
     {
       name: STORE_KEYS.USER_STORE,

@@ -8,11 +8,17 @@ import {
   type PrayerPreset,
 } from "@/configs/onboarding";
 import { colors } from "@/constants/colors";
+import { PAYWALL_SOURCES, type PaywallSource } from "@/constants/entitlements";
+import {
+  canAddFocusSchedule,
+  openPaywallForBlockedDecision,
+} from "@/services/entitlements";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore, type FocusSchedule } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal as GorhomBottomSheetModal } from "@gorhom/bottom-sheet";
 import * as Notifications from "expo-notifications";
+import { useRouter } from "expo-router";
 import {
   useCallback,
   useEffect,
@@ -32,8 +38,10 @@ export function FocusTimesStep({
   isEditTimes,
   scheduleError,
 }: FocusTimesStepProps) {
+  const router = useRouter();
   const focusSchedules = useUserStore((s) => s.focusSchedules);
   const setFocusSchedules = useUserStore((s) => s.setFocusSchedules);
+  const isPremium = useUserStore((s) => s.isPremium);
   const setQuranMinutesToUnblock = useBlockingStore(
     (s) => s.setQuranMinutesToUnblock,
   );
@@ -126,6 +134,19 @@ export function FocusTimesStep({
     [setFocusSchedules, setQuranMinutesToUnblock],
   );
 
+  const ensureCanAddSchedule = useCallback(
+    (source: PaywallSource) => {
+      const gate = canAddFocusSchedule({
+        isPremium,
+        focusScheduleCount: focusSchedules.length,
+      });
+      if (gate.allowed) return true;
+      openPaywallForBlockedDecision(router, gate, source);
+      return false;
+    },
+    [focusSchedules.length, isPremium, router],
+  );
+
   const onTogglePrayer = useCallback(
     (preset: PrayerPreset) => {
       const exists = selectedPrayerIds.has(preset.id);
@@ -137,6 +158,8 @@ export function FocusTimesStep({
         if (expandedScheduleId === preset.id) setExpandedScheduleId(null);
         return;
       }
+
+      if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_PRAYER)) return;
 
       setSchedule([
         ...focusSchedules,
@@ -151,7 +174,13 @@ export function FocusTimesStep({
       ]);
       setExpandedScheduleId(preset.id);
     },
-    [expandedScheduleId, focusSchedules, selectedPrayerIds, setSchedule],
+    [
+      ensureCanAddSchedule,
+      expandedScheduleId,
+      focusSchedules,
+      selectedPrayerIds,
+      setSchedule,
+    ],
   );
 
   const onUpdateSchedule = useCallback(
@@ -179,13 +208,19 @@ export function FocusTimesStep({
   }, []);
 
   const onOpenNewCustomTime = useCallback(() => {
+    if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_CUSTOM)) return;
     setTimePickerTarget("new");
     timePickerRef.current?.present();
-  }, []);
+  }, [ensureCanAddSchedule]);
 
   const onPickTime = useCallback(
     (hour: number, minute: number) => {
       if (timePickerTarget === "new") {
+        if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_CUSTOM)) {
+          timePickerRef.current?.dismiss();
+          setTimePickerTarget(null);
+          return;
+        }
         const customIndex = customIndexRef.current++;
         const id = `custom-${Date.now()}`;
         setSchedule([
@@ -207,7 +242,13 @@ export function FocusTimesStep({
       timePickerRef.current?.dismiss();
       setTimePickerTarget(null);
     },
-    [focusSchedules, onUpdateSchedule, setSchedule, timePickerTarget],
+    [
+      ensureCanAddSchedule,
+      focusSchedules,
+      onUpdateSchedule,
+      setSchedule,
+      timePickerTarget,
+    ],
   );
 
   const onCloseTimePicker = useCallback(() => {

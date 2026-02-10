@@ -1,3 +1,4 @@
+import { SCREEN_TIME } from "@/constants/screenTime";
 import type {
   Action,
   CallbackName,
@@ -9,20 +10,20 @@ import {
   configureActions,
   getAuthorizationStatus,
   requestAuthorization as libRequestAuthorization,
-  setFamilyActivitySelectionId,
   startMonitoring as libStartMonitoring,
   stopMonitoring as libStopMonitoring,
   unblockSelection as libUnblockSelection,
+  setFamilyActivitySelectionId,
   updateShieldWithId,
 } from "react-native-device-activity";
-import { SCREEN_TIME } from "@/constants/screenTime";
 
 const AuthorizationStatus = {
   notDetermined: 0,
   denied: 1,
   approved: 2,
 } as const;
-export type AuthorizationStatusType = (typeof AuthorizationStatus)[keyof typeof AuthorizationStatus];
+export type AuthorizationStatusType =
+  (typeof AuthorizationStatus)[keyof typeof AuthorizationStatus];
 
 export async function requestAuthorization(): Promise<void> {
   await libRequestAuthorization("individual");
@@ -46,7 +47,7 @@ export function setSelection(familyActivitySelection: string): void {
 export function configureBlockOnly(
   activityName: string,
   selectionId: string,
-  shieldId: string
+  shieldId: string,
 ): void {
   const blockActions: Action[] = [
     {
@@ -65,7 +66,7 @@ export function configureBlockOnly(
 export function configureBlockUnblock(
   activityName: string,
   selectionId: string,
-  shieldId: string
+  shieldId: string,
 ): void {
   const blockActions: Action[] = [
     {
@@ -100,12 +101,16 @@ export function unblockSelection(): void {
 export function updateShield(
   config: ShieldConfiguration,
   actions: ShieldActions,
-  shieldId: string = SCREEN_TIME.SHIELD_ID
+  shieldId: string = SCREEN_TIME.SHIELD_ID,
 ): void {
   updateShieldWithId(config, actions, shieldId);
 }
 
-function nowPlusMinutes(minutes: number): { hour: number; minute: number; second: number } {
+function nowPlusMinutes(minutes: number): {
+  hour: number;
+  minute: number;
+  second: number;
+} {
   const d = new Date();
   d.setMinutes(d.getMinutes() + minutes);
   return {
@@ -124,7 +129,9 @@ function nowComponents(): { hour: number; minute: number; second: number } {
   };
 }
 
-export async function startFocusSession(durationMinutes: number): Promise<void> {
+export async function startFocusSession(
+  durationMinutes: number,
+): Promise<void> {
   const schedule: DeviceActivitySchedule = {
     intervalStart: nowComponents(),
     intervalEnd: nowPlusMinutes(durationMinutes),
@@ -142,14 +149,17 @@ export function stopMonitoring(activityNames: string[]): void {
   libStopMonitoring(activityNames);
 }
 
-export async function startDailyBlockSchedule(hour: number, minute: number): Promise<void> {
+export async function startDailyBlockSchedule(
+  hour: number,
+  minute: number,
+): Promise<void> {
   await startDailyBlockScheduleFor(SCREEN_TIME.ACTIVITY_NAME, hour, minute);
 }
 
 export async function startDailyBlockScheduleFor(
   activityName: string,
   hour: number,
-  minute: number
+  minute: number,
 ): Promise<void> {
   const schedule: DeviceActivitySchedule = {
     intervalStart: { hour, minute, second: 0 },
@@ -159,21 +169,36 @@ export async function startDailyBlockScheduleFor(
   await libStartMonitoring(activityName, schedule, []);
 }
 
+const SHIELD_THEME = {
+  backgroundColor: { red: 12, green: 18, blue: 24, alpha: 0.95 },
+  titleColor: { red: 241, green: 245, blue: 249, alpha: 1 },
+  subtitleColor: { red: 148, green: 163, blue: 184, alpha: 1 },
+  primaryButtonLabelColor: { red: 255, green: 255, blue: 255, alpha: 1 },
+  primaryButtonBackgroundColor: { red: 13, green: 148, blue: 136, alpha: 1 },
+} as const;
+
 export const DEFAULT_SHIELD_CONFIG: ShieldConfiguration = {
-  title: "Focus time with Quran",
-  subtitle: "Tap OK to get a notification — then tap it to open a Quran verse.",
+  title: "You started this journey for Allah",
+  subtitle:
+    "You'll get a notification on clicking Open Quran. Open the notification to unblock your apps.",
   iconSystemName: "book.closed.fill",
-  primaryButtonLabel: "OK",
-  backgroundBlurStyle: 18,
+  primaryButtonLabel: "Open Quran",
+  primaryButtonLabelColor: SHIELD_THEME.primaryButtonLabelColor,
+  primaryButtonBackgroundColor: SHIELD_THEME.primaryButtonBackgroundColor,
+  backgroundColor: SHIELD_THEME.backgroundColor,
+  backgroundBlurStyle: 20,
+  titleColor: SHIELD_THEME.titleColor,
+  subtitleColor: SHIELD_THEME.subtitleColor,
 };
 
 export const DEFAULT_SHIELD_ACTIONS: ShieldActions = {
   primary: {
     type: "sendNotification",
     payload: {
-      title: "QuranLock",
-      body: "Tap to open a Quran verse",
+      title: "Quran Lock",
+      subtitle: "Tap to open your Quran page now",
       userInfo: { url: "quranlock://verse" },
+      body: "Qur'an 13:28: Hearts find peace in Allah's remembrance.",
     },
     behavior: "close",
   },

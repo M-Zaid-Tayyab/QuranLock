@@ -1,4 +1,11 @@
 import { colors } from "@/constants/colors";
+import { PAYWALL_SOURCES } from "@/constants/entitlements";
+import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
+import { unblockSelection } from "@/services/deviceActivity";
+import {
+  canOpenQuran,
+  openPaywallForBlockedDecision,
+} from "@/services/entitlements";
 import {
   QURAN_TOTAL_PAGES,
   deleteQuranPack,
@@ -11,12 +18,11 @@ import {
   type QuranPageData,
   type QuranWord,
 } from "@/services/quranPack";
-import { unblockSelection } from "@/services/deviceActivity";
-import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
 import { getScheduleStatuses } from "@/utils/scheduleEngine";
 import { Ionicons } from "@expo/vector-icons";
+import clsx from "clsx";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -44,7 +50,9 @@ export default function VerseScreen() {
     (s) => s.accumulatedQuranMinutesForCurrentBlock,
   );
   const completedScheduleIds = useBlockingStore((s) => s.completedScheduleIds);
-  const markScheduleCompleted = useBlockingStore((s) => s.markScheduleCompleted);
+  const markScheduleCompleted = useBlockingStore(
+    (s) => s.markScheduleCompleted,
+  );
   const setActiveSchedule = useBlockingStore((s) => s.setActiveSchedule);
   const lastReadPage = useUserStore((s) => s.lastReadPage);
   const setLastReadPage = useUserStore((s) => s.setLastReadPage);
@@ -52,8 +60,17 @@ export default function VerseScreen() {
   const setTranslationEnabled = useUserStore((s) => s.setTranslationEnabled);
   const quranFontScale = useUserStore((s) => s.quranFontScale);
   const setQuranFontScale = useUserStore((s) => s.setQuranFontScale);
+  const isPremium = useUserStore((s) => s.isPremium);
+  const completedUnlockSessions = useUserStore(
+    (s) => s.completedUnlockSessions,
+  );
+  const incrementCompletedUnlockSessions = useUserStore(
+    (s) => s.incrementCompletedUnlockSessions,
+  );
   const focusSchedules = useUserStore((s) => s.focusSchedules);
   const translationEnabledRef = useRef(translationEnabled);
+  const unlockSessionCountedRef = useRef(false);
+  const gateCheckedRef = useRef(false);
 
   const { dateKey, activeSchedule, pendingSchedules } =
     useFocusScheduleStatus();
@@ -81,9 +98,32 @@ export default function VerseScreen() {
 
   const requiredMinutes = getRequiredMinutes();
 
+  useEffect(() => {
+    if (gateCheckedRef.current) return;
+    gateCheckedRef.current = true;
+    const gate = canOpenQuran({ isPremium, completedUnlockSessions });
+    if (gate.allowed) return;
+    openPaywallForBlockedDecision(router, gate, PAYWALL_SOURCES.VERSE_GUARD, {
+      replace: true,
+    });
+  }, [completedUnlockSessions, isPremium, router]);
+
+  useEffect(() => {
+    if (
+      requiredMinutes > 0 &&
+      accumulatedQuranMinutesForCurrentBlock < requiredMinutes
+    ) {
+      unlockSessionCountedRef.current = false;
+    }
+  }, [accumulatedQuranMinutesForCurrentBlock, requiredMinutes]);
+
   const tick = useCallback(() => {
     const shouldUnblock = addQuranMinutes(MINUTES_PER_TICK);
     if (shouldUnblock) {
+      if (!unlockSessionCountedRef.current) {
+        incrementCompletedUnlockSessions();
+        unlockSessionCountedRef.current = true;
+      }
       if (activeSchedule) {
         const completedIds = completedScheduleIds.includes(
           activeSchedule.schedule.id,
@@ -96,7 +136,9 @@ export default function VerseScreen() {
           completedIds,
           new Date(),
         );
-        const nextPending = statuses.find((entry) => entry.status === "pending");
+        const nextPending = statuses.find(
+          (entry) => entry.status === "pending",
+        );
         if (nextPending) {
           setActiveSchedule(
             nextPending.schedule.id,
@@ -130,6 +172,7 @@ export default function VerseScreen() {
     markScheduleCompleted,
     resetAfterUnblock,
     setActiveSchedule,
+    incrementCompletedUnlockSessions,
   ]);
 
   useEffect(() => {
@@ -192,9 +235,7 @@ export default function VerseScreen() {
       await ensureQuranPack((progress) => setDownloadProgress(progress));
       setPackState("ready");
     } catch (error) {
-      setPackError(
-        error instanceof Error ? error.message : "Download failed",
-      );
+      setPackError(error instanceof Error ? error.message : "Download failed");
       setPackState("error");
     }
   }, []);
@@ -210,47 +251,50 @@ export default function VerseScreen() {
     }
   }, [packState, autoDownloadAttempted, handleDownload]);
 
-  const loadPage = useCallback(async (page: number) => {
-    const requestId = ++requestIdRef.current;
-    resetPrefetchQueue();
-    setLoadingPage(true);
-    setPageError(null);
-    setPageData(null);
-    transition.setValue(0);
-    try {
-      const timeout = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Loading timed out")), 8000);
-      });
-      const data = await Promise.race([
-        getQuranPage(page, {
-          priority: "high",
-          shouldAbort: () => requestId !== requestIdRef.current,
-        }),
-        timeout,
-      ]);
-      if (requestId !== requestIdRef.current) return;
-      setPageData(data);
-      setLastReadPage(page);
-      pruneQuranCache(page, 2);
-      const prefetchRadius = translationEnabledRef.current ? 1 : 2;
-      const pagesToPrefetch =
-        prefetchRadius === 1
-          ? [page - 1, page + 1]
-          : [page - 2, page - 1, page + 1, page + 2];
-      prefetchQuranPages(pagesToPrefetch);
-      if (!data) {
-        setPageError("Pack missing or corrupted. Please redownload.");
+  const loadPage = useCallback(
+    async (page: number) => {
+      const requestId = ++requestIdRef.current;
+      resetPrefetchQueue();
+      setLoadingPage(true);
+      setPageError(null);
+      setPageData(null);
+      transition.setValue(0);
+      try {
+        const timeout = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Loading timed out")), 8000);
+        });
+        const data = await Promise.race([
+          getQuranPage(page, {
+            priority: "high",
+            shouldAbort: () => requestId !== requestIdRef.current,
+          }),
+          timeout,
+        ]);
+        if (requestId !== requestIdRef.current) return;
+        setPageData(data);
+        setLastReadPage(page);
+        pruneQuranCache(page, 2);
+        const prefetchRadius = translationEnabledRef.current ? 1 : 2;
+        const pagesToPrefetch =
+          prefetchRadius === 1
+            ? [page - 1, page + 1]
+            : [page - 2, page - 1, page + 1, page + 2];
+        prefetchQuranPages(pagesToPrefetch);
+        if (!data) {
+          setPageError("Pack missing or corrupted. Please redownload.");
+        }
+      } catch (error) {
+        if (requestId !== requestIdRef.current) return;
+        setPageError(
+          error instanceof Error ? error.message : "Unable to load page",
+        );
+      } finally {
+        if (requestId !== requestIdRef.current) return;
+        setLoadingPage(false);
       }
-    } catch (error) {
-      if (requestId !== requestIdRef.current) return;
-      setPageError(
-        error instanceof Error ? error.message : "Unable to load page",
-      );
-    } finally {
-      if (requestId !== requestIdRef.current) return;
-      setLoadingPage(false);
-    }
-  }, [setLastReadPage]);
+    },
+    [setLastReadPage],
+  );
 
   useEffect(() => {
     if (packState === "ready") {
@@ -278,9 +322,7 @@ export default function VerseScreen() {
       await ensureQuranPack((progress) => setDownloadProgress(progress));
       setPackState("ready");
     } catch (error) {
-      setPackError(
-        error instanceof Error ? error.message : "Download failed",
-      );
+      setPackError(error instanceof Error ? error.message : "Download failed");
       setPackState("error");
     }
   }, []);
@@ -396,7 +438,11 @@ export default function VerseScreen() {
                 className="h-14 w-14 items-center justify-center rounded-full"
                 style={{ backgroundColor: colors.accent + "22" }}
               >
-                <Ionicons name="cloud-download" size={24} color={colors.accent} />
+                <Ionicons
+                  name="cloud-download"
+                  size={24}
+                  color={colors.accent}
+                />
               </View>
               <Text className="mt-4 text-xl font-sfPro-bold text-foreground">
                 Quran download
@@ -529,7 +575,8 @@ export default function VerseScreen() {
                         >
                           {verse.arabic ?? ""}
                         </Text>
-                        {translationEnabled && (verse.translation ?? verse.text) ? (
+                        {translationEnabled &&
+                        (verse.translation ?? verse.text) ? (
                           <Text
                             className="font-sfPro text-muted"
                             style={{ fontSize: translationFontSize }}
@@ -611,20 +658,18 @@ export default function VerseScreen() {
           </View>
 
           {isBlockSessionActive && requiredMinutes > 0 && (
-            <View className="mt-3 rounded-2xl border border-outline bg-backgroundElevated px-4 py-3">
-              <Text className="text-center text-xs font-sfPro text-muted">
-                Time on this screen counts toward unblocking your apps.
-              </Text>
+            <View
+              className={clsx(
+                "mt-2 rounded-full border border-outline bg-backgroundElevated px-4 py-3 self-center mb-1",
+                pendingSchedules.length > 1 ? "w-[70%]" : "w-[48%]",
+              )}
+            >
               <Text className="mt-1 text-center text-lg font-sfPro-bold text-foreground">
-                {remainingMinutes}:{remainingSeconds.toString().padStart(2, "0")}{" "}
-                remaining
-              </Text>
-              <Text className="mt-1 text-center text-xs font-sfPro text-muted">
-                {Math.floor(accumulatedQuranMinutesForCurrentBlock)} min of{" "}
-                {requiredMinutes} min
+                {remainingMinutes}:
+                {remainingSeconds.toString().padStart(2, "0")} remaining
               </Text>
               {pendingSchedules.length > 1 && (
-                <Text className="mt-1 text-center text-[10px] font-sfPro text-muted">
+                <Text className="mt-1 text-center text-xs font-sfPro text-muted">
                   {pendingSchedules.length} focus sessions remaining today
                 </Text>
               )}

@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
-import { useUserStore } from "@/store/user";
 import { syncUserProfile } from "@/services/userSync";
+import { useUserStore } from "@/store/user";
+import { useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 export const useUserSync = () => {
@@ -18,6 +18,8 @@ export const useUserSync = () => {
       wordByWordEnabled: s.wordByWordEnabled,
       translationEnabled: s.translationEnabled,
       isPremium: s.isPremium,
+      subscriptionTier: s.subscriptionTier,
+      completedUnlockSessions: s.completedUnlockSessions,
     })),
   );
 

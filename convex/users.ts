@@ -1,6 +1,11 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 
+const SUBSCRIPTION_TIERS = {
+  FREE: "free",
+  PRO: "pro",
+} as const;
+
 export const upsertUser = mutation({
   args: {
     appUserId: v.string(),
@@ -24,6 +29,11 @@ export const upsertUser = mutation({
     wordByWordEnabled: v.boolean(),
     translationEnabled: v.boolean(),
     isPremium: v.boolean(),
+    subscriptionTier: v.union(
+      v.literal(SUBSCRIPTION_TIERS.FREE),
+      v.literal(SUBSCRIPTION_TIERS.PRO),
+    ),
+    completedUnlockSessions: v.number(),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db

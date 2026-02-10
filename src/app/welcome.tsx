@@ -118,7 +118,6 @@ export default function Welcome() {
               ))}
             </View>
           </View>
-
         </View>
 
         {/* CTA */}
@@ -126,7 +125,7 @@ export default function Welcome() {
           <View className="pt-4">
             <PrimaryButton
               title="Begin"
-              onPress={() => router.push("/onboarding" as Href)}
+              onPress={() => router.replace("/onboarding" as Href)}
               disabled={!heroFinished}
             />
           </View>

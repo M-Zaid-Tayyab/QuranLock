@@ -1,8 +1,13 @@
 import "../../global.css";
 import { colors } from "@/constants/colors";
+import { PAYWALL_SOURCES } from "@/constants/entitlements";
+import {
+  canOpenQuran,
+  openPaywallForBlockedDecision,
+} from "@/services/entitlements";
 import { ensureQuranPack } from "@/services/quranPack";
 import { configureRevenueCat } from "@/services/revenueCat";
-import { useUserSync } from "@/hooks/useUserSync";
+import { useUserSync } from "@/hooks/user";
 import { useUserStore } from "@/store/user";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as Notifications from "expo-notifications";
@@ -21,12 +26,21 @@ if (vexoApiKey) {
 
 function useDeepLinkToVerse() {
   const router = useRouter();
+  const isPremium = useUserStore((s) => s.isPremium);
+  const completedUnlockSessions = useUserStore((s) => s.completedUnlockSessions);
 
   useEffect(() => {
     ensureQuranPack().catch(() => undefined);
     const handleUrl = (url: string | null) => {
       if (url && (url === "quranlock://verse" || url.startsWith("quranlock://verse"))) {
-        router.replace("/verse");
+        const gate = canOpenQuran({ isPremium, completedUnlockSessions });
+        if (gate.allowed) {
+          router.replace("/verse");
+          return;
+        }
+        openPaywallForBlockedDecision(router, gate, PAYWALL_SOURCES.DEEP_LINK_VERSE, {
+          replace: true,
+        });
       }
     };
 
@@ -36,16 +50,14 @@ function useDeepLinkToVerse() {
     const notificationSub = Notifications.addNotificationResponseReceivedListener((response) => {
       const content = response.notification.request.content;
       const url = (content.data?.url ?? (content as { userInfo?: { url?: string } }).userInfo?.url) as string | undefined;
-      if (url && (url === "quranlock://verse" || url.startsWith("quranlock://verse"))) {
-        router.replace("/verse");
-      }
+      handleUrl(url ?? null);
     });
 
     return () => {
       linkSub.remove();
       notificationSub.remove();
     };
-  }, [router]);
+  }, [completedUnlockSessions, isPremium, router]);
 }
 
 export default function RootLayout() {
