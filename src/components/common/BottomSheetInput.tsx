@@ -7,7 +7,6 @@ import {
   Platform,
   StyleProp,
   Text,
-  TextInput,
   TextInputProps,
   TextStyle,
   View,
@@ -26,7 +25,7 @@ export interface BottomSheetInputProps extends TextInputProps {
   leftComponent?: React.ReactNode;
   rightComponent?: React.ReactNode;
   border?: boolean;
-  inputRef?: React.RefObject<TextInput>;
+  inputRef?: BottomSheetTextInputRef;
   inputStyle?: StyleProp<TextStyle>;
   keyboardType?: KeyboardTypeOptions;
 }
