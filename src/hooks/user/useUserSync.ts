@@ -15,7 +15,6 @@ export const useUserSync = () => {
       onboardingComplete: s.onboardingComplete,
       hasSelectedApps: s.hasSelectedApps,
       lastReadPage: s.lastReadPage,
-      wordByWordEnabled: s.wordByWordEnabled,
       translationEnabled: s.translationEnabled,
       isPremium: s.isPremium,
       subscriptionTier: s.subscriptionTier,

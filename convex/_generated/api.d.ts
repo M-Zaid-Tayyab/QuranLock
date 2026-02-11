@@ -9,6 +9,7 @@
  */
 
 import type * as http from "../http.js";
+import type * as quranFoundation from "../quranFoundation.js";
 import type * as quranPack from "../quranPack.js";
 import type * as users from "../users.js";
 
@@ -20,6 +21,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   http: typeof http;
+  quranFoundation: typeof quranFoundation;
   quranPack: typeof quranPack;
   users: typeof users;
 }>;

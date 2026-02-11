@@ -13,6 +13,10 @@ import {
   View,
 } from "react-native";
 
+type BottomSheetTextInputRef = React.ComponentProps<
+  typeof BottomSheetTextInput
+>["ref"];
+
 export interface BottomSheetInputProps extends TextInputProps {
   error?: string;
   containerClassName?: string;

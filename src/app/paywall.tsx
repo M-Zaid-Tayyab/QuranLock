@@ -14,6 +14,10 @@ import { Pressable, Text, View } from "react-native";
 import { PACKAGE_TYPE, PurchasesPackage } from "react-native-purchases";
 
 type PlanOption = "weekly" | "annual";
+type PlanProduct = PurchasesPackage["product"] & {
+  pricePerWeekString?: string;
+  introPrice?: unknown;
+};
 
 export default function PaywallScreen() {
   const router = useRouter();
@@ -106,11 +110,7 @@ export default function PaywallScreen() {
     badge?: string,
   ) => {
     const isSelected = selectedPlan === id;
-    const product =
-      (pkg?.product as typeof pkg.product & {
-        pricePerWeekString?: string;
-        introPrice?: unknown;
-      }) ?? null;
+    const product = pkg?.product as PlanProduct | undefined;
     const price = product?.priceString ?? "--";
     const perWeek = product?.pricePerWeekString ?? "";
     const trialAvailable = product?.introPrice != null;

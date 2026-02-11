@@ -26,7 +26,6 @@ export default defineSchema({
     onboardingComplete: v.boolean(),
     hasSelectedApps: v.boolean(),
     lastReadPage: v.number(),
-    wordByWordEnabled: v.boolean(),
     translationEnabled: v.boolean(),
     isPremium: v.boolean(),
     subscriptionTier: v.union(

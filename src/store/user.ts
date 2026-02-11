@@ -17,7 +17,6 @@ export interface UserState {
   onboardingComplete: boolean;
   hasSelectedApps: boolean;
   lastReadPage: number;
-  wordByWordEnabled: boolean;
   translationEnabled: boolean;
   quranFontScale: number;
   isPremium: boolean;
@@ -44,7 +43,6 @@ interface UserActions {
   setOnboardingComplete: (value: boolean) => void;
   setHasSelectedApps: (value: boolean) => void;
   setLastReadPage: (page: number) => void;
-  setWordByWordEnabled: (value: boolean) => void;
   setTranslationEnabled: (value: boolean) => void;
   setQuranFontScale: (value: number) => void;
   setIsPremium: (value: boolean) => void;
@@ -62,7 +60,6 @@ const initialState: UserState = {
   onboardingComplete: false,
   hasSelectedApps: false,
   lastReadPage: 1,
-  wordByWordEnabled: true,
   translationEnabled: false,
   quranFontScale: 1,
   isPremium: false,
@@ -85,7 +82,6 @@ export const useUserStore = create<UserState & UserActions>()(
         set({ onboardingComplete }),
       setHasSelectedApps: (hasSelectedApps) => set({ hasSelectedApps }),
       setLastReadPage: (lastReadPage) => set({ lastReadPage }),
-      setWordByWordEnabled: (wordByWordEnabled) => set({ wordByWordEnabled }),
       setTranslationEnabled: (translationEnabled) =>
         set({ translationEnabled }),
       setQuranFontScale: (quranFontScale) => set({ quranFontScale }),

@@ -13,7 +13,6 @@ export interface UserSyncPayload {
   onboardingComplete: boolean;
   hasSelectedApps: boolean;
   lastReadPage: number;
-  wordByWordEnabled: boolean;
   translationEnabled: boolean;
   isPremium: boolean;
   subscriptionTier: SubscriptionTier;

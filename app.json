@@ -87,7 +87,8 @@
           "appleTeamId": "6758984483",
           "appGroup": "group.com.zaid.dev.QuranLock"
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "updates": {
       "checkAutomatically": "ON_LOAD",

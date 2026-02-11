@@ -88,3 +88,38 @@ function handleButtonPress() {
 Use the Convex CLI to push your functions to a deployment. See everything
 the Convex CLI can do by running `npx convex -h` in your project root
 directory. To learn more, launch the docs with `npx convex docs`.
+
+## Quran Foundation integration
+
+The project now includes `convex/quranFoundation.ts` with an authenticated
+proxy action and in-memory token caching.
+
+Required Convex env vars:
+
+- `QF_CLIENT_ID`
+- `QF_CLIENT_SECRET`
+- `QF_OAUTH_TOKEN_URL` (or `QF_OAUTH_BASE_URL` + optional `QF_OAUTH_TOKEN_PATH`)
+- `QF_CONTENT_API_BASE_URL` (or `QF_API_BASE_URL`)
+- `QF_SEARCH_API_BASE_URL` (or `QF_API_BASE_URL`)
+- Optional: `QF_SEARCH_SCOPE_FALLBACK_TO_CONTENT=true` (default). If `search`
+  scope is not enabled for your client, token requests for `search` will
+  transparently fall back to `content`.
+
+Alternatively, set `QF_ENV` and the integration will use official defaults:
+
+- `QF_ENV=prelive`
+  - OAuth base: `https://prelive-oauth2.quran.foundation`
+  - API base: `https://apis-prelive.quran.foundation`
+- `QF_ENV=production`
+  - OAuth base: `https://oauth2.quran.foundation`
+  - API base: `https://apis.quran.foundation`
+
+Client usage example:
+
+```ts
+await convexClient.action("quranFoundation:proxyGet", {
+  scope: "search",
+  path: "/v1/search",
+  query: { q: "sabr", size: "10", page: "1" },
+});
+```
