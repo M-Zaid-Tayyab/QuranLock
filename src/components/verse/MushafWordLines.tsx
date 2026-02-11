@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { Pressable, Text, View } from "react-native";
 import type { QuranWord } from "@/services/quranPack";
+import { getArabicTextStyle } from "@/utils/arabicTypography";
 
 interface MushafWordLinesProps {
   groupedLines: [number, QuranWord[]][];
@@ -40,12 +41,9 @@ export function MushafWordLines({
                 )}
               >
                 <Text
+                  allowFontScaling={false}
                   className={clsx(isSelected ? "text-accent" : "text-foreground")}
-                  style={{
-                    fontSize: arabicFontSize,
-                    lineHeight: arabicLineHeight,
-                    writingDirection: "rtl",
-                  }}
+                  style={getArabicTextStyle(arabicFontSize, arabicLineHeight)}
                 >
                   {word.text}
                 </Text>

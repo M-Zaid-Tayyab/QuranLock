@@ -69,7 +69,7 @@ export const BottomSheetModal: React.FC<Props> = ({
         showHandle ? { backgroundColor: colors.white } : { opacity: 0 }
       }
       backgroundStyle={{
-        backgroundColor: colors.background,
+        backgroundColor: colors.surface,
         borderTopLeftRadius: widthPercentageToDP(8),
         borderTopRightRadius: widthPercentageToDP(8),
       }}

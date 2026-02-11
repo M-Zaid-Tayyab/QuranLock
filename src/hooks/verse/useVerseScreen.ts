@@ -25,6 +25,7 @@ import {
 } from "@/services/quranPack";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
+import { getArabicLineHeight } from "@/utils/arabicTypography";
 import { getScheduleStatuses } from "@/utils/scheduleEngine";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -427,7 +428,7 @@ export const useVerseScreen = () => {
 
   const hasWordData = Boolean(pageData?.words?.length);
   const arabicFontSize = Math.round(28 * quranFontScale);
-  const arabicLineHeight = Math.round(arabicFontSize * 1.45);
+  const arabicLineHeight = getArabicLineHeight(arabicFontSize);
   const translationFontSize = Math.round(14 * Math.min(1.1, quranFontScale));
   const isBlockSessionActive = activeSchedule != null;
 

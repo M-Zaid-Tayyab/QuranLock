@@ -1,5 +1,6 @@
 import { Pressable, Text, View } from "react-native";
 import type { DisplayVerse } from "./types";
+import { getArabicTextStyle } from "@/utils/arabicTypography";
 
 interface MushafVerseFlowProps {
   verses: DisplayVerse[];
@@ -43,18 +44,18 @@ export function MushafVerseFlow({
             className={`rounded-xl px-2 py-3 ${isSelected ? "bg-accent/10" : ""}`}
           >
             <Text
+              allowFontScaling={false}
               className={isSelected ? "text-accent" : "text-foreground"}
-              style={{
-                fontSize: Math.round(arabicFontSize * 0.95),
-                lineHeight: Math.round(arabicLineHeight * 0.95),
-                writingDirection: "rtl",
-                textAlign: "right",
-              }}
+              style={getArabicTextStyle(arabicFontSize, arabicLineHeight)}
             >
               {verse.arabic}{" "}
               <Text
+                allowFontScaling={false}
                 className={isSelected ? "text-accent" : "text-muted"}
-                style={{ fontSize: Math.round(arabicFontSize * 0.62) }}
+                style={{
+                  fontSize: Math.round(arabicFontSize * 0.62),
+                  lineHeight: Math.round(arabicLineHeight * 0.78),
+                }}
               >
                 ۝{toArabicIndicDigits(ayahNumber)}
               </Text>

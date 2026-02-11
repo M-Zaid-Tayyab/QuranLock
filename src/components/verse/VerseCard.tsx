@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { Pressable, Text } from "react-native";
 import type { DisplayVerse } from "./types";
+import { getArabicTextStyle } from "@/utils/arabicTypography";
 
 interface VerseCardProps {
   verse: DisplayVerse;
@@ -33,12 +34,9 @@ export function VerseCard({
     >
       <Text className="text-xs font-sfPro-semibold text-accent">{verse.key}</Text>
       <Text
+        allowFontScaling={false}
         className="mt-3 text-right text-foreground"
-        style={{
-          fontSize: Math.round(arabicFontSize * 0.92),
-          lineHeight: Math.round(arabicLineHeight * 0.9),
-          writingDirection: "rtl",
-        }}
+        style={getArabicTextStyle(arabicFontSize, arabicLineHeight)}
       >
         {verse.arabic}
       </Text>
