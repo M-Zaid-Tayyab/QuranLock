@@ -7,6 +7,7 @@ interface MushafTranslationPanelProps {
   selectedVerseKey: string | null;
   translationFontSize: number;
   onSelectVerse: (verseKey: string) => void;
+  onVerseLayout?: (verseKey: string, y: number, height: number) => void;
 }
 
 export function MushafTranslationPanel({
@@ -14,6 +15,7 @@ export function MushafTranslationPanel({
   selectedVerseKey,
   translationFontSize,
   onSelectVerse,
+  onVerseLayout,
 }: MushafTranslationPanelProps) {
   const translatedVerses = verses.filter((verse) => Boolean(verse.translation));
   if (!translatedVerses.length) return null;
@@ -30,6 +32,13 @@ export function MushafTranslationPanel({
             <Pressable
               key={verse.key}
               onPress={() => onSelectVerse(verse.key)}
+              onLayout={(event) => {
+                onVerseLayout?.(
+                  verse.key,
+                  event.nativeEvent.layout.y,
+                  event.nativeEvent.layout.height,
+                );
+              }}
               className={clsx(
                 "rounded-xl border px-3 py-3",
                 isSelected

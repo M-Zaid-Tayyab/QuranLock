@@ -12,7 +12,7 @@ import {
 } from "@/components/verse";
 import { useVerseScreen } from "@/hooks/verse";
 import { BottomSheetModal as GorhomBottomSheetModal } from "@gorhom/bottom-sheet";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -25,6 +25,19 @@ import {
 export default function VerseScreen() {
   const vm = useVerseScreen();
   const settingsSheetRef = useRef<GorhomBottomSheetModal | null>(null);
+  const scrollViewRef = useRef<ScrollView | null>(null);
+  const verseLayoutsRef = useRef<Map<string, { y: number; height: number }>>(
+    new Map(),
+  );
+  const pendingAutoScrollVerseKeyRef = useRef<string | null>(null);
+  const suppressAutoScrollOnceRef = useRef(false);
+  const scrollMetricsRef = useRef({ y: 0, viewportHeight: 0 });
+  const bottomOverlayHeightRef = useRef(0);
+  const contentContainerYRef = useRef(0);
+  const studySectionYRef = useRef(0);
+  const mushafWordSectionYRef = useRef(0);
+  const mushafFlowSectionYRef = useRef(0);
+  const translationSectionYRef = useRef(0);
 
   const handleOpenSettings = useCallback(() => {
     settingsSheetRef.current?.present();
@@ -38,6 +51,106 @@ export default function VerseScreen() {
     settingsSheetRef.current?.dismiss();
     vm.actions.openSearch();
   }, [vm.actions]);
+
+  const tryAutoScrollToVerse = useCallback((verseKey: string) => {
+    const layout = verseLayoutsRef.current.get(verseKey);
+    const scrollView = scrollViewRef.current;
+    if (!layout || !scrollView) {
+      return false;
+    }
+
+    const { y: scrollY, viewportHeight } = scrollMetricsRef.current;
+    if (viewportHeight <= 0) {
+      return false;
+    }
+
+    const overlayOffset = bottomOverlayHeightRef.current + 24;
+    const usableViewportHeight = Math.max(140, viewportHeight - overlayOffset);
+    const verseCenter = layout.y + layout.height / 2;
+    const viewportCenter = scrollY + usableViewportHeight / 2;
+    const centerTolerance = Math.max(
+      40,
+      Math.min(96, usableViewportHeight * 0.12),
+    );
+    const isNearCenter =
+      Math.abs(verseCenter - viewportCenter) <= centerTolerance;
+    if (isNearCenter) {
+      return true;
+    }
+
+    const targetY = Math.max(0, verseCenter - usableViewportHeight / 2);
+    if (Math.abs(targetY - scrollY) < 12) {
+      return true;
+    }
+
+    scrollView.scrollTo({
+      y: targetY,
+      animated: true,
+    });
+    return true;
+  }, []);
+
+  const registerVerseLayout = useCallback(
+    (verseKey: string, y: number, height: number) => {
+      const existing = verseLayoutsRef.current.get(verseKey);
+      if (!existing) {
+        verseLayoutsRef.current.set(verseKey, { y, height });
+      } else {
+        verseLayoutsRef.current.set(verseKey, {
+          y: Math.min(existing.y, y),
+          height,
+        });
+      }
+
+      if (pendingAutoScrollVerseKeyRef.current === verseKey) {
+        const didScroll = tryAutoScrollToVerse(verseKey);
+        if (didScroll) {
+          pendingAutoScrollVerseKeyRef.current = null;
+        }
+      }
+    },
+    [tryAutoScrollToVerse],
+  );
+
+  const registerVerseLayoutWithBase = useCallback(
+    (verseKey: string, y: number, height: number, baseY: number) => {
+      registerVerseLayout(verseKey, baseY + y, height);
+    },
+    [registerVerseLayout],
+  );
+
+  useEffect(() => {
+    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    scrollMetricsRef.current.y = 0;
+    suppressAutoScrollOnceRef.current = true;
+  }, [vm.navigation.currentPage]);
+
+  useEffect(() => {
+    verseLayoutsRef.current.clear();
+    pendingAutoScrollVerseKeyRef.current = null;
+  }, [
+    vm.navigation.currentPage,
+    vm.readingMode,
+    vm.content.hasWordData,
+    vm.content.arabicFontSize,
+    vm.content.translationFontSize,
+    vm.header.translationEnabled,
+  ]);
+
+  useEffect(() => {
+    const selectedVerseKey = vm.content.selectedVerseKey;
+    if (!selectedVerseKey || !vm.recitation.isPlaying) return;
+    if (suppressAutoScrollOnceRef.current) {
+      suppressAutoScrollOnceRef.current = false;
+      return;
+    }
+    const didScroll = tryAutoScrollToVerse(selectedVerseKey);
+    pendingAutoScrollVerseKeyRef.current = didScroll ? null : selectedVerseKey;
+  }, [
+    tryAutoScrollToVerse,
+    vm.content.selectedVerseKey,
+    vm.recitation.isPlaying,
+  ]);
 
   return (
     <View className="flex-1 bg-background py-safe">
@@ -67,6 +180,7 @@ export default function VerseScreen() {
       )}
 
       <ScrollView
+        ref={scrollViewRef}
         className="flex-1 px-6"
         contentContainerStyle={
           vm.progress.pendingSchedulesCount > 0
@@ -74,6 +188,14 @@ export default function VerseScreen() {
             : { paddingBottom: 40 }
         }
         showsVerticalScrollIndicator={false}
+        onLayout={(event) => {
+          scrollMetricsRef.current.viewportHeight =
+            event.nativeEvent.layout.height;
+        }}
+        onScroll={(event) => {
+          scrollMetricsRef.current.y = event.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
       >
         {vm.content.packState !== "ready" && (
           <VersePackCard
@@ -85,7 +207,12 @@ export default function VerseScreen() {
         )}
 
         {vm.content.packState === "ready" && (
-          <View className="mt-6 rounded-3xl border border-outline bg-surface px-5 py-6">
+          <View
+            className="mt-6 rounded-3xl border border-outline bg-surface px-5 py-6"
+            onLayout={(event) => {
+              contentContainerYRef.current = event.nativeEvent.layout.y;
+            }}
+          >
             {vm.content.loadingPage && (
               <View className="items-center py-6">
                 <ActivityIndicator />
@@ -127,44 +254,109 @@ export default function VerseScreen() {
                 {vm.readingMode === "mushaf" ? (
                   <View>
                     {vm.content.hasWordData ? (
-                      <MushafWordLines
-                        groupedLines={vm.content.groupedLines}
-                        selectedVerseKey={vm.content.selectedVerseKey}
-                        arabicFontSize={vm.content.arabicFontSize}
-                        arabicLineHeight={vm.content.arabicLineHeight}
-                        onSelectVerse={vm.actions.selectVerse}
-                      />
+                      <View
+                        onLayout={(event) => {
+                          mushafWordSectionYRef.current =
+                            event.nativeEvent.layout.y;
+                        }}
+                      >
+                        <MushafWordLines
+                          groupedLines={vm.content.groupedLines}
+                          selectedVerseKey={vm.content.selectedVerseKey}
+                          arabicFontSize={vm.content.arabicFontSize}
+                          arabicLineHeight={vm.content.arabicLineHeight}
+                          onSelectVerse={vm.actions.selectVerse}
+                          onVerseLayout={(verseKey, y, height) => {
+                            registerVerseLayoutWithBase(
+                              verseKey,
+                              y,
+                              height,
+                              contentContainerYRef.current +
+                                mushafWordSectionYRef.current,
+                            );
+                          }}
+                        />
+                      </View>
                     ) : (
-                      <MushafVerseFlow
-                        verses={vm.content.displayVerses}
-                        selectedVerseKey={vm.content.selectedVerseKey}
-                        arabicFontSize={vm.content.arabicFontSize}
-                        arabicLineHeight={vm.content.arabicLineHeight}
-                        onSelectVerse={vm.actions.selectVerse}
-                      />
+                      <View
+                        onLayout={(event) => {
+                          mushafFlowSectionYRef.current =
+                            event.nativeEvent.layout.y;
+                        }}
+                      >
+                        <MushafVerseFlow
+                          verses={vm.content.displayVerses}
+                          selectedVerseKey={vm.content.selectedVerseKey}
+                          arabicFontSize={vm.content.arabicFontSize}
+                          arabicLineHeight={vm.content.arabicLineHeight}
+                          onSelectVerse={vm.actions.selectVerse}
+                          onVerseLayout={(verseKey, y, height) => {
+                            registerVerseLayoutWithBase(
+                              verseKey,
+                              y,
+                              height,
+                              contentContainerYRef.current +
+                                mushafFlowSectionYRef.current,
+                            );
+                          }}
+                        />
+                      </View>
                     )}
                     {vm.header.translationEnabled && (
-                      <MushafTranslationPanel
-                        verses={vm.content.displayVerses}
-                        selectedVerseKey={vm.content.selectedVerseKey}
-                        translationFontSize={vm.content.translationFontSize}
-                        onSelectVerse={vm.actions.selectVerse}
-                      />
+                      <View
+                        onLayout={(event) => {
+                          translationSectionYRef.current =
+                            event.nativeEvent.layout.y;
+                        }}
+                      >
+                        <MushafTranslationPanel
+                          verses={vm.content.displayVerses}
+                          selectedVerseKey={vm.content.selectedVerseKey}
+                          translationFontSize={vm.content.translationFontSize}
+                          onSelectVerse={vm.actions.selectVerse}
+                          onVerseLayout={(verseKey, y, height) => {
+                            registerVerseLayoutWithBase(
+                              verseKey,
+                              y,
+                              height,
+                              contentContainerYRef.current +
+                                translationSectionYRef.current,
+                            );
+                          }}
+                        />
+                      </View>
                     )}
                   </View>
                 ) : (
-                  <View className="gap-4">
+                  <View
+                    className="gap-4"
+                    onLayout={(event) => {
+                      studySectionYRef.current = event.nativeEvent.layout.y;
+                    }}
+                  >
                     {vm.content.displayVerses.map((verse) => (
-                      <VerseCard
+                      <View
                         key={verse.key}
-                        verse={verse}
-                        isSelected={vm.content.selectedVerseKey === verse.key}
-                        translationEnabled={vm.header.translationEnabled}
-                        arabicFontSize={vm.content.arabicFontSize}
-                        arabicLineHeight={vm.content.arabicLineHeight}
-                        translationFontSize={vm.content.translationFontSize}
-                        onSelect={() => vm.actions.selectVerse(verse.key)}
-                      />
+                        onLayout={(event) => {
+                          registerVerseLayoutWithBase(
+                            verse.key,
+                            event.nativeEvent.layout.y,
+                            event.nativeEvent.layout.height,
+                            contentContainerYRef.current +
+                              studySectionYRef.current,
+                          );
+                        }}
+                      >
+                        <VerseCard
+                          verse={verse}
+                          isSelected={vm.content.selectedVerseKey === verse.key}
+                          translationEnabled={vm.header.translationEnabled}
+                          arabicFontSize={vm.content.arabicFontSize}
+                          arabicLineHeight={vm.content.arabicLineHeight}
+                          translationFontSize={vm.content.translationFontSize}
+                          onSelect={() => vm.actions.selectVerse(verse.key)}
+                        />
+                      </View>
                     ))}
                   </View>
                 )}
@@ -187,6 +379,9 @@ export default function VerseScreen() {
           remainingMinutes={vm.progress.remainingMinutes}
           remainingSeconds={vm.progress.remainingSeconds}
           pendingSchedulesCount={vm.progress.pendingSchedulesCount}
+          onMeasuredHeight={(height) => {
+            bottomOverlayHeightRef.current = height;
+          }}
         />
       )}
 
@@ -205,9 +400,20 @@ export default function VerseScreen() {
         sheetRef={settingsSheetRef}
         readingMode={vm.readingMode}
         recitationVisible={vm.recitation.visible}
+        recitationDownloadProgressPercent={
+          vm.recitation.downloadProgressPercent
+        }
+        recitationDownloadCompletedChapters={
+          vm.recitation.downloadCompletedChapters
+        }
+        recitationDownloadTotalChapters={vm.recitation.downloadTotalChapters}
+        recitationDownloadCurrentChapter={vm.recitation.downloadCurrentChapter}
+        recitationDownloadError={vm.recitation.downloadError}
+        recitationDownloadInProgress={vm.recitation.isDownloadingOfflinePack}
         translationEnabled={vm.header.translationEnabled}
         onSetReadingMode={vm.actions.setReadingMode}
         onToggleRecitationVisible={vm.actions.toggleRecitationVisible}
+        onResumeRecitationDownload={vm.actions.resumeRecitationDownload}
         onToggleTranslation={vm.actions.toggleTranslation}
         onIncreaseFont={vm.actions.increaseFont}
         onDecreaseFont={vm.actions.decreaseFont}

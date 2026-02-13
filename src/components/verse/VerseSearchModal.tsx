@@ -1,6 +1,7 @@
 import { Input } from "@/components/common";
 import { colors } from "@/constants/colors";
 import type { QuranSearchResult } from "@/services/quranFoundation";
+import { getArabicLineHeight, getArabicTextStyle } from "@/utils/arabicTypography";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
@@ -18,6 +19,8 @@ const stripHtml = (value: string) =>
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+const SEARCH_ARABIC_FONT_SIZE = 22;
+const SEARCH_ARABIC_LINE_HEIGHT = getArabicLineHeight(SEARCH_ARABIC_FONT_SIZE);
 
 interface VerseSearchModalProps {
   visible: boolean;
@@ -96,31 +99,56 @@ export function VerseSearchModal({
             keyExtractor={(item) => item.verseKey}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingTop: 16, paddingBottom: 24 }}
-            renderItem={({ item }) => (
-              <Pressable
-                onPress={() => onPickResult(item)}
-                className="mb-3 rounded-2xl border border-outline bg-surface px-4 py-4"
-              >
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-xs font-sfPro-semibold text-accent">
-                    {item.verseKey}
-                  </Text>
-                  {item.surahName ? (
-                    <Text className="text-xs font-sfPro text-muted">
-                      {item.surahName}
+            renderItem={({ item }) => {
+              const normalizedArabic = item.arabicText
+                ? stripHtml(item.arabicText)
+                : "";
+              const normalizedHighlighted = stripHtml(item.highlightedText);
+              const showHighlighted = Boolean(
+                normalizedHighlighted &&
+                  normalizedHighlighted !== normalizedArabic,
+              );
+
+              return (
+                <Pressable
+                  onPress={() => onPickResult(item)}
+                  className="mb-3 rounded-2xl border border-outline bg-surface px-4 py-4"
+                >
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-xs font-sfPro-semibold text-accent">
+                      {item.verseKey}
+                    </Text>
+                    {item.surahName ? (
+                      <Text className="text-xs font-sfPro text-muted">
+                        {item.surahName}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {normalizedArabic ? (
+                    <Text
+                      allowFontScaling={false}
+                      className="mt-2 text-foreground"
+                      style={getArabicTextStyle(
+                        SEARCH_ARABIC_FONT_SIZE,
+                        SEARCH_ARABIC_LINE_HEIGHT,
+                      )}
+                    >
+                      {normalizedArabic}
                     </Text>
                   ) : null}
-                </View>
-                <Text className="mt-2 text-sm font-sfPro text-foreground">
-                  {stripHtml(item.highlightedText)}
-                </Text>
-                {item.translation ? (
-                  <Text className="mt-2 text-sm font-sfPro text-muted">
-                    {stripHtml(item.translation)}
-                  </Text>
-                ) : null}
-              </Pressable>
-            )}
+                  {showHighlighted ? (
+                    <Text className="mt-2 text-sm font-sfPro text-foreground">
+                      {normalizedHighlighted}
+                    </Text>
+                  ) : null}
+                  {item.translation ? (
+                    <Text className="mt-2 text-sm font-sfPro text-muted">
+                      {stripHtml(item.translation)}
+                    </Text>
+                  ) : null}
+                </Pressable>
+              );
+            }}
           />
         </View>
       </KeyboardAvoidingView>

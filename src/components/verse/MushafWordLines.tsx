@@ -9,6 +9,7 @@ interface MushafWordLinesProps {
   arabicFontSize: number;
   arabicLineHeight: number;
   onSelectVerse: (verseKey: string) => void;
+  onVerseLayout?: (verseKey: string, y: number, height: number) => void;
 }
 
 export function MushafWordLines({
@@ -17,12 +18,19 @@ export function MushafWordLines({
   arabicFontSize,
   arabicLineHeight,
   onSelectVerse,
+  onVerseLayout,
 }: MushafWordLinesProps) {
   return (
     <View className="gap-4">
       {groupedLines.map(([lineNumber, words]) => (
         <View
           key={`line-${lineNumber}`}
+          onLayout={(event) => {
+            const y = event.nativeEvent.layout.y;
+            const height = event.nativeEvent.layout.height;
+            const verseKeys = [...new Set(words.map((word) => word.verseKey))];
+            verseKeys.forEach((verseKey) => onVerseLayout?.(verseKey, y, height));
+          }}
           className="flex-row flex-wrap"
           style={{
             flexDirection: "row-reverse",

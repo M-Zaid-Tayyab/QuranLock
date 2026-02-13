@@ -11,6 +11,11 @@ import {
   type QuranSearchResult,
 } from "@/services/quranFoundation";
 import {
+  getRecitationOfflineDownloadStatus,
+  startGlobalRecitationOfflineDownload,
+  subscribeRecitationOfflineDownloadStatus,
+} from "@/services/recitationPack";
+import {
   QURAN_TOTAL_PAGES,
   deleteQuranPack,
   ensureQuranPack,
@@ -57,6 +62,15 @@ const deriveVersesFromWords = (words: QuranWord[]) => {
   }));
 };
 
+const getFirstVerseKeyFromPageData = (data: QuranPageData | null) => {
+  const firstVerseKey = data?.verses?.[0]?.key;
+  if (firstVerseKey) return firstVerseKey;
+  if (data?.words?.length) {
+    return deriveVersesFromWords(data.words)[0]?.key ?? null;
+  }
+  return null;
+};
+
 export const useVerseScreen = () => {
   const router = useRouter();
   const addQuranMinutes = useBlockingStore((s) => s.addQuranMinutes);
@@ -88,6 +102,7 @@ export const useVerseScreen = () => {
   const unlockSessionCountedRef = useRef(false);
   const gateCheckedRef = useRef(false);
   const searchRequestIdRef = useRef(0);
+  const searchWasVisibleRef = useRef(false);
 
   const { dateKey, activeSchedule, pendingSchedules } =
     useFocusScheduleStatus();
@@ -120,6 +135,9 @@ export const useVerseScreen = () => {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<QuranSearchResult[]>([]);
   const [recitationVisible, setRecitationVisible] = useState(false);
+  const [recitationDownloadStatus, setRecitationDownloadStatus] = useState(
+    getRecitationOfflineDownloadStatus,
+  );
 
   const requiredMinutes = getRequiredMinutes();
 
@@ -229,6 +247,12 @@ export const useVerseScreen = () => {
   useEffect(() => {
     translationEnabledRef.current = translationEnabled;
   }, [translationEnabled]);
+
+  useEffect(() => {
+    return subscribeRecitationOfflineDownloadStatus((status) => {
+      setRecitationDownloadStatus(status);
+    });
+  }, []);
 
   const checkPack = useCallback(async () => {
     try {
@@ -420,10 +444,31 @@ export const useVerseScreen = () => {
     () => displayVerses.map((verse) => verse.key),
     [displayVerses],
   );
+  const handleRecitationAdvanceToNextPage = useCallback(async () => {
+    if (currentPage >= QURAN_TOTAL_PAGES) {
+      return null;
+    }
+
+    const nextPage = currentPage + 1;
+    setPageDirection(1);
+    setCurrentPage(nextPage);
+
+    try {
+      const nextPageData = await getQuranPage(nextPage, { priority: "high" });
+      const nextVerseKey = getFirstVerseKeyFromPageData(nextPageData);
+      if (!nextVerseKey) return null;
+      setSelectedVerseKey(nextVerseKey);
+      return nextVerseKey;
+    } catch {
+      return null;
+    }
+  }, [currentPage]);
+
   const recitation = useVerseRecitation({
     verseKeys,
     selectedVerseKey,
     onSelectVerse: setSelectedVerseKey,
+    onRequestNextPageVerse: handleRecitationAdvanceToNextPage,
   });
 
   const hasWordData = Boolean(pageData?.words?.length);
@@ -485,12 +530,28 @@ export const useVerseScreen = () => {
   }, []);
 
   useEffect(() => {
-    if (!searchVisible) return;
+    if (!searchVisible) {
+      searchWasVisibleRef.current = false;
+      return;
+    }
+    const justOpened = !searchWasVisibleRef.current;
+    searchWasVisibleRef.current = true;
+    if (justOpened) {
+      return;
+    }
     const timer = setTimeout(() => {
       executeSearch(searchQuery);
     }, 350);
     return () => clearTimeout(timer);
   }, [executeSearch, searchQuery, searchVisible]);
+
+  const handleCloseSearch = useCallback(() => {
+    searchWasVisibleRef.current = false;
+    searchRequestIdRef.current += 1;
+    setSearching(false);
+    setSearchError(null);
+    setSearchVisible(false);
+  }, []);
 
   const jumpToVerse = useCallback(
     async (verseKey: string, fallbackPage?: number) => {
@@ -518,11 +579,10 @@ export const useVerseScreen = () => {
 
   const handleSearchPick = useCallback(
     async (item: QuranSearchResult) => {
-      setSearchVisible(false);
-      setSearchQuery(item.verseKey);
+      handleCloseSearch();
       await jumpToVerse(item.verseKey, item.pageNumber);
     },
-    [jumpToVerse],
+    [handleCloseSearch, jumpToVerse],
   );
 
   const animatedContentStyle = useMemo(
@@ -595,6 +655,12 @@ export const useVerseScreen = () => {
       canGoPrevious: recitation.canGoPrevious,
       positionLabel: recitation.positionLabel,
       durationLabel: recitation.durationLabel,
+      downloadProgressPercent: recitationDownloadStatus.progressPercent,
+      downloadCompletedChapters: recitationDownloadStatus.completedChapters,
+      downloadTotalChapters: recitationDownloadStatus.totalChapters,
+      downloadCurrentChapter: recitationDownloadStatus.currentChapter,
+      downloadError: recitationDownloadStatus.lastError,
+      isDownloadingOfflinePack: recitationDownloadStatus.isDownloading,
     },
     actions: {
       goBack: () => router.back(),
@@ -602,7 +668,7 @@ export const useVerseScreen = () => {
       decreaseFont: () => handleFontAdjust(-1),
       toggleTranslation: () => setTranslationEnabled(!translationEnabled),
       openSearch: () => setSearchVisible(true),
-      closeSearch: () => setSearchVisible(false),
+      closeSearch: handleCloseSearch,
       setSearchQuery,
       pickSearchResult: handleSearchPick,
       toggleReadingMode: () =>
@@ -616,6 +682,9 @@ export const useVerseScreen = () => {
       selectVerse: setSelectedVerseKey,
       toggleRecitationVisible: () =>
         setRecitationVisible((visible) => !visible),
+      resumeRecitationDownload: () => {
+        void startGlobalRecitationOfflineDownload();
+      },
       toggleRecitationPlayback: recitation.actions.togglePlayback,
       playNextRecitationVerse: recitation.actions.playNext,
       playPreviousRecitationVerse: recitation.actions.playPrevious,

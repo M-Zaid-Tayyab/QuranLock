@@ -8,6 +8,7 @@ interface MushafVerseFlowProps {
   arabicFontSize: number;
   arabicLineHeight: number;
   onSelectVerse: (verseKey: string) => void;
+  onVerseLayout?: (verseKey: string, y: number, height: number) => void;
 }
 
 const toArabicIndicDigits = (value: number) =>
@@ -30,6 +31,7 @@ export function MushafVerseFlow({
   arabicFontSize,
   arabicLineHeight,
   onSelectVerse,
+  onVerseLayout,
 }: MushafVerseFlowProps) {
   return (
     <View className="rounded-2xl border border-outline bg-backgroundElevated/50 px-3 py-3">
@@ -41,6 +43,13 @@ export function MushafVerseFlow({
           <Pressable
             key={verse.key}
             onPress={() => onSelectVerse(verse.key)}
+            onLayout={(event) => {
+              onVerseLayout?.(
+                verse.key,
+                event.nativeEvent.layout.y,
+                event.nativeEvent.layout.height,
+              );
+            }}
             className={`rounded-xl px-2 py-3 ${isSelected ? "bg-accent/10" : ""}`}
           >
             <Text

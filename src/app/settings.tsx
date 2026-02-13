@@ -17,11 +17,20 @@ export default function SettingsScreen() {
   const setHasSelectedApps = useUserStore((s) => s.setHasSelectedApps);
   const isPremium = useUserStore((s) => s.isPremium);
 
-  const privacyUrl = process.env.EXPO_PUBLIC_PRIVACY_URL ?? "";
-  const termsUrl = process.env.EXPO_PUBLIC_TERMS_URL ?? "";
-  const linkedInUrl = process.env.EXPO_PUBLIC_LINKEDIN_URL ?? "";
-  const instagramUrl = process.env.EXPO_PUBLIC_INSTAGRAM_URL ?? "";
-  const xUrl = process.env.EXPO_PUBLIC_X_URL ?? "";
+  const normalizeExternalUrl = (value: string | undefined) => {
+    const trimmed = value?.trim() ?? "";
+    if (!trimmed) return "";
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  };
+
+  const privacyUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_PRIVACY_URL);
+  const termsUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_TERMS_URL);
+  const linkedInUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_LINKEDIN_URL);
+  const instagramUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_INSTAGRAM_URL);
+  const xUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_X_URL);
 
   const appVersion = Application.nativeApplicationVersion ?? "";
   const buildVersion = Application.nativeBuildVersion ?? "";
@@ -173,19 +182,25 @@ export default function SettingsScreen() {
           <View className="mt-4 flex-row items-center gap-3">
             <Pressable
               onPress={() => openLink(linkedInUrl)}
+              disabled={!linkedInUrl}
               className="h-11 w-11 items-center justify-center rounded-full border border-outline bg-backgroundElevated"
+              style={!linkedInUrl ? { opacity: 0.5 } : undefined}
             >
               <Ionicons name="logo-linkedin" size={20} color="#94a3b8" />
             </Pressable>
             <Pressable
               onPress={() => openLink(instagramUrl)}
+              disabled={!instagramUrl}
               className="h-11 w-11 items-center justify-center rounded-full border border-outline bg-backgroundElevated"
+              style={!instagramUrl ? { opacity: 0.5 } : undefined}
             >
               <Ionicons name="logo-instagram" size={20} color="#94a3b8" />
             </Pressable>
             <Pressable
               onPress={() => openLink(xUrl)}
+              disabled={!xUrl}
               className="h-11 w-11 items-center justify-center rounded-full border border-outline bg-backgroundElevated"
+              style={!xUrl ? { opacity: 0.5 } : undefined}
             >
               <Ionicons name="logo-twitter" size={20} color="#94a3b8" />
             </Pressable>
@@ -200,7 +215,9 @@ export default function SettingsScreen() {
           <View className="mt-4 gap-3">
             <Pressable
               onPress={() => openLink(privacyUrl)}
+              disabled={!privacyUrl}
               className="flex-row items-center justify-between rounded-xl border border-outline bg-backgroundElevated px-4 py-3"
+              style={!privacyUrl ? { opacity: 0.5 } : undefined}
             >
               <View className="flex-row items-center gap-3">
                 <Ionicons name="shield-outline" size={18} color="#94a3b8" />
@@ -212,7 +229,9 @@ export default function SettingsScreen() {
             </Pressable>
             <Pressable
               onPress={() => openLink(termsUrl)}
+              disabled={!termsUrl}
               className="flex-row items-center justify-between rounded-xl border border-outline bg-backgroundElevated px-4 py-3"
+              style={!termsUrl ? { opacity: 0.5 } : undefined}
             >
               <View className="flex-row items-center gap-3">
                 <Ionicons name="document-text-outline" size={18} color="#94a3b8" />

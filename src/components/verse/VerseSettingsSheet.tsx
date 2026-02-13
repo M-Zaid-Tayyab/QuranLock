@@ -10,9 +10,16 @@ interface VerseSettingsSheetProps {
   sheetRef: RefObject<GorhomBottomSheetModal | null>;
   readingMode: ReadingMode;
   recitationVisible: boolean;
+  recitationDownloadProgressPercent: number;
+  recitationDownloadCompletedChapters: number;
+  recitationDownloadTotalChapters: number;
+  recitationDownloadCurrentChapter: number | null;
+  recitationDownloadError: string | null;
+  recitationDownloadInProgress: boolean;
   translationEnabled: boolean;
   onSetReadingMode: (mode: ReadingMode) => void;
   onToggleRecitationVisible: () => void;
+  onResumeRecitationDownload: () => void;
   onToggleTranslation: () => void;
   onIncreaseFont: () => void;
   onDecreaseFont: () => void;
@@ -53,15 +60,38 @@ export function VerseSettingsSheet({
   sheetRef,
   readingMode,
   recitationVisible,
+  recitationDownloadProgressPercent,
+  recitationDownloadCompletedChapters,
+  recitationDownloadTotalChapters,
+  recitationDownloadCurrentChapter,
+  recitationDownloadError,
+  recitationDownloadInProgress,
   translationEnabled,
   onSetReadingMode,
   onToggleRecitationVisible,
+  onResumeRecitationDownload,
   onToggleTranslation,
   onIncreaseFont,
   onDecreaseFont,
   onOpenSearch,
   onClose,
 }: VerseSettingsSheetProps) {
+  const isRecitationDownloadComplete = recitationDownloadProgressPercent >= 100;
+  const isRecitationDownloadActionDisabled =
+    isRecitationDownloadComplete || recitationDownloadInProgress;
+  const downloadCtaLabel = isRecitationDownloadComplete
+    ? "Completed"
+    : recitationDownloadInProgress
+      ? "Downloading..."
+      : "Resume";
+  const downloadStatusText = recitationDownloadInProgress
+    ? `Downloading chapter ${recitationDownloadCurrentChapter ?? "..."}.`
+    : isRecitationDownloadComplete
+      ? "Offline recitation pack ready."
+      : recitationDownloadError
+        ? "Download paused due to an error."
+        : "Download is paused.";
+
   return (
     <BottomSheetModal
       sheetRef={sheetRef}
@@ -152,6 +182,52 @@ export function VerseSettingsSheet({
             icon="play-circle-outline"
             onPress={onToggleRecitationVisible}
           />
+
+          <View className="rounded-2xl border border-outline bg-backgroundElevated px-4 py-4">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-sm font-sfPro-semibold text-foreground">
+                Recitation Download
+              </Text>
+              <Text className="text-xs font-sfPro text-muted">
+                {recitationDownloadProgressPercent}%
+              </Text>
+            </View>
+
+            <Text className="mt-1 text-xs font-sfPro text-muted">
+              {recitationDownloadCompletedChapters}/{recitationDownloadTotalChapters} chapters
+              downloaded
+            </Text>
+
+            <Text className="mt-2 text-xs font-sfPro text-muted">
+              {downloadStatusText}
+            </Text>
+
+            {recitationDownloadError ? (
+              <Text className="mt-2 text-xs font-sfPro text-error">
+                {recitationDownloadError}
+              </Text>
+            ) : null}
+
+            <Pressable
+              onPress={onResumeRecitationDownload}
+              disabled={isRecitationDownloadActionDisabled}
+              className={`mt-3 rounded-xl border px-4 py-3 ${
+                isRecitationDownloadActionDisabled
+                  ? "border-outline bg-surface"
+                  : "border-accent bg-accent/20"
+              }`}
+            >
+              <Text
+                className={`text-center text-sm font-sfPro-semibold ${
+                  isRecitationDownloadActionDisabled
+                    ? "text-muted"
+                    : "text-accent"
+                }`}
+              >
+                {downloadCtaLabel}
+              </Text>
+            </Pressable>
+          </View>
 
           <View className="rounded-2xl border border-outline bg-backgroundElevated px-4 py-4">
             <Text className="text-sm font-sfPro-semibold text-foreground">

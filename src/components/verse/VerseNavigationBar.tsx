@@ -15,6 +15,7 @@ interface VerseNavigationBarProps {
   remainingMinutes: number;
   remainingSeconds: number;
   pendingSchedulesCount: number;
+  onMeasuredHeight?: (height: number) => void;
 }
 
 export function VerseNavigationBar({
@@ -29,9 +30,15 @@ export function VerseNavigationBar({
   remainingMinutes,
   remainingSeconds,
   pendingSchedulesCount,
+  onMeasuredHeight,
 }: VerseNavigationBarProps) {
   return (
-    <View className="absolute bottom-6 left-6 right-6">
+    <View
+      className="absolute bottom-6 left-6 right-6"
+      onLayout={(event) => {
+        onMeasuredHeight?.(event.nativeEvent.layout.height);
+      }}
+    >
       <View className="flex-row items-center justify-between rounded-full border border-outline bg-surface px-4 py-3">
         <Pressable
           onPress={onNext}

@@ -1,9 +1,7 @@
 import {
   DEFAULT_QURAN_RECITERS,
-  fetchChapterVerseRecitations,
-  fetchVerseRecitationAudio,
-  prefetchVerseRecitationAudio,
 } from "@/services/quranFoundation";
+import { resolveVerseRecitationPlaybackSource } from "@/services/recitationPack";
 import {
   createAudioPlayer,
   setAudioModeAsync,
@@ -19,6 +17,11 @@ interface UseVerseRecitationArgs {
   verseKeys: string[];
   selectedVerseKey: string | null;
   onSelectVerse: (verseKey: string) => void;
+  onRequestNextPageVerse?: () => Promise<string | null>;
+}
+
+interface LoadVerseOptions {
+  silentTransition?: boolean;
 }
 
 const formatMillis = (value: number) => {
@@ -35,6 +38,7 @@ export const useVerseRecitation = ({
   verseKeys,
   selectedVerseKey,
   onSelectVerse,
+  onRequestNextPageVerse,
 }: UseVerseRecitationArgs) => {
   const playerRef = useRef<AudioPlayer | null>(null);
   const statusSubscriptionRef = useRef<{ remove: () => void } | null>(null);
@@ -44,13 +48,16 @@ export const useVerseRecitation = ({
   const unmountedRef = useRef(false);
   const loadedVerseKeyRef = useRef<string | null>(null);
   const loadedReciterIdRef = useRef<number | null>(null);
-  const prefetchedChapterKeysRef = useRef<Set<string>>(new Set());
+  const onRequestNextPageVerseRef = useRef<(() => Promise<string | null>) | null>(
+    onRequestNextPageVerse ?? null,
+  );
+  const pageAdvanceInFlightRef = useRef(false);
 
   const verseKeysRef = useRef<string[]>(verseKeys);
   const onSelectVerseRef = useRef(onSelectVerse);
-  const loadVerseRef = useRef<(verseKey: string, shouldPlay: boolean) => void>(
-    () => {},
-  );
+  const loadVerseRef = useRef<
+    (verseKey: string, shouldPlay: boolean, options?: LoadVerseOptions) => void
+  >(() => {});
 
   const reciterId = DEFAULT_RECITER_ID;
   const [playbackRate, setPlaybackRate] = useState<number>(1);
@@ -62,6 +69,7 @@ export const useVerseRecitation = ({
 
   verseKeysRef.current = verseKeys;
   onSelectVerseRef.current = onSelectVerse;
+  onRequestNextPageVerseRef.current = onRequestNextPageVerse ?? null;
 
   const currentIndex = useMemo(() => {
     if (!selectedVerseKey) return -1;
@@ -78,16 +86,6 @@ export const useVerseRecitation = ({
     },
     [],
   );
-
-  const getChapterNumberFromVerseKey = useCallback((verseKey: string | null) => {
-    if (!verseKey) return null;
-    const [chapterPart] = verseKey.split(":");
-    const chapterNumber = Number(chapterPart);
-    if (!Number.isFinite(chapterNumber) || chapterNumber < 1 || chapterNumber > 114) {
-      return null;
-    }
-    return Math.trunc(chapterNumber);
-  }, []);
 
   const detachStatusListener = useCallback(() => {
     statusSubscriptionRef.current?.remove();
@@ -106,10 +104,33 @@ export const useVerseRecitation = ({
     configuredRef.current = true;
   }, []);
 
+  const advanceToNextPageVerse = useCallback(() => {
+    if (pageAdvanceInFlightRef.current) return;
+    const requestNextPageVerse = onRequestNextPageVerseRef.current;
+    if (!requestNextPageVerse) return;
+
+    pageAdvanceInFlightRef.current = true;
+    void requestNextPageVerse()
+      .then((nextVerseKey) => {
+        if (!nextVerseKey || unmountedRef.current) return;
+        onSelectVerseRef.current(nextVerseKey);
+        loadVerseRef.current(nextVerseKey, true, { silentTransition: true });
+      })
+      .catch(() => {
+        // Keep silent; playback controls already expose loading/error state on next user action.
+      })
+      .finally(() => {
+        pageAdvanceInFlightRef.current = false;
+      });
+  }, []);
+
   const onPlaybackStatus = useCallback((status: AudioStatus) => {
     if (unmountedRef.current) return;
 
-    setIsPlaying(status.playing);
+    const shouldKeepPlayingState = status.didJustFinish;
+    if (!shouldKeepPlayingState) {
+      setIsPlaying(status.playing);
+    }
     setPositionMillis(Math.max(0, Math.round((status.currentTime ?? 0) * 1000)));
     if (Number.isFinite(status.duration) && status.duration > 0) {
       setDurationMillis(Math.round(status.duration * 1000));
@@ -120,18 +141,21 @@ export const useVerseRecitation = ({
 
     if (!status.didJustFinish) return;
 
-    setIsPlaying(false);
     setPositionMillis(0);
     const finishedVerseKey = loadedVerseKeyRef.current;
     if (!finishedVerseKey) return;
     const keys = verseKeysRef.current;
     const finishedIndex = keys.findIndex((key) => key === finishedVerseKey);
-    if (finishedIndex < 0 || finishedIndex >= keys.length - 1) return;
+    if (finishedIndex < 0) return;
+    if (finishedIndex >= keys.length - 1) {
+      advanceToNextPageVerse();
+      return;
+    }
     const nextVerseKey = keys[finishedIndex + 1];
     if (!nextVerseKey) return;
     onSelectVerseRef.current(nextVerseKey);
-    loadVerseRef.current(nextVerseKey, true);
-  }, []);
+    loadVerseRef.current(nextVerseKey, true, { silentTransition: true });
+  }, [advanceToNextPageVerse]);
 
   const attachStatusListener = useCallback(
     (player: AudioPlayer) => {
@@ -180,15 +204,22 @@ export const useVerseRecitation = ({
   }, [attachStatusListener]);
 
   const loadVerse = useCallback(
-    async (verseKey: string, shouldPlay: boolean) => {
+    async (
+      verseKey: string,
+      shouldPlay: boolean,
+      options?: LoadVerseOptions,
+    ) => {
       const trimmedVerseKey = verseKey.trim();
       if (!trimmedVerseKey) return;
+      const silentTransition = Boolean(options?.silentTransition);
       const requestKey = `${reciterId}:${trimmedVerseKey}:${shouldPlay ? "1" : "0"}`;
       if (loadingRequestKeyRef.current === requestKey) return;
 
       const requestId = ++loadRequestIdRef.current;
       loadingRequestKeyRef.current = requestKey;
-      setIsLoadingAudio(true);
+      if (!silentTransition) {
+        setIsLoadingAudio(true);
+      }
       setError(null);
 
       try {
@@ -215,12 +246,15 @@ export const useVerseRecitation = ({
           player.pause();
         }
 
-        const recitation = await fetchVerseRecitationAudio(trimmedVerseKey, reciterId);
+        const recitation = await resolveVerseRecitationPlaybackSource(
+          trimmedVerseKey,
+          reciterId,
+        );
         if (requestId !== loadRequestIdRef.current) {
           return;
         }
 
-        player.replace({ uri: recitation.url });
+        player.replace({ uri: recitation.uri });
         player.shouldCorrectPitch = true;
         player.setPlaybackRate(playbackRate, "high");
         updateLoadedSource(trimmedVerseKey, reciterId);
@@ -245,7 +279,11 @@ export const useVerseRecitation = ({
         if (requestId === loadRequestIdRef.current) {
           loadingRequestKeyRef.current = null;
         }
-        if (requestId === loadRequestIdRef.current && !unmountedRef.current) {
+        if (
+          !silentTransition &&
+          requestId === loadRequestIdRef.current &&
+          !unmountedRef.current
+        ) {
           setIsLoadingAudio(false);
         }
       }
@@ -253,8 +291,12 @@ export const useVerseRecitation = ({
     [ensureAudioMode, ensurePlayer, playbackRate, reciterId, updateLoadedSource],
   );
 
-  loadVerseRef.current = (verseKey: string, shouldPlay: boolean) => {
-    void loadVerse(verseKey, shouldPlay);
+  loadVerseRef.current = (
+    verseKey: string,
+    shouldPlay: boolean,
+    options?: LoadVerseOptions,
+  ) => {
+    void loadVerse(verseKey, shouldPlay, options);
   };
 
   const togglePlayback = useCallback(async () => {
@@ -292,11 +334,16 @@ export const useVerseRecitation = ({
       const baseIndex = currentIndex;
       if (baseIndex < 0) return;
       const target = verseKeys[baseIndex + offset];
-      if (!target) return;
+      if (!target) {
+        if (offset === 1) {
+          advanceToNextPageVerse();
+        }
+        return;
+      }
       onSelectVerse(target);
-      loadVerseRef.current(target, true);
+      loadVerseRef.current(target, true, { silentTransition: true });
     },
-    [currentIndex, onSelectVerse, verseKeys],
+    [advanceToNextPageVerse, currentIndex, onSelectVerse, verseKeys],
   );
 
   const cycleRate = useCallback(() => {
@@ -318,7 +365,7 @@ export const useVerseRecitation = ({
       unmountedRef.current = true;
       loadRequestIdRef.current += 1;
       loadingRequestKeyRef.current = null;
-      prefetchedChapterKeysRef.current.clear();
+      pageAdvanceInFlightRef.current = false;
       disposePlayer(playerRef.current);
     };
   }, [disposePlayer]);
@@ -354,26 +401,6 @@ export const useVerseRecitation = ({
       setDurationMillis(0);
     }
   }, [isPlaying, reciterId, selectedVerseKey, updateLoadedSource]);
-
-  useEffect(() => {
-    const dedupedVerseKeys = [...new Set(verseKeys.map((key) => key.trim()).filter(Boolean))];
-    if (dedupedVerseKeys.length) {
-      void prefetchVerseRecitationAudio(dedupedVerseKeys, reciterId, {
-        limit: 24,
-        concurrency: 4,
-      });
-    }
-
-    if (!selectedVerseKey) return;
-    const chapterNumber = getChapterNumberFromVerseKey(selectedVerseKey);
-    if (chapterNumber == null) return;
-    const chapterKey = `${reciterId}:${chapterNumber}`;
-    if (prefetchedChapterKeysRef.current.has(chapterKey)) return;
-    prefetchedChapterKeysRef.current.add(chapterKey);
-    void fetchChapterVerseRecitations(chapterNumber, reciterId).catch(() => {
-      prefetchedChapterKeysRef.current.delete(chapterKey);
-    });
-  }, [getChapterNumberFromVerseKey, reciterId, selectedVerseKey, verseKeys]);
 
   return {
     playbackRate,

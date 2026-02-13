@@ -10,7 +10,7 @@ import { useUserStore } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Linking, Pressable, Text, View } from "react-native";
 import { PACKAGE_TYPE, PurchasesPackage } from "react-native-purchases";
 
 type PlanOption = "weekly" | "annual";
@@ -22,6 +22,16 @@ type PlanProduct = PurchasesPackage["product"] & {
 export default function PaywallScreen() {
   const router = useRouter();
   const setIsPremium = useUserStore((s) => s.setIsPremium);
+  const normalizeExternalUrl = (value: string | undefined) => {
+    const trimmed = value?.trim() ?? "";
+    if (!trimmed) return "";
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  };
+  const privacyUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_PRIVACY_URL);
+  const termsUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_TERMS_URL);
 
   const [loading, setLoading] = useState(true);
   const [offeringError, setOfferingError] = useState<string | null>(null);
@@ -102,6 +112,11 @@ export default function PaywallScreen() {
       // ignore
     }
   }, [router, setIsPremium]);
+
+  const openLink = useCallback((url: string) => {
+    if (!url) return;
+    Linking.openURL(url).catch(() => undefined);
+  }, []);
 
   const renderPlan = (
     id: PlanOption,
@@ -318,13 +333,21 @@ export default function PaywallScreen() {
             </Pressable>
 
             <View className="flex-row items-center justify-center gap-2">
-              <Pressable>
+              <Pressable
+                onPress={() => openLink(privacyUrl)}
+                disabled={!privacyUrl}
+                style={!privacyUrl ? { opacity: 0.5 } : undefined}
+              >
                 <Text className="text-xs font-sfPro text-muted">
                   Privacy Policy
                 </Text>
               </Pressable>
               <Text className="text-xs font-sfPro text-muted">•</Text>
-              <Pressable>
+              <Pressable
+                onPress={() => openLink(termsUrl)}
+                disabled={!termsUrl}
+                style={!termsUrl ? { opacity: 0.5 } : undefined}
+              >
                 <Text className="text-xs font-sfPro text-muted">Terms</Text>
               </Pressable>
             </View>

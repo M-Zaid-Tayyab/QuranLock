@@ -43,6 +43,7 @@ export interface QuranVerseLookup {
 export interface QuranPackSearchResult {
   verseKey: string;
   highlightedText: string;
+  arabicText?: string;
   translation?: string;
   surahName?: string;
   pageNumber?: number;
@@ -372,6 +373,50 @@ export const findVerseLocationByKey = async (
   return null;
 };
 
+const getArabicTextForVerse = (pageData: QuranPageData, verseKey: string) => {
+  const verse = pageData.verses?.find((entry) => entry.key === verseKey);
+  if (verse?.arabic?.trim()) return verse.arabic.trim();
+
+  if (pageData.words?.length) {
+    const arabicWords = pageData.words
+      .filter((word) => word.verseKey === verseKey)
+      .map((word) => word.text)
+      .join(" ")
+      .trim();
+    if (arabicWords) return arabicWords;
+  }
+
+  return null;
+};
+
+export const getArabicTextByVerseKeysFromLocalPack = async (
+  verseKeys: string[],
+): Promise<Map<string, string>> => {
+  const targets = [...new Set(verseKeys.map((key) => key.trim()).filter(Boolean))];
+  if (!targets.length) return new Map();
+
+  const db = await openQuranDatabase();
+  const found = new Map<string, string>();
+
+  for (const verseKey of targets) {
+    const rows = await db.getAllAsync<{ data: string }>(
+      "SELECT data FROM pages WHERE data LIKE ? LIMIT 4",
+      [`%\"key\":\"${verseKey}\"%`],
+    );
+
+    for (const row of rows) {
+      if (!row?.data) continue;
+      const parsed = JSON.parse(row.data) as QuranPageData;
+      const arabic = getArabicTextForVerse(parsed, verseKey);
+      if (!arabic) continue;
+      found.set(verseKey, arabic);
+      break;
+    }
+  }
+
+  return found;
+};
+
 const normalizeSearchText = (value: string) => value.trim().toLowerCase();
 
 const buildSnippet = (source: string, needle: string) => {
@@ -443,6 +488,7 @@ export const searchVersesInLocalPack = async (
       dedup.set(verse.key, {
         verseKey: verse.key,
         highlightedText: buildSnippet(source, needle),
+        arabicText: arabic || undefined,
         translation: translation || undefined,
         surahName,
         pageNumber,
