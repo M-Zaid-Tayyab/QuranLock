@@ -1,18 +1,15 @@
-import { BottomSheetModal } from "@/components/common";
+import { BottomSheetModal, PrimaryButton } from "@/components/common";
 import { colors } from "@/constants/colors";
 import { setSelection } from "@/services/deviceActivity";
 import { useUserStore } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal as GorhomBottomSheetModal } from "@gorhom/bottom-sheet";
+import { useEffect, useRef } from "react";
 import type { NativeSyntheticEvent } from "react-native";
 import { Alert, Platform, Pressable, Text, View } from "react-native";
 import type { DeviceActivitySelectionEvent } from "react-native-device-activity";
 import { DeviceActivitySelectionView } from "react-native-device-activity";
-import Animated, {
-  Easing,
-  FadeInDown,
-} from "react-native-reanimated";
-import { useEffect, useRef } from "react";
+import Animated, { Easing, FadeInDown } from "react-native-reanimated";
 
 interface SelectAppsStepProps {
   familyActivitySelection: string | null;
@@ -28,7 +25,9 @@ export function SelectAppsStep({
   const sheetRef = useRef<GorhomBottomSheetModal | null>(null);
   const openedOnce = useRef(false);
 
-  const handleChange = (e: NativeSyntheticEvent<DeviceActivitySelectionEvent>) => {
+  const handleChange = (
+    e: NativeSyntheticEvent<DeviceActivitySelectionEvent>,
+  ) => {
     onSelectionChange(e.nativeEvent.familyActivitySelection ?? null);
   };
 
@@ -64,11 +63,7 @@ export function SelectAppsStep({
             className="h-12 w-12 items-center justify-center rounded-full"
             style={{ backgroundColor: colors.primary + "22" }}
           >
-            <Ionicons
-              name="apps-outline"
-              size={22}
-              color={colors.primary}
-            />
+            <Ionicons name="apps-outline" size={22} color={colors.primary} />
           </View>
           <View className="flex-1">
             <Text className="font-sfPro-semibold text-foreground">
@@ -102,19 +97,12 @@ export function SelectAppsStep({
             onPress={() => sheetRef.current?.present()}
             className="rounded-full bg-primary/20 px-4 py-2"
           >
-            <Text className="font-sfPro-semibold text-foreground">
-              Open
-            </Text>
+            <Text className="font-sfPro-semibold text-foreground">Open</Text>
           </Pressable>
         </View>
       </Animated.View>
 
-      <BottomSheetModal
-        sheetRef={sheetRef}
-        snapPoints={["85%"]}
-        showHandle
-        scrollView
-      >
+      <BottomSheetModal sheetRef={sheetRef} showHandle scrollView>
         <View className="px-6 pt-4 pb-8">
           <Text className="text-lg font-sfPro-semibold text-foreground">
             Select apps to block
@@ -129,14 +117,11 @@ export function SelectAppsStep({
               style={{ flex: 1 }}
             />
           </View>
-          <Pressable
+          <PrimaryButton
+            title="Done"
             onPress={() => sheetRef.current?.dismiss()}
-            className="mt-4 rounded-xl bg-primary py-3"
-          >
-            <Text className="text-center font-sfPro-semibold text-primaryForeground">
-              Done
-            </Text>
-          </Pressable>
+            className="mt-4"
+          />
         </View>
       </BottomSheetModal>
     </View>

@@ -40,7 +40,9 @@ const OptionCard = ({
         <View className="h-9 w-9 items-center justify-center rounded-full bg-surface">
           <Ionicons name={icon} size={16} color={colors.accent} />
         </View>
-        <Text className="text-sm font-sfPro-semibold text-foreground">{label}</Text>
+        <Text className="text-sm font-sfPro-semibold text-foreground">
+          {label}
+        </Text>
       </View>
       <Text className="text-xs font-sfPro text-muted">{value}</Text>
     </View>
@@ -63,7 +65,6 @@ export function VerseSettingsSheet({
   return (
     <BottomSheetModal
       sheetRef={sheetRef}
-      snapPoints={["76%"]}
       showHandle
       scrollView
       enablePanDownToClose
@@ -72,7 +73,9 @@ export function VerseSettingsSheet({
       <View className="px-6 pb-8 pt-2">
         <View className="flex-row items-center justify-between">
           <View>
-            <Text className="text-lg font-sfPro-bold text-foreground">Reading Settings</Text>
+            <Text className="text-lg font-sfPro-bold text-foreground">
+              Reading Settings
+            </Text>
             <Text className="mt-1 text-sm font-sfPro text-muted">
               Tune the verse view for your reading flow.
             </Text>
@@ -94,7 +97,9 @@ export function VerseSettingsSheet({
           />
 
           <View className="rounded-2xl border border-outline bg-backgroundElevated px-4 py-4">
-            <Text className="text-sm font-sfPro-semibold text-foreground">Reading Mode</Text>
+            <Text className="text-sm font-sfPro-semibold text-foreground">
+              Reading Mode
+            </Text>
             <Text className="mt-1 text-xs font-sfPro text-muted">
               Switch between mushaf layout and verse cards.
             </Text>
@@ -149,7 +154,9 @@ export function VerseSettingsSheet({
           />
 
           <View className="rounded-2xl border border-outline bg-backgroundElevated px-4 py-4">
-            <Text className="text-sm font-sfPro-semibold text-foreground">Arabic Font Size</Text>
+            <Text className="text-sm font-sfPro-semibold text-foreground">
+              Arabic Font Size
+            </Text>
             <View className="mt-3 flex-row items-center justify-between">
               <Pressable
                 onPress={onDecreaseFont}
@@ -157,7 +164,9 @@ export function VerseSettingsSheet({
               >
                 <Ionicons name="remove" size={18} color={colors.muted} />
               </Pressable>
-              <Text className="text-xs font-sfPro text-muted">Adjust readability</Text>
+              <Text className="text-xs font-sfPro text-muted">
+                Adjust readability
+              </Text>
               <Pressable
                 onPress={onIncreaseFont}
                 className="h-11 w-16 items-center justify-center rounded-xl border border-outline bg-surface"
