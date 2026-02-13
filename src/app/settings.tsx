@@ -101,7 +101,7 @@ export default function SettingsScreen() {
               <Text className="mt-1 text-sm font-sfPro text-muted">
                 {isPremium
                   ? "Thank you for supporting your Quran journey."
-                  : "Start your trial and unlock deeper focus tools."}
+                  : "Upgrade to Premium and unlock deeper focus tools."}
               </Text>
             </View>
             <Pressable

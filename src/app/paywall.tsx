@@ -10,13 +10,19 @@ import { useUserStore } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Linking, Pressable, Text, View } from "react-native";
+import {
+  Alert,
+  Linking,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { PACKAGE_TYPE, PurchasesPackage } from "react-native-purchases";
 
 type PlanOption = "weekly" | "annual";
 type PlanProduct = PurchasesPackage["product"] & {
   pricePerWeekString?: string;
-  introPrice?: unknown;
 };
 
 export default function PaywallScreen() {
@@ -74,9 +80,19 @@ export default function PaywallScreen() {
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowClose(true), 5000);
+    const timer = setTimeout(() => setShowClose(true), 6000);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (selectedPlan === "annual" && !annualPackage && weeklyPackage) {
+      setSelectedPlan("weekly");
+      return;
+    }
+    if (selectedPlan === "weekly" && !weeklyPackage && annualPackage) {
+      setSelectedPlan("annual");
+    }
+  }, [annualPackage, selectedPlan, weeklyPackage]);
 
   const handlePurchase = useCallback(async () => {
     if (!selectedPackage) return;
@@ -113,8 +129,11 @@ export default function PaywallScreen() {
     }
   }, [router, setIsPremium]);
 
-  const openLink = useCallback((url: string) => {
-    if (!url) return;
+  const openLink = useCallback((url: string, label: string) => {
+    if (!url) {
+      Alert.alert(`${label} unavailable`, "This link is not configured yet.");
+      return;
+    }
     Linking.openURL(url).catch(() => undefined);
   }, []);
 
@@ -128,7 +147,7 @@ export default function PaywallScreen() {
     const product = pkg?.product as PlanProduct | undefined;
     const price = product?.priceString ?? "--";
     const perWeek = product?.pricePerWeekString ?? "";
-    const trialAvailable = product?.introPrice != null;
+
     return (
       <Pressable
         onPress={() => setSelectedPlan(id)}
@@ -167,193 +186,152 @@ export default function PaywallScreen() {
               {badge}
             </Text>
           </View>
-        ) : trialAvailable ? (
-          <View className="mt-3 self-start rounded-full bg-primary/20 px-3 py-1">
-            <Text className="text-[10px] font-sfPro-semibold text-primary">
-              Trial
-            </Text>
-          </View>
         ) : null}
       </Pressable>
     );
   };
 
-  const showTrial =
-    (selectedPackage?.product as { introPrice?: unknown } | undefined)
-      ?.introPrice != null;
-  const actionLabel = showTrial ? "Start free trial" : "Continue";
-
   return (
-    <View className="flex-1 bg-background py-safe">
-      <View className="flex-1 px-6">
-        <View className="flex-1 justify-between pb-4 pt-4">
-          <View className="gap-4">
-            <View className="items-center">
-              <View className="h-12 w-12 items-center justify-center rounded-full bg-accent/20">
-                <Ionicons
-                  name="sparkles-outline"
-                  size={22}
-                  color={colors.accent}
-                />
-              </View>
-              <Text className="mt-4 text-center text-3xl font-sfPro-bold text-foreground">
-                Begin your journey
-              </Text>
-            </View>
-
-            <View className="rounded-3xl border border-outline bg-surface px-5 py-5">
-              <Text className="text-base font-sfPro-semibold text-foreground">
-                Trial timeline
-              </Text>
-              <View className="mt-4 gap-2">
-                <View className="flex-row items-start gap-4 py-1">
-                  <View className="items-center">
-                    <View className="h-9 w-9 items-center justify-center rounded-full bg-accent/20">
-                      <Ionicons
-                        name="lock-closed-outline"
-                        size={16}
-                        color={colors.accent}
-                      />
-                    </View>
-                    <View className="mt-1 h-6 w-[2px] bg-accent/30" />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-base font-sfPro-semibold text-foreground">
-                      Today
-                    </Text>
-                    <View className="mt-2 flex-row items-center gap-2">
-                      <Ionicons
-                        name="lock-open-outline"
-                        size={14}
-                        color={colors.muted}
-                      />
-                      <Text className="text-sm font-sfPro text-muted">
-                        Full access
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                <View className="flex-row items-start gap-4 py-1">
-                  <View className="items-center">
-                    <View className="h-9 w-9 items-center justify-center rounded-full bg-secondary/20">
-                      <Ionicons
-                        name="notifications-outline"
-                        size={16}
-                        color={colors.secondary}
-                      />
-                    </View>
-                    <View className="mt-1 h-6 w-[2px] bg-secondary/30" />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-base font-sfPro-semibold text-foreground">
-                      In 2 days
-                    </Text>
-                    <View className="mt-2 flex-row items-center gap-2">
-                      <Ionicons
-                        name="notifications-outline"
-                        size={14}
-                        color={colors.muted}
-                      />
-                      <Text className="text-sm font-sfPro text-muted">
-                        Reminder sent
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                <View className="flex-row items-start gap-4 py-1">
-                  <View className="items-center">
-                    <View className="h-9 w-9 items-center justify-center rounded-full bg-primary/20">
-                      <Ionicons
-                        name="trophy-outline"
-                        size={16}
-                        color={colors.primary}
-                      />
-                    </View>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-base font-sfPro-semibold text-foreground">
-                      In 3 days
-                    </Text>
-                    <View className="mt-2 flex-row items-center gap-2">
-                      <Ionicons
-                        name="checkmark-circle-outline"
-                        size={14}
-                        color={colors.muted}
-                      />
-                      <Text className="text-sm font-sfPro text-muted">
-                        Continue or cancel
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </View>
-
-            <Text className="text-center text-sm font-sfPro-semibold text-muted">
-              No commitment · Cancel anytime
-            </Text>
-
-            <View className="flex-row gap-3">
-              {renderPlan(
-                "weekly",
-                weeklyPackage,
-                "Perfect for a short commitment.",
-              )}
-              {renderPlan(
-                "annual",
-                annualPackage,
-                "Best value for long-term consistency.",
-                "Best value",
-              )}
-            </View>
-          </View>
-
-          <View className="gap-3">
-            {offeringError && (
-              <Text className="text-center text-sm font-sfPro text-error">
-                {offeringError}
-              </Text>
-            )}
-
-            <PrimaryButton
-              title={actionLabel}
-              isLoading={loading || purchasing}
-              disabled={!selectedPackage}
-              onPress={handlePurchase}
-              className="w-full"
-            />
-
-            <Pressable
-              onPress={handleRestore}
-              className="self-center rounded-full border border-outline bg-surface px-4 py-2"
-            >
-              <Text className="text-sm font-sfPro-semibold text-foreground">
-                Restore
-              </Text>
-            </Pressable>
-
-            <View className="flex-row items-center justify-center gap-2">
-              <Pressable
-                onPress={() => openLink(privacyUrl)}
-                disabled={!privacyUrl}
-                style={!privacyUrl ? { opacity: 0.5 } : undefined}
-              >
-                <Text className="text-xs font-sfPro text-muted">
-                  Privacy Policy
+    <View className="flex-1 bg-background pt-safe pb-safe">
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="mt-12 items-center">
+          <View className="mt-3 flex-row flex-wrap justify-center">
+            {["It's", "time", "to", "invest", "in", "your", "Akhirah."].map(
+              (word, index) => (
+                <Text
+                  key={`${word}-${index}`}
+                  className="text-center text-4xl font-sfPro-bold leading-tight"
+                  style={{
+                    color:
+                      word === "invest" || word === "Akhirah."
+                        ? colors.accent
+                        : colors.foreground,
+                  }}
+                >
+                  {word}
+                  {index < 6 ? " " : ""}
                 </Text>
-              </Pressable>
-              <Text className="text-xs font-sfPro text-muted">•</Text>
-              <Pressable
-                onPress={() => openLink(termsUrl)}
-                disabled={!termsUrl}
-                style={!termsUrl ? { opacity: 0.5 } : undefined}
-              >
-                <Text className="text-xs font-sfPro text-muted">Terms</Text>
-              </Pressable>
-            </View>
+              ),
+            )}
           </View>
         </View>
-      </View>
+
+        <View className="mt-10 gap-4">
+          <View className="flex-row items-center gap-3">
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={23}
+              color={colors.primary}
+            />
+            <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
+              Block distractions in every focus window
+            </Text>
+          </View>
+          <View className="flex-row items-center gap-3">
+            <Ionicons name="book-outline" size={23} color={colors.accent} />
+            <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
+              Replace scrolling urges with Quran
+            </Text>
+          </View>
+          <View className="flex-row items-center gap-3">
+            <Ionicons
+              name="notifications-outline"
+              size={23}
+              color={colors.secondary}
+            />
+            <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
+              Stay consistent with timely reminders
+            </Text>
+          </View>
+          <View className="flex-row items-center gap-3">
+            <Ionicons name="time-outline" size={23} color={colors.primary} />
+            <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
+              Protect your time before regret starts
+            </Text>
+          </View>
+        </View>
+
+        <View className="mt-10">
+          <View className="flex-row items-center justify-between">
+            <Text className="mt-1 text-2xl font-sfPro-bold text-foreground">
+              Choose your plan
+            </Text>
+            <Text className="mt-1 text-sm font-sfPro-semibold text-muted">
+              Cancel anytime
+            </Text>
+          </View>
+
+          <View className="mt-7 gap-3">
+            {!loading && !weeklyPackage && !annualPackage ? (
+              <Text className="text-sm font-sfPro text-muted">
+                Subscription plans are not available right now.
+              </Text>
+            ) : (
+              <View className="flex-row gap-3">
+                {(loading || weeklyPackage) &&
+                  renderPlan(
+                    "weekly",
+                    weeklyPackage,
+                    "Flexible commitment billed weekly.",
+                  )}
+                {(loading || annualPackage) &&
+                  renderPlan(
+                    "annual",
+                    annualPackage,
+                    "Lower weekly cost for long-term consistency.",
+                    "Best value",
+                  )}
+              </View>
+            )}
+          </View>
+        </View>
+
+        <View className="mt-5 gap-3">
+          {offeringError && (
+            <Text className="text-center text-sm font-sfPro text-error">
+              {offeringError}
+            </Text>
+          )}
+
+          <PrimaryButton
+            title="Connect with Allah"
+            isLoading={loading || purchasing}
+            disabled={!selectedPackage}
+            onPress={handlePurchase}
+            className="w-full mt-4"
+          />
+
+          <Pressable
+            onPress={handleRestore}
+            className="self-center rounded-full border border-outline bg-surface px-4 py-2 my-2"
+          >
+            <Text className="text-sm font-sfPro-semibold text-foreground">
+              Restore purchases
+            </Text>
+          </Pressable>
+
+          <View className="flex-row items-center justify-center gap-2">
+            <Pressable
+              onPress={() => openLink(privacyUrl, "Privacy Policy")}
+              hitSlop={8}
+            >
+              <Text className="text-xs font-sfPro-semibold text-foreground">
+                Privacy Policy
+              </Text>
+            </Pressable>
+            <Text className="text-xs font-sfPro text-muted">•</Text>
+            <Pressable onPress={() => openLink(termsUrl, "Terms")} hitSlop={8}>
+              <Text className="text-xs font-sfPro-semibold text-foreground">
+                Terms
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </ScrollView>
 
       {showClose && (
         <Pressable
