@@ -3,7 +3,6 @@ import {
   fetchChapterVerseRecitations,
   fetchVerseRecitationAudio,
   prefetchVerseRecitationAudio,
-  type QuranReciter,
 } from "@/services/quranFoundation";
 import {
   createAudioPlayer,
@@ -14,6 +13,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const PLAYBACK_RATES = [0.8, 1, 1.2] as const;
+const DEFAULT_RECITER_ID = DEFAULT_QURAN_RECITERS[0]?.id ?? 7;
 
 interface UseVerseRecitationArgs {
   verseKeys: string[];
@@ -52,9 +52,7 @@ export const useVerseRecitation = ({
     () => {},
   );
 
-  const [reciterId, setReciterId] = useState<number>(
-    DEFAULT_QURAN_RECITERS[0]?.id ?? 7,
-  );
+  const reciterId = DEFAULT_RECITER_ID;
   const [playbackRate, setPlaybackRate] = useState<number>(1);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -378,9 +376,6 @@ export const useVerseRecitation = ({
   }, [getChapterNumberFromVerseKey, reciterId, selectedVerseKey, verseKeys]);
 
   return {
-    reciters: DEFAULT_QURAN_RECITERS as QuranReciter[],
-    reciterId,
-    setReciterId,
     playbackRate,
     isLoadingAudio,
     isPlaying,

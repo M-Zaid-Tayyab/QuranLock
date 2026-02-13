@@ -2,15 +2,8 @@ import { colors } from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
 
-interface ReciterOption {
-  id: number;
-  name: string;
-}
-
 interface VerseRecitationControlsProps {
   selectedVerseKey: string | null;
-  reciters: ReciterOption[];
-  selectedReciterId: number;
   playbackRate: number;
   isLoadingAudio: boolean;
   isPlaying: boolean;
@@ -23,13 +16,10 @@ interface VerseRecitationControlsProps {
   onPlayNext: () => void;
   onPlayPrevious: () => void;
   onCycleRate: () => void;
-  onSelectReciter: (reciterId: number) => void;
 }
 
 export function VerseRecitationControls({
   selectedVerseKey,
-  reciters,
-  selectedReciterId,
   playbackRate,
   isLoadingAudio,
   isPlaying,
@@ -42,7 +32,6 @@ export function VerseRecitationControls({
   onPlayNext,
   onPlayPrevious,
   onCycleRate,
-  onSelectReciter,
 }: VerseRecitationControlsProps) {
   const hasSelection = Boolean(selectedVerseKey);
 
@@ -114,31 +103,6 @@ export function VerseRecitationControls({
               {playbackRate.toFixed(1)}x
             </Text>
           </Pressable>
-        </View>
-
-        <View className="mt-3 flex-row flex-wrap gap-2">
-          {reciters.map((reciter) => {
-            const selected = reciter.id === selectedReciterId;
-            return (
-              <Pressable
-                key={reciter.id}
-                onPress={() => onSelectReciter(reciter.id)}
-                className={`rounded-full border px-3 py-1 ${
-                  selected
-                    ? "border-accent bg-accent/20"
-                    : "border-outline bg-backgroundElevated"
-                }`}
-              >
-                <Text
-                  className={`text-xs font-sfPro-semibold ${
-                    selected ? "text-accent" : "text-muted"
-                  }`}
-                >
-                  {reciter.name}
-                </Text>
-              </Pressable>
-            );
-          })}
         </View>
 
         {error ? (

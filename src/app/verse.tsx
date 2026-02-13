@@ -51,8 +51,6 @@ export default function VerseScreen() {
       {vm.content.packState === "ready" && vm.recitation.visible && (
         <VerseRecitationControls
           selectedVerseKey={vm.content.selectedVerseKey}
-          reciters={vm.recitation.reciters}
-          selectedReciterId={vm.recitation.selectedReciterId}
           playbackRate={vm.recitation.playbackRate}
           isLoadingAudio={vm.recitation.isLoadingAudio}
           isPlaying={vm.recitation.isPlaying}
@@ -65,7 +63,6 @@ export default function VerseScreen() {
           onPlayNext={vm.actions.playNextRecitationVerse}
           onPlayPrevious={vm.actions.playPreviousRecitationVerse}
           onCycleRate={vm.actions.cycleRecitationRate}
-          onSelectReciter={vm.actions.setReciter}
         />
       )}
 

@@ -587,8 +587,6 @@ export const useVerseScreen = () => {
     },
     recitation: {
       visible: recitationVisible,
-      reciters: recitation.reciters,
-      selectedReciterId: recitation.reciterId,
       playbackRate: recitation.playbackRate,
       isLoadingAudio: recitation.isLoadingAudio,
       isPlaying: recitation.isPlaying,
@@ -616,7 +614,6 @@ export const useVerseScreen = () => {
       goNextPage: () => handlePageChange(currentPage + 1),
       goPreviousPage: () => handlePageChange(currentPage - 1),
       selectVerse: setSelectedVerseKey,
-      setReciter: recitation.setReciterId,
       toggleRecitationVisible: () =>
         setRecitationVisible((visible) => !visible),
       toggleRecitationPlayback: recitation.actions.togglePlayback,
