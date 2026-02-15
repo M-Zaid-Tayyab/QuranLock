@@ -1,6 +1,9 @@
 import { PAYWALL_SOURCES } from "@/constants/entitlements";
 import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
-import { getAuthStatus, requestAuthorization } from "@/services/deviceActivity";
+import {
+  getStableAuthStatus,
+  requestAuthorization,
+} from "@/services/deviceActivity";
 import {
   canAddFocusSchedule,
   canOpenQuran,
@@ -12,7 +15,7 @@ import type { ScheduleStatus } from "@/utils/scheduleEngine";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 
 const AuthorizationStatus = {
   notDetermined: 0,
@@ -67,9 +70,42 @@ export const useHomeScreen = () => {
   );
   const getRequiredMinutes = useBlockingStore((s) => s.getRequiredMinutes);
 
+  const refreshScreenTimeStatus = useCallback(async () => {
+    if (Platform.OS !== "ios") return;
+    try {
+      const status = await getStableAuthStatus();
+      setScreenTimeStatus(status);
+    } catch {
+      setScreenTimeStatus(AuthorizationStatus.notDetermined);
+    }
+  }, []);
+
   useEffect(() => {
     if (Platform.OS !== "ios") return;
-    setScreenTimeStatus(getAuthStatus());
+    let cancelled = false;
+
+    const syncStatus = async () => {
+      try {
+        const status = await getStableAuthStatus();
+        if (!cancelled) setScreenTimeStatus(status);
+      } catch {
+        if (!cancelled) {
+          setScreenTimeStatus(AuthorizationStatus.notDetermined);
+        }
+      }
+    };
+
+    void syncStatus();
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        void syncStatus();
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -81,9 +117,9 @@ export const useHomeScreen = () => {
   const handleRequestScreenTime = useCallback(() => {
     setRequestingScreenTime(true);
     requestAuthorization()
-      .then(() => setScreenTimeStatus(getAuthStatus()))
+      .then(() => refreshScreenTimeStatus())
       .finally(() => setRequestingScreenTime(false));
-  }, []);
+  }, [refreshScreenTimeStatus]);
 
   const handleRequestNotifications = useCallback(async () => {
     const { status } = await Notifications.requestPermissionsAsync();
@@ -143,7 +179,9 @@ export const useHomeScreen = () => {
     : "All focus windows for today are done";
 
   const needsScreenTime =
-    Platform.OS === "ios" && screenTimeStatus !== AuthorizationStatus.approved;
+    Platform.OS === "ios" &&
+    screenTimeStatus != null &&
+    screenTimeStatus !== AuthorizationStatus.approved;
   const needsNotifications = notificationGranted === false;
 
   const showSetupApps = !hasSelectedApps;
