@@ -155,16 +155,6 @@ export const formatTime = (hour: number, minute: number) => {
   return `${displayHour}:${displayMinute} ${suffix}`;
 };
 
-export const TIME_OPTIONS = Array.from({ length: 48 }).map((_, index) => {
-  const hour = Math.floor(index / 2);
-  const minute = index % 2 === 0 ? 0 : 30;
-  return {
-    hour,
-    minute,
-    label: formatTime(hour, minute),
-  };
-});
-
 export const getNextDuration = (schedules: FocusSchedule[]) => {
   if (!schedules.length) return 30;
 

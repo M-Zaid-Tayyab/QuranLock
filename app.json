@@ -16,7 +16,8 @@
       "bundleIdentifier": "com.zaid.dev.QuranLock",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      }
+      },
+      "appleTeamId": "J35C3N342N"
     },
     "android": {
       "adaptiveIcon": {
@@ -27,7 +28,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.zaid.dev.QuranLock"
+      "package": "com.zaid.dev.QuranLock",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "output": "static",
@@ -69,7 +74,8 @@
             "./src/assets/fonts/SF-Pro-Text-Regular.ttf",
             "./src/assets/fonts/SF-Pro-Text-Medium.ttf",
             "./src/assets/fonts/SF-Pro-Text-Semibold.ttf",
-            "./src/assets/fonts/SF-Pro-Text-Bold.ttf"
+            "./src/assets/fonts/SF-Pro-Text-Bold.ttf",
+            "./src/assets/fonts/Al-Majeed-Quranic-Font-shiped.ttf"
           ]
         }
       ],
@@ -87,7 +93,8 @@
           "appleTeamId": "6758984483",
           "appGroup": "group.com.zaid.dev.QuranLock"
         }
-      ]
+      ],
+      "expo-audio"
     ],
     "updates": {
       "checkAutomatically": "ON_LOAD",

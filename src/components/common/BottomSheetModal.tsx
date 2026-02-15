@@ -65,9 +65,11 @@ export const BottomSheetModal: React.FC<Props> = ({
       keyboardBehavior="interactive"
       keyboardBlurBehavior={keyboardBlurBehavior}
       android_keyboardInputMode="adjustResize"
-      handleIndicatorStyle={showHandle ? undefined : { opacity: 0 }}
+      handleIndicatorStyle={
+        showHandle ? { backgroundColor: colors.white } : { opacity: 0 }
+      }
       backgroundStyle={{
-        backgroundColor: colors.background,
+        backgroundColor: colors.surface,
         borderTopLeftRadius: widthPercentageToDP(8),
         borderTopRightRadius: widthPercentageToDP(8),
       }}

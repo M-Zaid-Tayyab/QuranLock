@@ -1,4 +1,10 @@
 import { platformSelect } from "nativewind/theme";
+
+const quranArabic = {
+  ios: "Al Majeed Quranic Font",
+  android: "Al-Majeed-Quranic-Font-shiped",
+};
+
 const fonts = {
   sfPro: platformSelect({
     ios: "SFProText-Regular",
@@ -16,6 +22,7 @@ const fonts = {
     ios: "SFProText-Semibold",
     android: "SF-Pro-Text-Semibold",
   }),
+  quranArabic: platformSelect(quranArabic),
 };
 
 module.exports = fonts;

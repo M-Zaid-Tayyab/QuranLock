@@ -1,8 +1,6 @@
-import { BottomSheetModal, PrimaryButton } from "@/components/common";
 import {
   DURATION_OPTIONS,
   PRAYER_PRESETS,
-  TIME_OPTIONS,
   formatTime,
   getNextDuration,
   type PrayerPreset,
@@ -15,8 +13,10 @@ import {
 } from "@/services/entitlements";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore, type FocusSchedule } from "@/store/user";
+import DateTimePicker, {
+  DateTimePickerAndroid,
+} from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
-import { BottomSheetModal as GorhomBottomSheetModal } from "@gorhom/bottom-sheet";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import {
@@ -25,7 +25,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type RefObject,
 } from "react";
 import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 
@@ -55,8 +54,6 @@ export function FocusTimesStep({
   >(null);
 
   const hasRequestedNotificationsRef = useRef(false);
-  const timePickerRef: RefObject<GorhomBottomSheetModal | null> =
-    useRef<GorhomBottomSheetModal | null>(null);
   const customIndexRef = useRef(
     focusSchedules.filter((schedule) => schedule.kind === "custom").length + 1,
   );
@@ -64,6 +61,7 @@ export function FocusTimesStep({
   useEffect(() => {
     if (focusSchedules.length === 0) {
       setExpandedScheduleId(null);
+      setTimePickerTarget(null);
     }
   }, [focusSchedules.length]);
 
@@ -113,14 +111,6 @@ export function FocusTimesStep({
       ),
     [focusSchedules],
   );
-
-  const activeTimeValue = useMemo(() => {
-    const active = focusSchedules.find(
-      (schedule) => schedule.id === timePickerTarget,
-    );
-    if (!active) return null;
-    return `${active.hour}-${active.minute}`;
-  }, [focusSchedules, timePickerTarget]);
 
   const setSchedule = useCallback(
     (next: FocusSchedule[]) => {
@@ -202,23 +192,18 @@ export function FocusTimesStep({
     [expandedScheduleId, focusSchedules, setSchedule],
   );
 
-  const onOpenTimePicker = useCallback((id: string) => {
-    setTimePickerTarget(id);
-    timePickerRef.current?.present();
+  const toPickerDate = useCallback((hour: number, minute: number) => {
+    const nextDate = new Date();
+    nextDate.setHours(hour, minute, 0, 0);
+    return nextDate;
   }, []);
 
-  const onOpenNewCustomTime = useCallback(() => {
-    if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_CUSTOM)) return;
-    setTimePickerTarget("new");
-    timePickerRef.current?.present();
-  }, [ensureCanAddSchedule]);
-
-  const onPickTime = useCallback(
-    (hour: number, minute: number) => {
-      if (timePickerTarget === "new") {
+  const applyPickedTime = useCallback(
+    (targetId: string, date: Date) => {
+      const hour = date.getHours();
+      const minute = date.getMinutes();
+      if (targetId === "new") {
         if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_CUSTOM)) {
-          timePickerRef.current?.dismiss();
-          setTimePickerTarget(null);
           return;
         }
         const customIndex = customIndexRef.current++;
@@ -235,29 +220,86 @@ export function FocusTimesStep({
           },
         ]);
         setExpandedScheduleId(id);
-      } else if (timePickerTarget) {
-        onUpdateSchedule(timePickerTarget, { hour, minute });
+      } else {
+        onUpdateSchedule(targetId, { hour, minute });
       }
-
-      timePickerRef.current?.dismiss();
-      setTimePickerTarget(null);
     },
-    [
-      ensureCanAddSchedule,
-      focusSchedules,
-      onUpdateSchedule,
-      setSchedule,
-      timePickerTarget,
-    ],
+    [ensureCanAddSchedule, focusSchedules, onUpdateSchedule, setSchedule],
   );
 
-  const onCloseTimePicker = useCallback(() => {
-    timePickerRef.current?.dismiss();
-    setTimePickerTarget(null);
-  }, []);
+  const onOpenTimePicker = useCallback(
+    (id: string) => {
+      const active = focusSchedules.find((schedule) => schedule.id === id);
+      const initialDate = active
+        ? toPickerDate(active.hour, active.minute)
+        : toPickerDate(12, 0);
+
+      if (Platform.OS === "android") {
+        DateTimePickerAndroid.open({
+          value: initialDate,
+          mode: "time",
+          is24Hour: false,
+          onChange: (event, selectedDate) => {
+            if (event.type !== "set" || !selectedDate) return;
+            applyPickedTime(id, selectedDate);
+          },
+        });
+        return;
+      }
+
+      setTimePickerTarget((current) => (current === id ? null : id));
+    },
+    [applyPickedTime, focusSchedules, toPickerDate],
+  );
+
+  const onOpenNewCustomTime = useCallback(() => {
+    if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_CUSTOM)) return;
+
+    const initialDate = toPickerDate(12, 0);
+    if (Platform.OS === "android") {
+      DateTimePickerAndroid.open({
+        value: initialDate,
+        mode: "time",
+        is24Hour: false,
+        onChange: (event, selectedDate) => {
+          if (event.type !== "set" || !selectedDate) return;
+          applyPickedTime("new", selectedDate);
+        },
+      });
+      return;
+    }
+
+    const customIndex = customIndexRef.current++;
+    const id = `custom-${Date.now()}`;
+    setSchedule([
+      ...focusSchedules,
+      {
+        id,
+        label: `Custom ${customIndex}`,
+        kind: "custom",
+        hour: initialDate.getHours(),
+        minute: initialDate.getMinutes(),
+        durationMinutes: 30,
+      },
+    ]);
+    setExpandedScheduleId(id);
+    setTimePickerTarget(id);
+  }, [
+    applyPickedTime,
+    ensureCanAddSchedule,
+    focusSchedules,
+    setSchedule,
+    toPickerDate,
+  ]);
 
   const onToggleExpandedSchedule = useCallback((id: string) => {
-    setExpandedScheduleId((current) => (current === id ? null : id));
+    setExpandedScheduleId((current) => {
+      const next = current === id ? null : id;
+      if (next !== id) {
+        setTimePickerTarget(null);
+      }
+      return next;
+    });
   }, []);
 
   return (
@@ -356,6 +398,24 @@ export function FocusTimesStep({
                           {formatTime(schedule.hour, schedule.minute)}
                         </Text>
                       </Pressable>
+                      {Platform.OS === "ios" &&
+                      timePickerTarget === schedule.id ? (
+                        <View className="mt-3 rounded-xl border border-outline bg-backgroundElevated px-2 py-2">
+                          <DateTimePicker
+                            value={toPickerDate(schedule.hour, schedule.minute)}
+                            mode="time"
+                            display="spinner"
+                            onChange={(event, selectedDate) => {
+                              if (event.type === "dismissed" || !selectedDate)
+                                return;
+                              onUpdateSchedule(schedule.id, {
+                                hour: selectedDate.getHours(),
+                                minute: selectedDate.getMinutes(),
+                              });
+                            }}
+                          />
+                        </View>
+                      ) : null}
 
                       <View className="mt-4">
                         <Text className="text-xs font-sfPro-semibold tracking-widest text-muted">
@@ -452,41 +512,6 @@ export function FocusTimesStep({
           </View>
         )}
       </ScrollView>
-
-      <BottomSheetModal
-        sheetRef={timePickerRef}
-        snapPoints={["70%"]}
-        showHandle
-        scrollView
-      >
-        <View className="px-6 pt-4 pb-8">
-          <Text className="text-lg font-sfPro-semibold text-foreground">
-            Choose a time
-          </Text>
-          <Text className="mt-1 text-sm font-sfPro text-muted">
-            Pick a time that fits your daily rhythm.
-          </Text>
-          <View className="mt-4 gap-2">
-            {TIME_OPTIONS.map((option) => (
-              <Pressable
-                key={`${option.hour}-${option.minute}`}
-                onPress={() => onPickTime(option.hour, option.minute)}
-                className={`flex-row items-center justify-between rounded-xl border px-4 py-3 ${
-                  activeTimeValue === `${option.hour}-${option.minute}`
-                    ? "border-primary bg-primary/15"
-                    : "border-outline bg-surface"
-                }`}
-              >
-                <Text className="font-sfPro text-foreground">{option.label}</Text>
-                <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-              </Pressable>
-            ))}
-          </View>
-          <View className="mt-4">
-            <PrimaryButton title="Close" onPress={onCloseTimePicker} />
-          </View>
-        </View>
-      </BottomSheetModal>
     </View>
   );
 }

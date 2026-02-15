@@ -6,6 +6,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 export interface BlockingState {
   requiredQuranMinutes: number;
   accumulatedQuranMinutesForCurrentBlock: number;
+  totalQuranMinutesLifetime: number;
   lastBlockedAt: number | null;
   quranMinutesToUnblock: number;
   activeScheduleId: string | null;
@@ -32,6 +33,7 @@ interface BlockingActions {
 const initialState: BlockingState = {
   requiredQuranMinutes: 0,
   accumulatedQuranMinutesForCurrentBlock: 0,
+  totalQuranMinutesLifetime: 0,
   lastBlockedAt: null,
   quranMinutesToUnblock: 30,
   activeScheduleId: null,
@@ -57,7 +59,14 @@ export const useBlockingStore = create<BlockingState & BlockingActions>()(
         const state = get();
         const newAccumulated =
           state.accumulatedQuranMinutesForCurrentBlock + minutes;
-        set({ accumulatedQuranMinutesForCurrentBlock: newAccumulated });
+        const nextLifetime = Math.max(
+          0,
+          state.totalQuranMinutesLifetime + Math.max(0, minutes),
+        );
+        set({
+          accumulatedQuranMinutesForCurrentBlock: newAccumulated,
+          totalQuranMinutesLifetime: nextLifetime,
+        });
         const required =
           state.requiredQuranMinutes || state.quranMinutesToUnblock;
         return required > 0 && newAccumulated >= required;

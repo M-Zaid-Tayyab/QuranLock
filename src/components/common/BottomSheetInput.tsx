@@ -7,11 +7,14 @@ import {
   Platform,
   StyleProp,
   Text,
-  TextInput,
   TextInputProps,
   TextStyle,
   View,
 } from "react-native";
+
+type BottomSheetTextInputRef = React.ComponentProps<
+  typeof BottomSheetTextInput
+>["ref"];
 
 export interface BottomSheetInputProps extends TextInputProps {
   error?: string;
@@ -22,7 +25,7 @@ export interface BottomSheetInputProps extends TextInputProps {
   leftComponent?: React.ReactNode;
   rightComponent?: React.ReactNode;
   border?: boolean;
-  inputRef?: React.RefObject<TextInput>;
+  inputRef?: BottomSheetTextInputRef;
   inputStyle?: StyleProp<TextStyle>;
   keyboardType?: KeyboardTypeOptions;
 }

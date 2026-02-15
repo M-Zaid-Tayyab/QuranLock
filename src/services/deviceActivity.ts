@@ -9,6 +9,7 @@ import type {
 import {
   configureActions,
   getAuthorizationStatus,
+  pollAuthorizationStatus,
   requestAuthorization as libRequestAuthorization,
   startMonitoring as libStartMonitoring,
   stopMonitoring as libStopMonitoring,
@@ -31,6 +32,13 @@ export async function requestAuthorization(): Promise<void> {
 
 export function getAuthStatus(): AuthorizationStatusType {
   return getAuthorizationStatus();
+}
+
+export async function getStableAuthStatus(): Promise<AuthorizationStatusType> {
+  return pollAuthorizationStatus({
+    pollIntervalMs: 250,
+    maxAttempts: 12,
+  });
 }
 
 export function isAuthorized(): boolean {

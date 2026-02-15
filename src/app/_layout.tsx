@@ -6,6 +6,7 @@ import {
   openPaywallForBlockedDecision,
 } from "@/services/entitlements";
 import { ensureQuranPack } from "@/services/quranPack";
+import { startGlobalRecitationOfflineDownload } from "@/services/recitationPack";
 import { configureRevenueCat } from "@/services/revenueCat";
 import { useUserSync } from "@/hooks/user";
 import { useUserStore } from "@/store/user";
@@ -31,6 +32,7 @@ function useDeepLinkToVerse() {
 
   useEffect(() => {
     ensureQuranPack().catch(() => undefined);
+    startGlobalRecitationOfflineDownload().catch(() => undefined);
     const handleUrl = (url: string | null) => {
       if (url && (url === "quranlock://verse" || url.startsWith("quranlock://verse"))) {
         const gate = canOpenQuran({ isPremium, completedUnlockSessions });

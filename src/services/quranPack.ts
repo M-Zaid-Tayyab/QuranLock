@@ -35,6 +35,20 @@ export interface QuranPageData {
   verses?: QuranVerseTranslation[];
 }
 
+export interface QuranVerseLookup {
+  page: number;
+  verse: QuranVerseTranslation;
+}
+
+export interface QuranPackSearchResult {
+  verseKey: string;
+  highlightedText: string;
+  arabicText?: string;
+  translation?: string;
+  surahName?: string;
+  pageNumber?: number;
+}
+
 /**
  * Expected SQLite schema:
  * pages(page_number INTEGER PRIMARY KEY, data TEXT)
@@ -60,7 +74,10 @@ export const getPackInfo = async () => {
     return { exists: false, size: 0 };
   }
   const info = await FileSystem.getInfoAsync(fileUri);
-  return { exists: info.exists, size: info.size ?? 0 };
+  return {
+    exists: info.exists,
+    size: "size" in info ? (info.size ?? 0) : 0,
+  };
 };
 
 export const deleteQuranPack = async () => {
@@ -327,4 +344,160 @@ export const pruneQuranCache = (centerPage: number, radius = 2) => {
       pageCache.delete(key);
     }
   }
+};
+
+export const findVerseLocationByKey = async (
+  verseKey: string,
+): Promise<QuranVerseLookup | null> => {
+  if (!verseKey.trim()) return null;
+  const db = await openQuranDatabase();
+  const needle = `%\"key\":\"${verseKey.trim()}\"%`;
+  const rows = await db.getAllAsync<{ page_number: number; data: string }>(
+    "SELECT page_number, data FROM pages WHERE data LIKE ? LIMIT 12",
+    [needle],
+  );
+
+  for (const row of rows) {
+    if (!row?.data) continue;
+    const parsed = JSON.parse(row.data) as QuranPageData;
+    const match = parsed.verses?.find((verse) => verse.key === verseKey);
+    if (match) {
+      pageCache.set(parsed.page, parsed);
+      return {
+        page: row.page_number || parsed.page,
+        verse: match,
+      };
+    }
+  }
+
+  return null;
+};
+
+const getArabicTextForVerse = (pageData: QuranPageData, verseKey: string) => {
+  const verse = pageData.verses?.find((entry) => entry.key === verseKey);
+  if (verse?.arabic?.trim()) return verse.arabic.trim();
+
+  if (pageData.words?.length) {
+    const arabicWords = pageData.words
+      .filter((word) => word.verseKey === verseKey)
+      .map((word) => word.text)
+      .join(" ")
+      .trim();
+    if (arabicWords) return arabicWords;
+  }
+
+  return null;
+};
+
+export const getArabicTextByVerseKeysFromLocalPack = async (
+  verseKeys: string[],
+): Promise<Map<string, string>> => {
+  const targets = [...new Set(verseKeys.map((key) => key.trim()).filter(Boolean))];
+  if (!targets.length) return new Map();
+
+  const db = await openQuranDatabase();
+  const found = new Map<string, string>();
+
+  for (const verseKey of targets) {
+    const rows = await db.getAllAsync<{ data: string }>(
+      "SELECT data FROM pages WHERE data LIKE ? LIMIT 4",
+      [`%\"key\":\"${verseKey}\"%`],
+    );
+
+    for (const row of rows) {
+      if (!row?.data) continue;
+      const parsed = JSON.parse(row.data) as QuranPageData;
+      const arabic = getArabicTextForVerse(parsed, verseKey);
+      if (!arabic) continue;
+      found.set(verseKey, arabic);
+      break;
+    }
+  }
+
+  return found;
+};
+
+const normalizeSearchText = (value: string) => value.trim().toLowerCase();
+
+const buildSnippet = (source: string, needle: string) => {
+  const cleaned = source.replace(/\s+/g, " ").trim();
+  if (!cleaned) return "";
+  const lower = cleaned.toLowerCase();
+  const idx = lower.indexOf(needle);
+  if (idx === -1) return cleaned.slice(0, 120);
+  const start = Math.max(0, idx - 36);
+  const end = Math.min(cleaned.length, idx + needle.length + 60);
+  return cleaned.slice(start, end).trim();
+};
+
+export const searchVersesInLocalPack = async (
+  query: string,
+  options?: {
+    limit?: number;
+  },
+): Promise<QuranPackSearchResult[]> => {
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  const db = await openQuranDatabase();
+  const limit = Math.min(40, Math.max(1, options?.limit ?? 15));
+  const coarseLimit = Math.max(80, limit * 8);
+  const needle = normalizeSearchText(trimmed);
+
+  let rows = await db.getAllAsync<{ page_number: number; data: string }>(
+    "SELECT page_number, data FROM pages WHERE data LIKE ? LIMIT ?",
+    [`%${trimmed}%`, coarseLimit],
+  );
+
+  if (!rows.length && trimmed.includes(" ")) {
+    const firstToken = trimmed.split(/\s+/).find((token) => token.length > 1);
+    if (firstToken) {
+      rows = await db.getAllAsync<{ page_number: number; data: string }>(
+        "SELECT page_number, data FROM pages WHERE data LIKE ? LIMIT ?",
+        [`%${firstToken}%`, coarseLimit],
+      );
+    }
+  }
+
+  const dedup = new Map<string, QuranPackSearchResult>();
+  for (const row of rows) {
+    if (!row?.data) continue;
+    const parsed = JSON.parse(row.data) as QuranPageData;
+    const pageNumber = row.page_number || parsed.page;
+    const surahName = parsed.surahName;
+    const verseWordMap = new Map<string, string[]>();
+    parsed.words?.forEach((word) => {
+      const words = verseWordMap.get(word.verseKey) ?? [];
+      words.push(word.text);
+      verseWordMap.set(word.verseKey, words);
+    });
+
+    const verses = parsed.verses ?? [];
+    for (const verse of verses) {
+      if (!verse.key || dedup.has(verse.key)) continue;
+      const arabic = verse.arabic ?? verseWordMap.get(verse.key)?.join(" ") ?? "";
+      const translation = verse.translation ?? verse.text;
+      const corpus = `${arabic} ${translation ?? ""}`.toLowerCase();
+      if (!corpus.includes(needle)) continue;
+
+      const source =
+        [arabic, translation].find((value) =>
+          (value ?? "").toLowerCase().includes(needle),
+        ) ?? arabic ?? translation ?? "";
+
+      dedup.set(verse.key, {
+        verseKey: verse.key,
+        highlightedText: buildSnippet(source, needle),
+        arabicText: arabic || undefined,
+        translation: translation || undefined,
+        surahName,
+        pageNumber,
+      });
+      if (dedup.size >= limit) {
+        return [...dedup.values()];
+      }
+    }
+  }
+
+  return [...dedup.values()];
 };
