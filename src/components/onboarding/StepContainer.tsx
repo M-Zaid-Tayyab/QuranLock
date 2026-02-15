@@ -2,7 +2,13 @@ import { PrimaryButton } from "@/components/common";
 import { colors } from "@/constants/colors";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useEffect } from "react";
-import { Text, TouchableOpacity, View } from "react-native";
+import {
+  Keyboard,
+  Text,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -88,99 +94,103 @@ export function StepContainer({
   }));
 
   return (
-    <View className="flex-1 bg-background pt-safe pb-safe">
-      <View className="px-6 pt-2">
-        {!hideProgress && (
-          <View
-            className={`mb-4 ${progressVariant === "bar" ? "" : "flex-row items-center gap-3"}`}
-          >
-            {progressVariant === "full" && (
-              <Text className="text-muted font-sfPro text-sm">
-                Step {step + 1} of {totalSteps}
-              </Text>
-            )}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View className="flex-1 bg-background pt-safe pb-safe">
+        <View className="px-6 pt-2">
+          {!hideProgress && (
             <View
-              className={`h-2 mt-1 rounded-full overflow-hidden ${
-                progressVariant === "bar" ? "w-full" : "flex-1"
-              }`}
-              style={{ backgroundColor: colors.outline }}
+              className={`mb-4 ${progressVariant === "bar" ? "" : "flex-row items-center gap-3"}`}
             >
+              {progressVariant === "full" && (
+                <Text className="text-muted font-sfPro text-sm">
+                  Step {step + 1} of {totalSteps}
+                </Text>
+              )}
               <View
-                className="h-full rounded-full"
+                className={`h-2 mt-1 rounded-full overflow-hidden ${
+                  progressVariant === "bar" ? "w-full" : "flex-1"
+                }`}
                 style={{
-                  width: `${progress * 100}%`,
-                  backgroundColor: accentColor,
+                  backgroundColor: colors.outline,
                 }}
-              />
-            </View>
-            {progressVariant === "full" && (
-              <Text
-                className="text-sm font-sfPro-semibold min-w-[2.5rem]"
-                style={{ color: accentColor }}
               >
-                {progressPercent}%
-              </Text>
-            )}
-          </View>
-        )}
-
-        {/* Back link (optional) */}
-        {showBack && onBack && (
-          <TouchableOpacity
-            onPress={onBack}
-            hitSlop={12}
-            activeOpacity={0.7}
-            className="flex-row items-center mb-4"
-          >
-            <MaterialIcons
-              name="chevron-left"
-              size={24}
-              color={colors.primary}
-            />
-            <Text className="text-primary font-sfPro-semibold text-base ml-1">
-              Back
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {/* Centered icon circle (reference style) */}
-        {icon && (
-          <View className="items-center mb-4">
-            <View
-              className="w-16 h-16 rounded-full items-center justify-center"
-              style={{ backgroundColor: accentColor + "22" }}
-            >
-              <Ionicons name={icon as any} size={32} color={accentColor} />
+                <View
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${progress * 100}%`,
+                    backgroundColor: accentColor,
+                  }}
+                />
+              </View>
+              {progressVariant === "full" && (
+                <Text
+                  className="text-sm font-sfPro-semibold min-w-[2.5rem]"
+                  style={{ color: accentColor }}
+                >
+                  {progressPercent}%
+                </Text>
+              )}
             </View>
-          </View>
-        )}
+          )}
 
-        {/* Title + subtitle */}
-        {title ? (
-          <View className="mb-6">
-            <Text className="text-2xl font-sfPro-bold text-foreground leading-tight">
-              {title}
-            </Text>
-            {subtitle ? (
-              <Text className="mt-2 text-muted font-sfPro text-base leading-6">
-                {subtitle}
+          {/* Back link (optional) */}
+          {showBack && onBack && (
+            <TouchableOpacity
+              onPress={onBack}
+              hitSlop={12}
+              activeOpacity={0.7}
+              className="flex-row items-center mb-4"
+            >
+              <MaterialIcons
+                name="chevron-left"
+                size={24}
+                color={colors.primary}
+              />
+              <Text className="text-primary font-sfPro-semibold text-base ml-1">
+                Back
               </Text>
-            ) : null}
-          </View>
-        ) : null}
-      </View>
+            </TouchableOpacity>
+          )}
 
-      <View className="flex-1 px-6">{children}</View>
+          {/* Centered icon circle (reference style) */}
+          {icon && (
+            <View className="items-center mb-4">
+              <View
+                className="w-16 h-16 rounded-full items-center justify-center"
+                style={{ backgroundColor: accentColor + "22" }}
+              >
+                <Ionicons name={icon as any} size={32} color={accentColor} />
+              </View>
+            </View>
+          )}
 
-      <View className="px-6 pb-6 pt-4">
-        <Animated.View style={ctaAnimatedStyle}>
-          <PrimaryButton
-            title={nextLabel}
-            onPress={onNext}
-            disabled={nextDisabled}
-          />
-        </Animated.View>
+          {/* Title + subtitle */}
+          {title ? (
+            <View className="mb-6">
+              <Text className="text-2xl font-sfPro-bold text-foreground leading-tight">
+                {title}
+              </Text>
+              {subtitle ? (
+                <Text className="mt-2 text-muted font-sfPro text-base leading-6">
+                  {subtitle}
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+
+        <View className="flex-1 px-6">{children}</View>
+
+        <View className="px-6 pb-6 pt-4">
+          <Animated.View style={ctaAnimatedStyle}>
+            <PrimaryButton
+              title={nextLabel}
+              onPress={onNext}
+              disabled={nextDisabled}
+            />
+          </Animated.View>
+        </View>
       </View>
-    </View>
+    </TouchableWithoutFeedback>
   );
 }

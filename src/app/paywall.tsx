@@ -220,7 +220,7 @@ export default function PaywallScreen() {
           </View>
         </View>
 
-        <View className="mt-10 gap-4">
+        <View className="mt-14 gap-4">
           <View className="flex-row items-center gap-3">
             <Ionicons
               name="shield-checkmark-outline"
@@ -255,7 +255,7 @@ export default function PaywallScreen() {
           </View>
         </View>
 
-        <View className="mt-10">
+        <View className="mt-14">
           <View className="flex-row items-center justify-between">
             <Text className="mt-1 text-2xl font-sfPro-bold text-foreground">
               Choose your plan
