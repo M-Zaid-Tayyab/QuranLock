@@ -1,10 +1,9 @@
-import {
-  DEFAULT_QURAN_RECITERS,
-} from "@/services/quranFoundation";
+import { DEFAULT_QURAN_RECITERS } from "@/services/quranFoundation";
 import { resolveVerseRecitationPlaybackSource } from "@/services/recitationPack";
 import {
-  createAudioPlayer,
   setAudioModeAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
   type AudioPlayer,
   type AudioStatus,
 } from "expo-audio";
@@ -12,6 +11,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const PLAYBACK_RATES = [0.8, 1, 1.2] as const;
 const DEFAULT_RECITER_ID = DEFAULT_QURAN_RECITERS[0]?.id ?? 7;
+const PLAYER_END_SEEK_TOLERANCE_SECONDS = 0.06;
+const STATUS_END_TOLERANCE_SECONDS = 0.08;
+const AUTOPLAY_KICK_INTERVAL_MS = 120;
+const MAX_AUTOPLAY_KICK_ATTEMPTS = 5;
 
 interface UseVerseRecitationArgs {
   verseKeys: string[];
@@ -24,6 +27,23 @@ interface LoadVerseOptions {
   silentTransition?: boolean;
 }
 
+interface LoadedSourceState {
+  verseKey: string | null;
+  reciterId: number | null;
+}
+
+interface PlayIntentState {
+  enabled: boolean;
+  loadId: number;
+  verseKey: string | null;
+}
+
+interface PlayKickState {
+  loadId: number;
+  attempts: number;
+  lastAtMs: number;
+}
+
 const formatMillis = (value: number) => {
   const totalSeconds = Math.max(0, Math.floor(value / 1000));
   const minutes = Math.floor(totalSeconds / 60);
@@ -31,8 +51,16 @@ const formatMillis = (value: number) => {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 };
 
-const isPlaybackAtEnd = (player: AudioPlayer) =>
-  player.duration > 0 && player.currentTime >= player.duration - 0.06;
+const isPlayerAtTrackEnd = (player: AudioPlayer) =>
+  player.duration > 0 &&
+  player.currentTime >= player.duration - PLAYER_END_SEEK_TOLERANCE_SECONDS;
+
+const didStatusReachTrackEnd = (status: AudioStatus) =>
+  status.isLoaded &&
+  Number.isFinite(status.duration) &&
+  status.duration > 0 &&
+  Number.isFinite(status.currentTime) &&
+  status.currentTime >= status.duration - STATUS_END_TOLERANCE_SECONDS;
 
 export const useVerseRecitation = ({
   verseKeys,
@@ -40,27 +68,45 @@ export const useVerseRecitation = ({
   onSelectVerse,
   onRequestNextPageVerse,
 }: UseVerseRecitationArgs) => {
-  const playerRef = useRef<AudioPlayer | null>(null);
-  const statusSubscriptionRef = useRef<{ remove: () => void } | null>(null);
-  const loadRequestIdRef = useRef(0);
-  const loadingRequestKeyRef = useRef<string | null>(null);
-  const configuredRef = useRef(false);
+  const reciterId = DEFAULT_RECITER_ID;
+  const player = useAudioPlayer(null, {
+    updateInterval: 250,
+    keepAudioSessionActive: true,
+  });
+  const status = useAudioPlayerStatus(player);
+
   const unmountedRef = useRef(false);
-  const loadedVerseKeyRef = useRef<string | null>(null);
-  const loadedReciterIdRef = useRef<number | null>(null);
+  const configuredAudioModeRef = useRef(false);
+  const activeLoadIdRef = useRef(0);
+  const inFlightRequestKeyRef = useRef<string | null>(null);
+  const loadedSourceRef = useRef<LoadedSourceState>({
+    verseKey: null,
+    reciterId: null,
+  });
+  const pageAdvanceInFlightRef = useRef(false);
+  const wasPlayingRef = useRef(false);
+  const completionHandledForVerseRef = useRef<string | null>(null);
+  const playIntentRef = useRef<PlayIntentState>({
+    enabled: false,
+    loadId: 0,
+    verseKey: null,
+  });
+  const playKickStateRef = useRef<PlayKickState>({
+    loadId: 0,
+    attempts: 0,
+    lastAtMs: 0,
+  });
+
+  const verseKeysRef = useRef(verseKeys);
+  const onSelectVerseRef = useRef(onSelectVerse);
   const onRequestNextPageVerseRef = useRef<(() => Promise<string | null>) | null>(
     onRequestNextPageVerse ?? null,
   );
-  const pageAdvanceInFlightRef = useRef(false);
-
-  const verseKeysRef = useRef<string[]>(verseKeys);
-  const onSelectVerseRef = useRef(onSelectVerse);
   const loadVerseRef = useRef<
     (verseKey: string, shouldPlay: boolean, options?: LoadVerseOptions) => void
   >(() => {});
 
-  const reciterId = DEFAULT_RECITER_ID;
-  const [playbackRate, setPlaybackRate] = useState<number>(1);
+  const [playbackRate, setPlaybackRate] = useState(1);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [positionMillis, setPositionMillis] = useState(0);
@@ -79,21 +125,37 @@ export const useVerseRecitation = ({
   const canGoNext = currentIndex >= 0 && currentIndex < verseKeys.length - 1;
   const canGoPrevious = currentIndex > 0;
 
-  const updateLoadedSource = useCallback(
+  const setLoadedSource = useCallback(
     (verseKey: string | null, nextReciterId: number | null) => {
-      loadedVerseKeyRef.current = verseKey;
-      loadedReciterIdRef.current = nextReciterId;
+      loadedSourceRef.current = {
+        verseKey,
+        reciterId: nextReciterId,
+      };
+      if (!verseKey) {
+        completionHandledForVerseRef.current = null;
+      }
     },
     [],
   );
 
-  const detachStatusListener = useCallback(() => {
-    statusSubscriptionRef.current?.remove();
-    statusSubscriptionRef.current = null;
-  }, []);
+  const setPlayIntent = useCallback(
+    (enabled: boolean, loadId: number, verseKey: string | null) => {
+      playIntentRef.current = {
+        enabled,
+        loadId,
+        verseKey,
+      };
+      playKickStateRef.current = {
+        loadId,
+        attempts: 0,
+        lastAtMs: 0,
+      };
+    },
+    [],
+  );
 
   const ensureAudioMode = useCallback(async () => {
-    if (configuredRef.current) return;
+    if (configuredAudioModeRef.current) return;
     await setAudioModeAsync({
       allowsRecording: false,
       playsInSilentMode: true,
@@ -101,36 +163,85 @@ export const useVerseRecitation = ({
       shouldPlayInBackground: false,
       interruptionMode: "duckOthers",
     });
-    configuredRef.current = true;
+    configuredAudioModeRef.current = true;
   }, []);
 
   const advanceToNextPageVerse = useCallback(() => {
     if (pageAdvanceInFlightRef.current) return;
+
     const requestNextPageVerse = onRequestNextPageVerseRef.current;
-    if (!requestNextPageVerse) return;
+    if (!requestNextPageVerse) {
+      setPlayIntent(false, activeLoadIdRef.current, null);
+      setIsPlaying(false);
+      return;
+    }
 
     pageAdvanceInFlightRef.current = true;
     void requestNextPageVerse()
       .then((nextVerseKey) => {
-        if (!nextVerseKey || unmountedRef.current) return;
+        if (!nextVerseKey || unmountedRef.current) {
+          setPlayIntent(false, activeLoadIdRef.current, null);
+          setIsPlaying(false);
+          return;
+        }
         onSelectVerseRef.current(nextVerseKey);
         loadVerseRef.current(nextVerseKey, true, { silentTransition: true });
       })
       .catch(() => {
-        // Keep silent; playback controls already expose loading/error state on next user action.
+        setPlayIntent(false, activeLoadIdRef.current, null);
+        setIsPlaying(false);
       })
       .finally(() => {
         pageAdvanceInFlightRef.current = false;
       });
-  }, []);
+  }, [setPlayIntent]);
 
-  const onPlaybackStatus = useCallback((status: AudioStatus) => {
+  const advanceToNextVerse = useCallback(
+    (finishedVerseKey: string) => {
+      const keys = verseKeysRef.current;
+      const finishedIndex = keys.findIndex((key) => key === finishedVerseKey);
+
+      if (finishedIndex < 0) {
+        setPlayIntent(false, activeLoadIdRef.current, null);
+        setIsPlaying(false);
+        return;
+      }
+
+      if (finishedIndex >= keys.length - 1) {
+        advanceToNextPageVerse();
+        return;
+      }
+
+      const nextVerseKey = keys[finishedIndex + 1];
+      if (!nextVerseKey) {
+        setPlayIntent(false, activeLoadIdRef.current, null);
+        setIsPlaying(false);
+        return;
+      }
+      onSelectVerseRef.current(nextVerseKey);
+      loadVerseRef.current(nextVerseKey, true, { silentTransition: true });
+    },
+    [advanceToNextPageVerse, setPlayIntent],
+  );
+
+  useEffect(() => {
+    player.shouldCorrectPitch = true;
+  }, [player]);
+
+  useEffect(() => {
     if (unmountedRef.current) return;
 
-    const shouldKeepPlayingState = status.didJustFinish;
-    if (!shouldKeepPlayingState) {
-      setIsPlaying(status.playing);
+    const reachedTrackEnd =
+      status.didJustFinish ||
+      (wasPlayingRef.current && !status.playing && didStatusReachTrackEnd(status));
+    if (!reachedTrackEnd) {
+      const shouldHoldPlaying =
+        playIntentRef.current.enabled &&
+        playIntentRef.current.loadId === activeLoadIdRef.current &&
+        !status.playing;
+      setIsPlaying(shouldHoldPlaying ? true : status.playing);
     }
+
     setPositionMillis(Math.max(0, Math.round((status.currentTime ?? 0) * 1000)));
     if (Number.isFinite(status.duration) && status.duration > 0) {
       setDurationMillis(Math.round(status.duration * 1000));
@@ -139,103 +250,112 @@ export const useVerseRecitation = ({
       setIsLoadingAudio(false);
     }
 
-    if (!status.didJustFinish) return;
-
-    setPositionMillis(0);
-    const finishedVerseKey = loadedVerseKeyRef.current;
-    if (!finishedVerseKey) return;
-    const keys = verseKeysRef.current;
-    const finishedIndex = keys.findIndex((key) => key === finishedVerseKey);
-    if (finishedIndex < 0) return;
-    if (finishedIndex >= keys.length - 1) {
-      advanceToNextPageVerse();
-      return;
+    if (status.playing) {
+      if (playIntentRef.current.enabled) {
+        setPlayIntent(
+          false,
+          activeLoadIdRef.current,
+          loadedSourceRef.current.verseKey,
+        );
+      }
+      completionHandledForVerseRef.current = null;
     }
-    const nextVerseKey = keys[finishedIndex + 1];
-    if (!nextVerseKey) return;
-    onSelectVerseRef.current(nextVerseKey);
-    loadVerseRef.current(nextVerseKey, true, { silentTransition: true });
-  }, [advanceToNextPageVerse]);
 
-  const attachStatusListener = useCallback(
-    (player: AudioPlayer) => {
-      detachStatusListener();
-      statusSubscriptionRef.current = player.addListener(
-        "playbackStatusUpdate",
-        onPlaybackStatus,
-      );
-    },
-    [detachStatusListener, onPlaybackStatus],
-  );
+    if (status.isLoaded && !status.playing && !reachedTrackEnd) {
+      const intent = playIntentRef.current;
+      const loadedVerseKey = loadedSourceRef.current.verseKey;
+      const isIntentActive =
+        intent.enabled &&
+        intent.loadId === activeLoadIdRef.current &&
+        intent.verseKey != null &&
+        intent.verseKey === loadedVerseKey;
 
-  const disposePlayer = useCallback(
-    (player: AudioPlayer | null) => {
-      if (!player) return;
-      if (playerRef.current?.id === player.id) {
-        detachStatusListener();
-        playerRef.current = null;
-      }
-      try {
-        if (player.playing) {
-          player.pause();
+      if (isIntentActive) {
+        const now = Date.now();
+        const kickState = playKickStateRef.current;
+
+        if (kickState.loadId !== intent.loadId) {
+          playKickStateRef.current = {
+            loadId: intent.loadId,
+            attempts: 0,
+            lastAtMs: 0,
+          };
         }
-      } catch {
-        // noop
-      }
-      try {
-        player.remove();
-      } catch {
-        // noop
-      }
-    },
-    [detachStatusListener],
-  );
 
-  const ensurePlayer = useCallback(() => {
-    if (playerRef.current) return playerRef.current;
-    const player = createAudioPlayer(null, {
-      updateInterval: 250,
-      keepAudioSessionActive: true,
-    });
-    player.shouldCorrectPitch = true;
-    attachStatusListener(player);
-    playerRef.current = player;
-    return player;
-  }, [attachStatusListener]);
+        const currentKickState = playKickStateRef.current;
+        const canKickNow =
+          now - currentKickState.lastAtMs >= AUTOPLAY_KICK_INTERVAL_MS;
+
+        if (canKickNow && currentKickState.attempts < MAX_AUTOPLAY_KICK_ATTEMPTS) {
+          player.play();
+          playKickStateRef.current = {
+            loadId: intent.loadId,
+            attempts: currentKickState.attempts + 1,
+            lastAtMs: now,
+          };
+        } else if (currentKickState.attempts >= MAX_AUTOPLAY_KICK_ATTEMPTS) {
+          setPlayIntent(false, intent.loadId, intent.verseKey);
+          setIsPlaying(false);
+        }
+      }
+    }
+
+    if (reachedTrackEnd) {
+      if (playIntentRef.current.enabled) {
+        wasPlayingRef.current = status.playing;
+        return;
+      }
+
+      setPositionMillis(0);
+      const finishedVerseKey = loadedSourceRef.current.verseKey;
+      if (!finishedVerseKey) {
+        setPlayIntent(false, activeLoadIdRef.current, null);
+        setIsPlaying(false);
+      } else if (completionHandledForVerseRef.current !== finishedVerseKey) {
+        completionHandledForVerseRef.current = finishedVerseKey;
+        advanceToNextVerse(finishedVerseKey);
+      }
+    }
+
+    wasPlayingRef.current = status.playing;
+  }, [
+    advanceToNextVerse,
+    player,
+    setPlayIntent,
+    status,
+  ]);
 
   const loadVerse = useCallback(
-    async (
-      verseKey: string,
-      shouldPlay: boolean,
-      options?: LoadVerseOptions,
-    ) => {
+    async (verseKey: string, shouldPlay: boolean, options?: LoadVerseOptions) => {
       const trimmedVerseKey = verseKey.trim();
       if (!trimmedVerseKey) return;
+
       const silentTransition = Boolean(options?.silentTransition);
       const requestKey = `${reciterId}:${trimmedVerseKey}:${shouldPlay ? "1" : "0"}`;
-      if (loadingRequestKeyRef.current === requestKey) return;
+      if (inFlightRequestKeyRef.current === requestKey) {
+        return;
+      }
 
-      const requestId = ++loadRequestIdRef.current;
-      loadingRequestKeyRef.current = requestKey;
+      const loadId = ++activeLoadIdRef.current;
+      inFlightRequestKeyRef.current = requestKey;
+      setPlayIntent(shouldPlay, loadId, shouldPlay ? trimmedVerseKey : null);
+      setError(null);
       if (!silentTransition) {
         setIsLoadingAudio(true);
       }
-      setError(null);
 
       try {
         await ensureAudioMode();
-        const player = ensurePlayer();
+
         const isSameSource =
-          loadedVerseKeyRef.current === trimmedVerseKey &&
-          loadedReciterIdRef.current === reciterId;
+          loadedSourceRef.current.verseKey === trimmedVerseKey &&
+          loadedSourceRef.current.reciterId === reciterId;
 
         if (isSameSource) {
           player.setPlaybackRate(playbackRate, "high");
           if (shouldPlay) {
-            if (isPlaybackAtEnd(player)) {
-              await player.seekTo(0).catch(() => {
-                // noop
-              });
+            if (isPlayerAtTrackEnd(player)) {
+              await player.seekTo(0).catch(() => undefined);
             }
             player.play();
           }
@@ -246,29 +366,29 @@ export const useVerseRecitation = ({
           player.pause();
         }
 
-        const recitation = await resolveVerseRecitationPlaybackSource(
+        const source = await resolveVerseRecitationPlaybackSource(
           trimmedVerseKey,
           reciterId,
         );
-        if (requestId !== loadRequestIdRef.current) {
-          return;
-        }
+        if (loadId !== activeLoadIdRef.current) return;
 
-        player.replace({ uri: recitation.uri });
+        player.replace({ uri: source.uri });
         player.shouldCorrectPitch = true;
         player.setPlaybackRate(playbackRate, "high");
-        updateLoadedSource(trimmedVerseKey, reciterId);
+        setLoadedSource(trimmedVerseKey, reciterId);
         setPositionMillis(0);
         setDurationMillis(
-          recitation.durationMs != null && Number.isFinite(recitation.durationMs)
-            ? recitation.durationMs
+          source.durationMs != null && Number.isFinite(source.durationMs)
+            ? source.durationMs
             : 0,
         );
+
         if (shouldPlay) {
           player.play();
         }
       } catch (loadError) {
-        if (requestId !== loadRequestIdRef.current || unmountedRef.current) return;
+        if (loadId !== activeLoadIdRef.current || unmountedRef.current) return;
+        setPlayIntent(false, loadId, trimmedVerseKey);
         setError(
           loadError instanceof Error
             ? loadError.message
@@ -276,19 +396,26 @@ export const useVerseRecitation = ({
         );
         setIsPlaying(false);
       } finally {
-        if (requestId === loadRequestIdRef.current) {
-          loadingRequestKeyRef.current = null;
+        if (loadId === activeLoadIdRef.current) {
+          inFlightRequestKeyRef.current = null;
         }
         if (
           !silentTransition &&
-          requestId === loadRequestIdRef.current &&
+          loadId === activeLoadIdRef.current &&
           !unmountedRef.current
         ) {
           setIsLoadingAudio(false);
         }
       }
     },
-    [ensureAudioMode, ensurePlayer, playbackRate, reciterId, updateLoadedSource],
+    [
+      ensureAudioMode,
+      playbackRate,
+      player,
+      reciterId,
+      setLoadedSource,
+      setPlayIntent,
+    ],
   );
 
   loadVerseRef.current = (
@@ -301,39 +428,35 @@ export const useVerseRecitation = ({
 
   const togglePlayback = useCallback(async () => {
     if (!selectedVerseKey || isLoadingAudio) return;
+    const isLoadedSelection =
+      loadedSourceRef.current.verseKey === selectedVerseKey &&
+      loadedSourceRef.current.reciterId === reciterId;
 
-    const player = playerRef.current;
-    const isLoadedCurrentVerse =
-      loadedVerseKeyRef.current === selectedVerseKey &&
-      loadedReciterIdRef.current === reciterId;
-
-    if (player && isLoadedCurrentVerse) {
+    if (isLoadedSelection) {
       if (!player.isLoaded) {
         await loadVerse(selectedVerseKey, true);
         return;
       }
 
       if (player.playing) {
+        setPlayIntent(false, activeLoadIdRef.current, selectedVerseKey);
         player.pause();
       } else {
-        if (isPlaybackAtEnd(player)) {
-          await player.seekTo(0).catch(() => {
-            // noop
-          });
+        if (isPlayerAtTrackEnd(player)) {
+          await player.seekTo(0).catch(() => undefined);
         }
+        setPlayIntent(true, activeLoadIdRef.current, selectedVerseKey);
         player.play();
       }
       return;
     }
-
     await loadVerse(selectedVerseKey, true);
-  }, [isLoadingAudio, loadVerse, reciterId, selectedVerseKey]);
+  }, [isLoadingAudio, loadVerse, player, reciterId, selectedVerseKey, setPlayIntent]);
 
   const playRelative = useCallback(
     (offset: 1 | -1) => {
-      const baseIndex = currentIndex;
-      if (baseIndex < 0) return;
-      const target = verseKeys[baseIndex + offset];
+      if (currentIndex < 0) return;
+      const target = verseKeys[currentIndex + offset];
       if (!target) {
         if (offset === 1) {
           advanceToNextPageVerse();
@@ -343,54 +466,69 @@ export const useVerseRecitation = ({
       onSelectVerse(target);
       loadVerseRef.current(target, true, { silentTransition: true });
     },
-    [advanceToNextPageVerse, currentIndex, onSelectVerse, verseKeys],
+    [
+      advanceToNextPageVerse,
+      currentIndex,
+      onSelectVerse,
+      verseKeys,
+    ],
   );
 
   const cycleRate = useCallback(() => {
-    const currentRateIndex = PLAYBACK_RATES.findIndex(
-      (value) => value === playbackRate,
-    );
+    const currentRateIndex = PLAYBACK_RATES.findIndex((value) => value === playbackRate);
     const nextRate =
       PLAYBACK_RATES[(currentRateIndex + 1 + PLAYBACK_RATES.length) % PLAYBACK_RATES.length];
     setPlaybackRate(nextRate);
 
-    const player = playerRef.current;
-    if (player?.isLoaded) {
+    if (player.isLoaded) {
       player.setPlaybackRate(nextRate, "high");
     }
-  }, [playbackRate]);
+  }, [playbackRate, player]);
 
   useEffect(() => {
     return () => {
       unmountedRef.current = true;
-      loadRequestIdRef.current += 1;
-      loadingRequestKeyRef.current = null;
+      activeLoadIdRef.current += 1;
+      inFlightRequestKeyRef.current = null;
       pageAdvanceInFlightRef.current = false;
-      disposePlayer(playerRef.current);
+      wasPlayingRef.current = false;
+      completionHandledForVerseRef.current = null;
+      setPlayIntent(false, activeLoadIdRef.current, null);
+      try {
+        if (player.playing) {
+          player.pause();
+        }
+      } catch {
+        // noop
+      }
     };
-  }, [disposePlayer]);
+  }, [player, setPlayIntent]);
 
   useEffect(() => {
-    const player = playerRef.current;
     if (!selectedVerseKey) {
-      if (player?.playing) {
-        player.pause();
+      try {
+        if (player.playing) {
+          player.pause();
+        }
+      } catch {
+        // noop
       }
+      setPlayIntent(false, activeLoadIdRef.current, null);
       setIsPlaying(false);
       setIsLoadingAudio(false);
       setPositionMillis(0);
       setDurationMillis(0);
       setError(null);
-      updateLoadedSource(null, null);
+      setLoadedSource(null, null);
       return;
     }
 
     const isLoadedSelection =
-      loadedVerseKeyRef.current === selectedVerseKey &&
-      loadedReciterIdRef.current === reciterId;
+      loadedSourceRef.current.verseKey === selectedVerseKey &&
+      loadedSourceRef.current.reciterId === reciterId;
 
     if (isPlaying && !isLoadedSelection) {
-      if (!loadingRequestKeyRef.current?.includes(`:${selectedVerseKey}:`)) {
+      if (!inFlightRequestKeyRef.current?.includes(`:${selectedVerseKey}:`)) {
         loadVerseRef.current(selectedVerseKey, true);
       }
       return;
@@ -400,7 +538,7 @@ export const useVerseRecitation = ({
       setPositionMillis(0);
       setDurationMillis(0);
     }
-  }, [isPlaying, reciterId, selectedVerseKey, updateLoadedSource]);
+  }, [isPlaying, player, reciterId, selectedVerseKey, setLoadedSource, setPlayIntent]);
 
   return {
     playbackRate,

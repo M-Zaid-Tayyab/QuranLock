@@ -192,7 +192,10 @@ export function useOnboarding(): UseOnboardingResult {
 
       if (!isEditTimes) {
         setOnboardingComplete(true);
-        router.replace("/paywall");
+        router.replace({
+          pathname: "/paywall",
+          params: { entry: "onboarding" },
+        });
       } else {
         router.back();
       }

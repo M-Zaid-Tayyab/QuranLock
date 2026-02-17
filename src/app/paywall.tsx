@@ -8,7 +8,7 @@ import {
 } from "@/services/revenueCat";
 import { useUserStore } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -27,7 +27,23 @@ type PlanProduct = PurchasesPackage["product"] & {
 
 export default function PaywallScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ entry?: string | string[] }>();
   const setIsPremium = useUserStore((s) => s.setIsPremium);
+  const paywallEntry =
+    typeof params.entry === "string" ? params.entry : params.entry?.[0];
+
+  const exitPaywall = useCallback(() => {
+    if (paywallEntry === "onboarding") {
+      router.replace("/home");
+      return;
+    }
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace("/home");
+  }, [paywallEntry, router]);
+
   const normalizeExternalUrl = (value: string | undefined) => {
     const trimmed = value?.trim() ?? "";
     if (!trimmed) return "";
@@ -105,14 +121,14 @@ export default function PaywallScreen() {
       const isActive = Boolean(customerInfo.entitlements.active[entitlementId]);
       setIsPremium(isActive);
       if (isActive) {
-        router.back();
+        exitPaywall();
       }
     } catch {
       // user cancelled or failed
     } finally {
       setPurchasing(false);
     }
-  }, [router, selectedPackage, setIsPremium]);
+  }, [exitPaywall, selectedPackage, setIsPremium]);
 
   const handleRestore = useCallback(async () => {
     try {
@@ -122,12 +138,12 @@ export default function PaywallScreen() {
       const isActive = Boolean(info.entitlements.active[entitlementId]);
       setIsPremium(isActive);
       if (isActive) {
-        router.back();
+        exitPaywall();
       }
     } catch {
       // ignore
     }
-  }, [router, setIsPremium]);
+  }, [exitPaywall, setIsPremium]);
 
   const openLink = useCallback((url: string, label: string) => {
     if (!url) {
@@ -335,7 +351,7 @@ export default function PaywallScreen() {
 
       {showClose && (
         <Pressable
-          onPress={() => router.replace("/home")}
+          onPress={exitPaywall}
           className="absolute right-6 top-safe h-10 w-10 items-center justify-center rounded-full border border-outline bg-surface"
         >
           <Ionicons name="close" size={20} color={colors.muted} />

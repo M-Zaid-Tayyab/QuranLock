@@ -30,6 +30,7 @@ import {
 } from "@/services/quranPack";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
+import { useVerseStore, type ReadingMode } from "@/store/verse";
 import { getArabicLineHeight } from "@/utils/arabicTypography";
 import { getScheduleStatuses } from "@/utils/scheduleEngine";
 import { useRouter } from "expo-router";
@@ -40,7 +41,6 @@ const TICK_INTERVAL_MS = 1000;
 const MINUTES_PER_TICK = 1 / 60;
 const FONT_SCALES = [0.9, 1, 1.15, 1.3];
 
-type ReadingMode = "mushaf" | "study";
 type PackState = "checking" | "missing" | "downloading" | "ready" | "error";
 
 interface DisplayVerse {
@@ -86,8 +86,10 @@ export const useVerseScreen = () => {
   const setActiveSchedule = useBlockingStore((s) => s.setActiveSchedule);
   const lastReadPage = useUserStore((s) => s.lastReadPage);
   const setLastReadPage = useUserStore((s) => s.setLastReadPage);
-  const translationEnabled = useUserStore((s) => s.translationEnabled);
-  const setTranslationEnabled = useUserStore((s) => s.setTranslationEnabled);
+  const syncedTranslationEnabled = useUserStore((s) => s.translationEnabled);
+  const setSyncedTranslationEnabled = useUserStore(
+    (s) => s.setTranslationEnabled,
+  );
   const quranFontScale = useUserStore((s) => s.quranFontScale);
   const setQuranFontScale = useUserStore((s) => s.setQuranFontScale);
   const isPremium = useUserStore((s) => s.isPremium);
@@ -98,6 +100,23 @@ export const useVerseScreen = () => {
     (s) => s.incrementCompletedUnlockSessions,
   );
   const focusSchedules = useUserStore((s) => s.focusSchedules);
+  const hasMigratedFromUserStore = useVerseStore(
+    (s) => s.hasMigratedFromUserStore,
+  );
+  const hydrateFromUserTranslation = useVerseStore(
+    (s) => s.hydrateFromUserTranslation,
+  );
+  const translationEnabled = useVerseStore((s) => s.translationEnabled);
+  const toggleTranslationEnabled = useVerseStore(
+    (s) => s.toggleTranslationEnabled,
+  );
+  const readingMode = useVerseStore((s) => s.readingMode);
+  const setReadingMode = useVerseStore((s) => s.setReadingMode);
+  const toggleReadingMode = useVerseStore((s) => s.toggleReadingMode);
+  const recitationVisible = useVerseStore((s) => s.recitationVisible);
+  const toggleRecitationVisible = useVerseStore(
+    (s) => s.toggleRecitationVisible,
+  );
   const translationEnabledRef = useRef(translationEnabled);
   const unlockSessionCountedRef = useRef(false);
   const gateCheckedRef = useRef(false);
@@ -126,7 +145,6 @@ export const useVerseScreen = () => {
   const [pageDirection, setPageDirection] = useState<1 | -1>(1);
   const requestIdRef = useRef(0);
 
-  const [readingMode, setReadingMode] = useState<ReadingMode>("mushaf");
   const [selectedVerseKey, setSelectedVerseKey] = useState<string | null>(null);
 
   const [searchVisible, setSearchVisible] = useState(false);
@@ -134,7 +152,6 @@ export const useVerseScreen = () => {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<QuranSearchResult[]>([]);
-  const [recitationVisible, setRecitationVisible] = useState(false);
   const [recitationDownloadStatus, setRecitationDownloadStatus] = useState(
     getRecitationOfflineDownloadStatus,
   );
@@ -247,6 +264,26 @@ export const useVerseScreen = () => {
   useEffect(() => {
     translationEnabledRef.current = translationEnabled;
   }, [translationEnabled]);
+
+  useEffect(() => {
+    if (hasMigratedFromUserStore) return;
+    hydrateFromUserTranslation(syncedTranslationEnabled);
+  }, [
+    hasMigratedFromUserStore,
+    hydrateFromUserTranslation,
+    syncedTranslationEnabled,
+  ]);
+
+  useEffect(() => {
+    if (!hasMigratedFromUserStore) return;
+    if (syncedTranslationEnabled === translationEnabled) return;
+    setSyncedTranslationEnabled(translationEnabled);
+  }, [
+    hasMigratedFromUserStore,
+    setSyncedTranslationEnabled,
+    syncedTranslationEnabled,
+    translationEnabled,
+  ]);
 
   useEffect(() => {
     return subscribeRecitationOfflineDownloadStatus((status) => {
@@ -663,16 +700,21 @@ export const useVerseScreen = () => {
       isDownloadingOfflinePack: recitationDownloadStatus.isDownloading,
     },
     actions: {
-      goBack: () => router.back(),
+      goBack: () => {
+        if (router.canGoBack()) {
+          router.back();
+          return;
+        }
+        router.replace("/home");
+      },
       increaseFont: () => handleFontAdjust(1),
       decreaseFont: () => handleFontAdjust(-1),
-      toggleTranslation: () => setTranslationEnabled(!translationEnabled),
+      toggleTranslation: toggleTranslationEnabled,
       openSearch: () => setSearchVisible(true),
       closeSearch: handleCloseSearch,
       setSearchQuery,
       pickSearchResult: handleSearchPick,
-      toggleReadingMode: () =>
-        setReadingMode((mode) => (mode === "mushaf" ? "study" : "mushaf")),
+      toggleReadingMode,
       setReadingMode: (mode: ReadingMode) => setReadingMode(mode),
       readingMode,
       downloadPack: handleDownload,
@@ -680,8 +722,7 @@ export const useVerseScreen = () => {
       goNextPage: () => handlePageChange(currentPage + 1),
       goPreviousPage: () => handlePageChange(currentPage - 1),
       selectVerse: setSelectedVerseKey,
-      toggleRecitationVisible: () =>
-        setRecitationVisible((visible) => !visible),
+      toggleRecitationVisible,
       resumeRecitationDownload: () => {
         void startGlobalRecitationOfflineDownload();
       },
