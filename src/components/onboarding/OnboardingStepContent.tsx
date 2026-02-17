@@ -107,6 +107,9 @@ export function OnboardingStepContent({
     return (
       <ScreenTimeStep
         onAuthorizationChange={onboarding.onScreenTimeAuthorizationChange}
+        onAuthorizationStatusChange={
+          onboarding.onScreenTimeAuthorizationStatusChange
+        }
       />
     );
   }
@@ -125,6 +128,12 @@ export function OnboardingStepContent({
       <FocusTimesStep
         isEditTimes={onboarding.isEditTimes}
         scheduleError={onboarding.scheduleError}
+        onNotificationPermissionChange={
+          onboarding.onNotificationPermissionChange
+        }
+        onNotificationPermissionStatusChange={
+          onboarding.onNotificationPermissionStatusChange
+        }
       />
     );
   }

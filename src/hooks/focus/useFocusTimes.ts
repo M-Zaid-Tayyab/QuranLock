@@ -23,10 +23,18 @@ import {
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
+
+export type FocusNotificationStatus =
+  | "granted"
+  | "denied"
+  | "undetermined"
+  | null;
 
 export interface UseFocusTimesArgs {
   isEditTimes: boolean;
+  onNotificationPermissionChange?: (approved: boolean) => void;
+  onNotificationPermissionStatusChange?: (status: FocusNotificationStatus) => void;
 }
 
 export interface UseFocusTimesResult {
@@ -38,7 +46,7 @@ export interface UseFocusTimesResult {
   timePickerTarget: string | null;
   pickerDate: Date;
   isTimePickerOpen: boolean;
-  notificationStatus: "granted" | "denied" | "undetermined" | null;
+  notificationStatus: FocusNotificationStatus;
   selectedPrayerIds: Set<string>;
   orderedSchedules: FocusSchedule[];
   summaryMinutesText: string;
@@ -65,6 +73,8 @@ export const FOCUS_LABEL_MAX_LENGTH = 24;
 
 export function useFocusTimes({
   isEditTimes,
+  onNotificationPermissionChange,
+  onNotificationPermissionStatusChange,
 }: UseFocusTimesArgs): UseFocusTimesResult {
   const router = useRouter();
   const focusSchedules = useUserStore((s) => s.focusSchedules);
@@ -88,9 +98,8 @@ export function useFocusTimes({
     d.setHours(12, 0, 0, 0);
     return d;
   });
-  const [notificationStatus, setNotificationStatus] = useState<
-    "granted" | "denied" | "undetermined" | null
-  >(null);
+  const [notificationStatus, setNotificationStatus] =
+    useState<FocusNotificationStatus>(null);
   const [goalDaysInput, setGoalDaysInput] = useState(() =>
     String(sanitizeGoalDays(focusCompletionDays)),
   );
@@ -111,34 +120,79 @@ export function useFocusTimes({
     }
   }, [focusSchedules.length]);
 
+  const mapNotificationStatus = useCallback(
+    (status: Notifications.PermissionStatus): Exclude<
+      FocusNotificationStatus,
+      null
+    > =>
+      status === "granted"
+        ? "granted"
+        : status === "denied"
+          ? "denied"
+          : "undetermined",
+    [],
+  );
+
+  const syncNotificationStatus = useCallback(async () => {
+    if (Platform.OS !== "ios") {
+      setNotificationStatus("granted");
+      return "granted" as const;
+    }
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      const mapped = mapNotificationStatus(status);
+      setNotificationStatus(mapped);
+      return mapped;
+    } catch {
+      return null;
+    }
+  }, [mapNotificationStatus]);
+
+  const requestNotifications = useCallback(async () => {
+    if (Platform.OS !== "ios") return;
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      setNotificationStatus(mapNotificationStatus(status));
+    } catch {}
+  }, [mapNotificationStatus]);
+
+  useEffect(() => {
+    void syncNotificationStatus();
+  }, [syncNotificationStatus]);
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") {
+        void syncNotificationStatus();
+      }
+    });
+    return () => subscription.remove();
+  }, [syncNotificationStatus]);
+
   useEffect(() => {
     if (isEditTimes || Platform.OS !== "ios") return;
+    if (notificationStatus !== "undetermined") return;
     if (hasRequestedNotificationsRef.current) return;
 
     hasRequestedNotificationsRef.current = true;
-    Notifications.getPermissionsAsync()
-      .then(({ status }) => {
-        const current =
-          status === "granted"
-            ? "granted"
-            : status === "denied"
-              ? "denied"
-              : "undetermined";
-        setNotificationStatus(current);
+    void requestNotifications();
+  }, [isEditTimes, notificationStatus, requestNotifications]);
 
-        if (status === "granted") return;
-        return Notifications.requestPermissionsAsync().then(({ status: s }) => {
-          setNotificationStatus(
-            s === "granted"
-              ? "granted"
-              : s === "denied"
-                ? "denied"
-                : "undetermined",
-          );
-        });
-      })
-      .catch(() => {});
-  }, [isEditTimes]);
+  useEffect(() => {
+    if (!onNotificationPermissionChange) return;
+    if (Platform.OS !== "ios") {
+      onNotificationPermissionChange(true);
+      return;
+    }
+    if (notificationStatus == null) return;
+    onNotificationPermissionChange(notificationStatus === "granted");
+  }, [notificationStatus, onNotificationPermissionChange]);
+
+  useEffect(() => {
+    if (!onNotificationPermissionStatusChange) return;
+    onNotificationPermissionStatusChange(notificationStatus);
+  }, [notificationStatus, onNotificationPermissionStatusChange]);
 
   const selectedPrayerIds = useMemo(
     () =>

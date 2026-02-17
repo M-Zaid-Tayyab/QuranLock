@@ -3,6 +3,7 @@ import { colors } from "@/constants/colors";
 import {
   FOCUS_DURATION_STEP,
   FOCUS_LABEL_MAX_LENGTH,
+  type FocusNotificationStatus,
   useFocusTimes,
 } from "@/hooks/focus";
 import { GOAL_DAYS_MAX, GOAL_DAYS_MIN } from "@/utils/focusPlan";
@@ -14,11 +15,15 @@ import { Pressable, Text, TextInput, View } from "react-native";
 interface FocusTimesStepProps {
   isEditTimes: boolean;
   scheduleError: string | null;
+  onNotificationPermissionChange?: (approved: boolean) => void;
+  onNotificationPermissionStatusChange?: (status: FocusNotificationStatus) => void;
 }
 
 export function FocusTimesStep({
   isEditTimes,
   scheduleError,
+  onNotificationPermissionChange,
+  onNotificationPermissionStatusChange,
 }: FocusTimesStepProps) {
   const {
     focusSchedules,
@@ -47,7 +52,43 @@ export function FocusTimesStep({
     onCommitDurationInput,
     onChangeScheduleLabel,
     onCommitScheduleLabel,
-  } = useFocusTimes({ isEditTimes });
+  } = useFocusTimes({
+    isEditTimes,
+    onNotificationPermissionChange,
+    onNotificationPermissionStatusChange,
+  });
+
+  const notificationMeta = (() => {
+    if (notificationStatus === "granted") {
+      return {
+        label: "Allowed",
+        tone: colors.success,
+        bg: colors.success + "22",
+      };
+    }
+    if (notificationStatus === "denied") {
+      return {
+        label: "Denied",
+        tone: colors.error,
+        bg: colors.error + "22",
+      };
+    }
+    if (notificationStatus === "undetermined") {
+      return {
+        label: "Not determined",
+        tone: colors.warning,
+        bg: colors.warning + "22",
+      };
+    }
+    return {
+      label: "Checking...",
+      tone: colors.muted,
+      bg: colors.muted + "1A",
+    };
+  })();
+  const showNotificationCard =
+    !isEditTimes &&
+    (notificationStatus === "undetermined" || notificationStatus === "denied");
 
   return (
     <View className="flex-1">
@@ -414,7 +455,7 @@ export function FocusTimesStep({
           </Text>
         ) : null}
 
-        {!isEditTimes && (
+        {showNotificationCard && (
           <View className="mt-6 rounded-2xl border border-outline bg-backgroundElevated px-4 py-4">
             <View className="flex-row items-center gap-3">
               <View
@@ -436,18 +477,17 @@ export function FocusTimesStep({
                 </Text>
               </View>
             </View>
-            {notificationStatus ? (
-              <Text className="mt-3 text-sm font-sfPro text-muted">
-                Status:{" "}
-                <Text className="font-sfPro-semibold text-foreground">
-                  {notificationStatus === "granted"
-                    ? "Allowed"
-                    : notificationStatus === "denied"
-                      ? "Denied"
-                      : "Not determined"}
-                </Text>
+            <View
+              className="mt-3 self-start rounded-full px-3 py-1.5"
+              style={{ backgroundColor: notificationMeta.bg }}
+            >
+              <Text
+                className="text-xs font-sfPro-semibold"
+                style={{ color: notificationMeta.tone }}
+              >
+                Notification status: {notificationMeta.label}
               </Text>
-            ) : null}
+            </View>
           </View>
         )}
       </KeyboardAwareScrollView>

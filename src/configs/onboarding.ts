@@ -41,7 +41,7 @@ export const STEP_SUBTITLES: Record<number, string> = {
   6: "",
   7: "We use Screen Time to protect your focus window and pause distracting apps.",
   8: "Choose the apps that tend to pull your attention away.",
-  9: "Pick prayer/custom times, optionally set a Quran completion goal in days, and adjust durations anytime.",
+  9: "Pick prayer times and set a Quran completion goal.",
 };
 
 export const STEP_ICONS: Partial<Record<number, string>> = {};
