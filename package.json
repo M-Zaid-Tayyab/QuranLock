@@ -7,6 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "postinstall": "patch-package",
     "lint": "expo lint",
     "build:quran-pack-lite": "node src/scripts/build-quran-pack-lite.mjs",
     "build:ios": "eas build --profile production --platform ios",
@@ -16,7 +17,6 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@gorhom/bottom-sheet": "^5.2.8",
-    "@react-native-community/datetimepicker": "^8.6.0",
     "@react-navigation/bottom-tabs": "^7.4.0",
     "@react-navigation/elements": "^2.6.3",
     "@react-navigation/native": "^7.1.8",
@@ -45,8 +45,10 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
+    "react-native-date-picker": "5.0.13",
     "react-native-device-activity": "^0.5.3",
     "react-native-gesture-handler": "~2.28.0",
+    "react-native-keyboard-controller": "^1.20.7",
     "react-native-mmkv": "^4.1.2",
     "react-native-nitro-modules": "^0.33.7",
     "react-native-purchases": "^9.0.0",
@@ -67,6 +69,7 @@
     "eslint": "^9.25.0",
     "eslint-config-expo": "~10.0.0",
     "fast-xml-parser": "^4.3.6",
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2"
   },
   "private": true

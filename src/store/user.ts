@@ -14,6 +14,9 @@ export interface UserState {
   quranFrequency: string;
   reasonsDisconnect: string[];
   focusSchedules: FocusSchedule[];
+  focusDurationMode: FocusDurationMode;
+  focusCompletionDays: number;
+  focusMinutesPerPage: number;
   onboardingComplete: boolean;
   hasSelectedApps: boolean;
   lastReadPage: number;
@@ -33,6 +36,8 @@ export interface FocusSchedule {
   durationMinutes: number;
 }
 
+export type FocusDurationMode = "manual" | "goal";
+
 interface UserActions {
   setAppUserId: (value: string) => void;
   setName: (name: string) => void;
@@ -40,6 +45,9 @@ interface UserActions {
   setQuranFrequency: (value: string) => void;
   setReasonsDisconnect: (value: string[]) => void;
   setFocusSchedules: (value: FocusSchedule[]) => void;
+  setFocusDurationMode: (value: FocusDurationMode) => void;
+  setFocusCompletionDays: (value: number) => void;
+  setFocusMinutesPerPage: (value: number) => void;
   setOnboardingComplete: (value: boolean) => void;
   setHasSelectedApps: (value: boolean) => void;
   setLastReadPage: (page: number) => void;
@@ -57,6 +65,9 @@ const initialState: UserState = {
   quranFrequency: "",
   reasonsDisconnect: [],
   focusSchedules: [],
+  focusDurationMode: "goal",
+  focusCompletionDays: 30,
+  focusMinutesPerPage: 3.0,
   onboardingComplete: false,
   hasSelectedApps: false,
   lastReadPage: 1,
@@ -78,6 +89,11 @@ export const useUserStore = create<UserState & UserActions>()(
       setQuranFrequency: (quranFrequency) => set({ quranFrequency }),
       setReasonsDisconnect: (reasonsDisconnect) => set({ reasonsDisconnect }),
       setFocusSchedules: (focusSchedules) => set({ focusSchedules }),
+      setFocusDurationMode: (focusDurationMode) => set({ focusDurationMode }),
+      setFocusCompletionDays: (focusCompletionDays) =>
+        set({ focusCompletionDays }),
+      setFocusMinutesPerPage: (focusMinutesPerPage) =>
+        set({ focusMinutesPerPage }),
       setOnboardingComplete: (onboardingComplete) =>
         set({ onboardingComplete }),
       setHasSelectedApps: (hasSelectedApps) => set({ hasSelectedApps }),
