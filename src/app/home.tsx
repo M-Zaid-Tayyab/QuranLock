@@ -7,10 +7,12 @@ import {
   SetupCard,
 } from "@/components/home";
 import { colors } from "@/constants/colors";
+import { useFunnelText } from "@/hooks/app";
 import { useHomeScreen } from "@/hooks/home";
 import { ScrollView, View } from "react-native";
 
 export default function HomeScreen() {
+  const funnelText = useFunnelText();
   const vm = useHomeScreen();
 
   return (
@@ -50,7 +52,7 @@ export default function HomeScreen() {
             iconColor={colors.warning}
             iconBackground={colors.warning + "22"}
             title="Select apps to block"
-            description="Choose the apps you want paused during focus time."
+            description={funnelText.home.setupAppsDescription}
             ctaLabel="Open settings"
             onPress={vm.actions.openSettingsForApps}
           />
@@ -62,7 +64,7 @@ export default function HomeScreen() {
             iconColor={colors.secondary}
             iconBackground={colors.secondary + "22"}
             title="Add focus times"
-            description="Set prayer or custom times so your journey stays consistent."
+            description={funnelText.home.setupTimesDescription}
             ctaLabel="Set times"
             onPress={vm.actions.openFocusTimes}
           />

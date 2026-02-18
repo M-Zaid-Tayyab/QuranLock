@@ -1,5 +1,6 @@
 import { PrimaryButton } from "@/components/common";
 import { colors } from "@/constants/colors";
+import { useFunnelText } from "@/hooks/app";
 import { useRouter, type Href } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Text, View } from "react-native";
@@ -14,11 +15,11 @@ import Animated, {
 
 export default function Welcome() {
   const router = useRouter();
+  const funnelText = useFunnelText();
 
-  const heroText =
-    "Reconnect with Allah, step away from endless scrolling, and sit with his talk to you again.";
+  const heroText = funnelText.welcome.heroText;
   const heroWords = heroText.split(" ");
-  const highlightedWords = ["allah", "talk"];
+  const highlightedWords = funnelText.welcome.highlightedWords;
 
   const [heroFinished, setHeroFinished] = useState(false);
 

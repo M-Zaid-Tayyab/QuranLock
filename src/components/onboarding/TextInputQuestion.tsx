@@ -1,11 +1,16 @@
 import { colors } from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
-import Animated, {
-  Easing,
-  FadeInDown,
-} from "react-native-reanimated";
+import {
+  Keyboard,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import Animated, { Easing, FadeInDown } from "react-native-reanimated";
 
 interface TextInputQuestionProps {
   question: string;
@@ -48,7 +53,10 @@ export function TextInputQuestion({
   const questionWords = question.split(" ");
 
   return (
-    <View className="items-center w-full flex-1">
+    <Pressable
+      className="items-center w-full flex-1"
+      onPress={Keyboard.dismiss}
+    >
       <Animated.View
         entering={FadeInDown.delay(40)
           .duration(220)
@@ -112,6 +120,6 @@ export function TextInputQuestion({
           <Text className="text-error font-sfPro text-sm mt-2">{error}</Text>
         ) : null}
       </Animated.View>
-    </View>
+    </Pressable>
   );
 }

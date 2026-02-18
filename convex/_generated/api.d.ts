@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as appConfig from "../appConfig.js";
 import type * as http from "../http.js";
 import type * as quranFoundation from "../quranFoundation.js";
 import type * as quranPack from "../quranPack.js";
@@ -20,6 +21,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  appConfig: typeof appConfig;
   http: typeof http;
   quranFoundation: typeof quranFoundation;
   quranPack: typeof quranPack;

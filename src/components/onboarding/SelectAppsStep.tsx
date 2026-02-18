@@ -1,5 +1,6 @@
 import { BottomSheetModal, PrimaryButton } from "@/components/common";
 import { colors } from "@/constants/colors";
+import { useFunnelText } from "@/hooks/app";
 import { setSelection } from "@/services/deviceActivity";
 import { useUserStore } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,6 +23,7 @@ export function SelectAppsStep({
   onSelectionChange,
   autoOpen = true,
 }: SelectAppsStepProps) {
+  const funnelText = useFunnelText();
   const sheetRef = useRef<GorhomBottomSheetModal | null>(null);
   const openedOnce = useRef(false);
 
@@ -70,7 +72,7 @@ export function SelectAppsStep({
               Choose what to pause
             </Text>
             <Text className="mt-1 text-sm font-sfPro text-muted">
-              We’ll only block the apps you select during focus time.
+              {funnelText.onboarding.selectAppsDescription}
             </Text>
           </View>
         </View>

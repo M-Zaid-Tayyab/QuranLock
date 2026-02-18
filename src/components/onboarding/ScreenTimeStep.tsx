@@ -1,9 +1,13 @@
 import { colors } from "@/constants/colors";
-import { getAuthStatus, requestAuthorization } from "@/services/deviceActivity";
-import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useRef, useState } from "react";
+import { useFunnelText } from "@/hooks/app";
 import {
-  ActivityIndicator,
+  getAuthStatus,
+  getStableAuthStatus,
+  requestAuthorization,
+} from "@/services/deviceActivity";
+import { Ionicons } from "@expo/vector-icons";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
   AppState,
   Platform,
   Text,
@@ -18,29 +22,46 @@ const AuthorizationStatus = { notDetermined: 0, denied: 1, approved: 2 } as cons
 
 interface ScreenTimeStepProps {
   onAuthorizationChange?: (approved: boolean) => void;
+  onAuthorizationStatusChange?: (status: number) => void;
 }
 
 export function ScreenTimeStep({
   onAuthorizationChange,
+  onAuthorizationStatusChange,
 }: ScreenTimeStepProps = {}) {
+  const funnelText = useFunnelText();
   const [authStatus, setAuthStatus] = useState<number | null>(null);
-  const [requesting, setRequesting] = useState(false);
   const hasRequested = useRef(false);
+
+  const refreshStatus = useCallback(async () => {
+    if (Platform.OS !== "ios") return;
+    try {
+      const status = await getStableAuthStatus();
+      setAuthStatus(status);
+    } catch {
+      setAuthStatus(getAuthStatus());
+    }
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
-    setAuthStatus(getAuthStatus());
-  }, []);
+    void refreshStatus();
+  }, [refreshStatus]);
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
-        setAuthStatus(getAuthStatus());
+        void refreshStatus();
       }
     });
     return () => subscription.remove();
-  }, []);
+  }, [refreshStatus]);
+
+  const effectiveStatus =
+    authStatus === AuthorizationStatus.notDetermined && hasRequested.current
+      ? AuthorizationStatus.denied
+      : authStatus;
 
   useEffect(() => {
     if (!onAuthorizationChange) return;
@@ -48,21 +69,29 @@ export function ScreenTimeStep({
       onAuthorizationChange(true);
       return;
     }
-    if (authStatus == null) return;
-    onAuthorizationChange(authStatus === AuthorizationStatus.approved);
-  }, [authStatus, onAuthorizationChange]);
+    if (effectiveStatus == null) return;
+    onAuthorizationChange(effectiveStatus === AuthorizationStatus.approved);
+  }, [effectiveStatus, onAuthorizationChange]);
+
+  useEffect(() => {
+    if (!onAuthorizationStatusChange) return;
+    if (Platform.OS !== "ios") {
+      onAuthorizationStatusChange(AuthorizationStatus.approved);
+      return;
+    }
+    if (effectiveStatus == null) return;
+    onAuthorizationStatusChange(effectiveStatus);
+  }, [effectiveStatus, onAuthorizationStatusChange]);
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
     if (authStatus !== AuthorizationStatus.notDetermined) return;
     if (hasRequested.current) return;
     hasRequested.current = true;
-    setRequesting(true);
     requestAuthorization()
-      .then(() => setAuthStatus(getAuthStatus()))
-      .catch(() => setAuthStatus(getAuthStatus()))
-      .finally(() => setRequesting(false));
-  }, [authStatus]);
+      .then(() => refreshStatus())
+      .catch(() => refreshStatus());
+  }, [authStatus, refreshStatus]);
 
   if (Platform.OS !== "ios") {
     return (
@@ -73,22 +102,6 @@ export function ScreenTimeStep({
       </View>
     );
   }
-
-  const statusLabel =
-    authStatus === AuthorizationStatus.approved
-      ? "Allowed"
-      : authStatus === AuthorizationStatus.denied
-        ? "Denied"
-        : requesting
-          ? "Requesting…"
-          : "Not determined";
-
-  const statusColor =
-    authStatus === AuthorizationStatus.approved
-      ? colors.success
-      : authStatus === AuthorizationStatus.denied
-        ? colors.error
-        : colors.warning;
 
   return (
     <View className="flex-1 justify-center">
@@ -114,8 +127,7 @@ export function ScreenTimeStep({
               Turn on the Shield
             </Text>
             <Text className="mt-1 text-sm font-sfPro text-muted">
-              Screen Time powers a gentle shield. When it appears, open
-              QuranLock and read to unlock your apps.
+              {funnelText.onboarding.screenTimeShieldBody}
             </Text>
           </View>
         </View>
@@ -128,7 +140,7 @@ export function ScreenTimeStep({
         className="mt-5 gap-3"
       >
         {[
-          "Shield appears only in your scheduled focus times",
+          funnelText.onboarding.screenTimeFirstBullet,
           "Reading on this screen unlocks your apps",
           "You stay in control — no hard lock",
         ].map((item) => (
@@ -148,40 +160,6 @@ export function ScreenTimeStep({
         ))}
       </Animated.View>
 
-      <Animated.View
-        entering={FadeInDown.delay(200)
-          .duration(240)
-          .easing(Easing.out(Easing.cubic))}
-        className="mt-5 rounded-2xl border border-outline bg-surface px-4 py-4"
-      >
-        <View className="flex-row items-center justify-between">
-          <Text className="font-sfPro text-sm text-muted">Permission</Text>
-          <View
-            className="rounded-full px-3 py-1"
-            style={{ backgroundColor: statusColor + "22" }}
-          >
-            <Text
-              className="text-xs font-sfPro-semibold"
-              style={{ color: statusColor }}
-            >
-              {statusLabel}
-            </Text>
-          </View>
-        </View>
-        {authStatus === AuthorizationStatus.denied && (
-          <Text className="mt-3 text-sm font-sfPro text-muted">
-            Enable Screen Time in Settings → Screen Time to continue.
-          </Text>
-        )}
-        {requesting && (
-          <View className="mt-3 flex-row items-center gap-2">
-            <ActivityIndicator color={colors.primary} />
-            <Text className="text-sm font-sfPro text-muted">
-              Waiting for permission prompt…
-            </Text>
-          </View>
-        )}
-      </Animated.View>
     </View>
   );
 }

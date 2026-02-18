@@ -1,5 +1,6 @@
 import { PrimaryButton } from "@/components/common/PrimaryButton";
 import { colors } from "@/constants/colors";
+import { useFunnelText } from "@/hooks/app";
 import {
   getCurrentOffering,
   pickPackage,
@@ -27,6 +28,7 @@ type PlanProduct = PurchasesPackage["product"] & {
 
 export default function PaywallScreen() {
   const router = useRouter();
+  const funnelText = useFunnelText();
   const params = useLocalSearchParams<{ entry?: string | string[] }>();
   const setIsPremium = useUserStore((s) => s.setIsPremium);
   const paywallEntry =
@@ -214,29 +216,36 @@ export default function PaywallScreen() {
         contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
       >
-        <View className="mt-12 items-center">
-          <View className="mt-3 flex-row flex-wrap justify-center">
-            {["It's", "time", "to", "invest", "in", "your", "Akhirah."].map(
-              (word, index) => (
-                <Text
-                  key={`${word}-${index}`}
-                  className="text-center text-4xl font-sfPro-bold leading-tight"
-                  style={{
-                    color:
-                      word === "invest" || word === "Akhirah."
-                        ? colors.accent
-                        : colors.foreground,
-                  }}
-                >
-                  {word}
-                  {index < 6 ? " " : ""}
-                </Text>
-              ),
-            )}
+        {showClose && (
+          <Pressable
+            onPress={exitPaywall}
+            className="h-10 w-10 self-end items-center justify-center rounded-full border border-outline bg-surface"
+          >
+            <Ionicons name="close" size={20} color={colors.muted} />
+          </Pressable>
+        )}
+        <View className=" items-center">
+          <View className="mt-3 flex-row flex-wrap justify-center px-4">
+            {funnelText.paywall.headlineWords.map((word, index) => (
+              <Text
+                key={`${word}-${index}`}
+                className="text-center text-4xl font-sfPro-bold leading-tight"
+                style={{
+                  color: funnelText.paywall.headlineHighlightedWords.includes(
+                    word.replace(/[^a-z]/gi, "").toLowerCase(),
+                  )
+                    ? colors.accent
+                    : colors.foreground,
+                }}
+              >
+                {word}
+                {index < funnelText.paywall.headlineWords.length - 1 ? " " : ""}
+              </Text>
+            ))}
           </View>
         </View>
 
-        <View className="mt-14 gap-4">
+        <View className="mt-10 gap-3">
           <View className="flex-row items-center gap-3">
             <Ionicons
               name="shield-checkmark-outline"
@@ -244,13 +253,13 @@ export default function PaywallScreen() {
               color={colors.primary}
             />
             <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
-              Block distractions in every focus window
+              {funnelText.paywall.featureLines[0]}
             </Text>
           </View>
           <View className="flex-row items-center gap-3">
             <Ionicons name="book-outline" size={23} color={colors.accent} />
             <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
-              Replace scrolling urges with Quran
+              {funnelText.paywall.featureLines[1]}
             </Text>
           </View>
           <View className="flex-row items-center gap-3">
@@ -260,18 +269,18 @@ export default function PaywallScreen() {
               color={colors.secondary}
             />
             <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
-              Stay consistent with timely reminders
+              {funnelText.paywall.featureLines[2]}
             </Text>
           </View>
           <View className="flex-row items-center gap-3">
             <Ionicons name="time-outline" size={23} color={colors.primary} />
             <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
-              Protect your time before regret starts
+              {funnelText.paywall.featureLines[3]}
             </Text>
           </View>
         </View>
 
-        <View className="mt-14">
+        <View className="mt-10">
           <View className="flex-row items-center justify-between">
             <Text className="mt-1 text-2xl font-sfPro-bold text-foreground">
               Choose your plan
@@ -314,7 +323,7 @@ export default function PaywallScreen() {
           )}
 
           <PrimaryButton
-            title="Connect with Allah"
+            title={funnelText.paywall.ctaTitle}
             isLoading={loading || purchasing}
             disabled={!selectedPackage}
             onPress={handlePurchase}
@@ -348,15 +357,6 @@ export default function PaywallScreen() {
           </View>
         </View>
       </ScrollView>
-
-      {showClose && (
-        <Pressable
-          onPress={exitPaywall}
-          className="absolute right-6 top-safe h-10 w-10 items-center justify-center rounded-full border border-outline bg-surface"
-        >
-          <Ionicons name="close" size={20} color={colors.muted} />
-        </Pressable>
-      )}
     </View>
   );
 }

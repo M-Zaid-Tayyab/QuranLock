@@ -14,6 +14,8 @@ export default function SettingsScreen() {
   >(null);
 
   const focusSchedules = useUserStore((s) => s.focusSchedules);
+  const focusDurationMode = useUserStore((s) => s.focusDurationMode);
+  const focusCompletionDays = useUserStore((s) => s.focusCompletionDays);
   const setHasSelectedApps = useUserStore((s) => s.setHasSelectedApps);
   const isPremium = useUserStore((s) => s.isPremium);
 
@@ -121,6 +123,22 @@ export default function SettingsScreen() {
           <Text className="mt-1 text-sm font-sfPro text-muted">
             Prayer and custom times that trigger the shield.
           </Text>
+          <View className="mt-3 rounded-xl border border-outline bg-backgroundElevated px-3 py-2">
+            <Text className="text-xs font-sfPro text-muted">
+              Mode:{" "}
+              <Text className="font-sfPro-semibold text-foreground">
+                {focusDurationMode === "goal" ? "Goal mode" : "Manual mode"}
+              </Text>
+            </Text>
+            {focusDurationMode === "goal" ? (
+              <Text className="mt-1 text-xs font-sfPro text-muted">
+                Completion target:{" "}
+                <Text className="font-sfPro-semibold text-foreground">
+                  {focusCompletionDays} days
+                </Text>
+              </Text>
+            ) : null}
+          </View>
           {orderedSchedules.length > 0 ? (
             <View className="mt-4 flex-row flex-wrap gap-2">
               {orderedSchedules.map((schedule) => (

@@ -8,6 +8,8 @@ import {
 import { ensureQuranPack } from "@/services/quranPack";
 import { startGlobalRecitationOfflineDownload } from "@/services/recitationPack";
 import { configureRevenueCat } from "@/services/revenueCat";
+import { useRemoteAppConfig } from "@/hooks/app";
+import { QueryProvider } from "@/providers/QueryProvider";
 import { useUserSync } from "@/hooks/user";
 import { useUserStore } from "@/store/user";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -17,6 +19,7 @@ import { useEffect } from "react";
 import { Linking, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import Purchases, { type CustomerInfo } from "react-native-purchases";
 import { identifyDevice, vexo } from "vexo-analytics";
 
@@ -62,8 +65,9 @@ function useDeepLinkToVerse() {
   }, [completedUnlockSessions, isPremium, router]);
 }
 
-export default function RootLayout() {
+function RootLayoutContent() {
   useDeepLinkToVerse();
+  useRemoteAppConfig();
   useUserSync();
 
   const appUserId = useUserStore((s) => s.appUserId);
@@ -110,16 +114,26 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <BottomSheetModalProvider>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: colors.background },
-            animation: "slide_from_right",
-          }}
-        />
-      </BottomSheetModalProvider>
+      <KeyboardProvider>
+        <BottomSheetModalProvider>
+          <StatusBar style="light" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.background },
+              animation: "slide_from_right",
+            }}
+          />
+        </BottomSheetModalProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <QueryProvider>
+      <RootLayoutContent />
+    </QueryProvider>
   );
 }

@@ -1,5 +1,6 @@
 import { colors, rgba } from "@/constants/colors";
 import { INTRO_STEPS } from "@/configs/onboarding";
+import { useFunnelText } from "@/hooks/app";
 import { Text, View } from "react-native";
 import Animated, { Easing, FadeInDown } from "react-native-reanimated";
 
@@ -48,8 +49,11 @@ const renderAnimatedHeadline = (
 };
 
 export function IntroStep({ step }: IntroStepProps) {
+  const funnelText = useFunnelText();
   const currentStep = INTRO_STEPS[step];
   if (!currentStep) return null;
+  const overrideTitle = funnelText.onboarding.introTitles[step];
+  const title = overrideTitle ?? currentStep.title;
 
   return (
     <View key={`intro-${step}`} className="flex-1 justify-center">
@@ -71,7 +75,7 @@ export function IntroStep({ step }: IntroStepProps) {
 
         <View className="mt-5">
           {renderAnimatedHeadline(
-            currentStep.title,
+            title,
             currentStep.highlight,
             currentStep.accent,
             `intro-${step}`,

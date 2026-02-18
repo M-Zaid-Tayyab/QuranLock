@@ -3,10 +3,8 @@ import { colors } from "@/constants/colors";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useEffect } from "react";
 import {
-  Keyboard,
   Text,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   View,
 } from "react-native";
 import Animated, {
@@ -94,9 +92,8 @@ export function StepContainer({
   }));
 
   return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View className="flex-1 bg-background pt-safe pb-safe">
-        <View className="px-6 pt-2">
+    <View className="flex-1 bg-background pt-safe pb-safe">
+      <View className="px-6 pt-2">
           {!hideProgress && (
             <View
               className={`mb-4 ${progressVariant === "bar" ? "" : "flex-row items-center gap-3"}`}
@@ -179,18 +176,19 @@ export function StepContainer({
           ) : null}
         </View>
 
-        <View className="flex-1 px-6">{children}</View>
-
-        <View className="px-6 pb-6 pt-4">
-          <Animated.View style={ctaAnimatedStyle}>
-            <PrimaryButton
-              title={nextLabel}
-              onPress={onNext}
-              disabled={nextDisabled}
-            />
-          </Animated.View>
-        </View>
+      <View className="flex-1 px-6" style={{ minHeight: 0 }}>
+        {children}
       </View>
-    </TouchableWithoutFeedback>
+
+      <View className="px-6 pb-6 pt-4">
+        <Animated.View style={ctaAnimatedStyle}>
+          <PrimaryButton
+            title={nextLabel}
+            onPress={onNext}
+            disabled={nextDisabled}
+          />
+        </Animated.View>
+      </View>
+    </View>
   );
 }

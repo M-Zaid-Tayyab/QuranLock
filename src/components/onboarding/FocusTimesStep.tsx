@@ -1,318 +1,247 @@
-import {
-  DURATION_OPTIONS,
-  PRAYER_PRESETS,
-  formatTime,
-  getNextDuration,
-  type PrayerPreset,
-} from "@/configs/onboarding";
+import { PRAYER_PRESETS, formatTime } from "@/configs/onboarding";
 import { colors } from "@/constants/colors";
-import { PAYWALL_SOURCES, type PaywallSource } from "@/constants/entitlements";
+import { useFunnelText } from "@/hooks/app";
 import {
-  canAddFocusSchedule,
-  openPaywallForBlockedDecision,
-} from "@/services/entitlements";
-import { useBlockingStore } from "@/store/blocking";
-import { useUserStore, type FocusSchedule } from "@/store/user";
-import DateTimePicker, {
-  DateTimePickerAndroid,
-} from "@react-native-community/datetimepicker";
+  FOCUS_DURATION_STEP,
+  FOCUS_LABEL_MAX_LENGTH,
+  type FocusNotificationStatus,
+  useFocusTimes,
+} from "@/hooks/focus";
+import { GOAL_DAYS_MAX, GOAL_DAYS_MIN } from "@/utils/focusPlan";
 import { Ionicons } from "@expo/vector-icons";
-import * as Notifications from "expo-notifications";
-import { useRouter } from "expo-router";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
+import DatePicker from "react-native-date-picker";
+import { Pressable, Text, TextInput, View } from "react-native";
 
 interface FocusTimesStepProps {
   isEditTimes: boolean;
   scheduleError: string | null;
+  onNotificationPermissionChange?: (approved: boolean) => void;
+  onNotificationPermissionStatusChange?: (status: FocusNotificationStatus) => void;
 }
 
 export function FocusTimesStep({
   isEditTimes,
   scheduleError,
+  onNotificationPermissionChange,
+  onNotificationPermissionStatusChange,
 }: FocusTimesStepProps) {
-  const router = useRouter();
-  const focusSchedules = useUserStore((s) => s.focusSchedules);
-  const setFocusSchedules = useUserStore((s) => s.setFocusSchedules);
-  const isPremium = useUserStore((s) => s.isPremium);
-  const setQuranMinutesToUnblock = useBlockingStore(
-    (s) => s.setQuranMinutesToUnblock,
-  );
-
-  const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(
-    null,
-  );
-  const [timePickerTarget, setTimePickerTarget] = useState<string | null>(null);
-  const [notificationStatus, setNotificationStatus] = useState<
-    "granted" | "denied" | "undetermined" | null
-  >(null);
-
-  const hasRequestedNotificationsRef = useRef(false);
-  const customIndexRef = useRef(
-    focusSchedules.filter((schedule) => schedule.kind === "custom").length + 1,
-  );
-
-  useEffect(() => {
-    if (focusSchedules.length === 0) {
-      setExpandedScheduleId(null);
-      setTimePickerTarget(null);
-    }
-  }, [focusSchedules.length]);
-
-  useEffect(() => {
-    if (isEditTimes || Platform.OS !== "ios") return;
-    if (hasRequestedNotificationsRef.current) return;
-
-    hasRequestedNotificationsRef.current = true;
-    Notifications.getPermissionsAsync()
-      .then(({ status }) => {
-        const current =
-          status === "granted"
-            ? "granted"
-            : status === "denied"
-              ? "denied"
-              : "undetermined";
-        setNotificationStatus(current);
-
-        if (status === "granted") return;
-        return Notifications.requestPermissionsAsync().then(({ status: s }) => {
-          setNotificationStatus(
-            s === "granted"
-              ? "granted"
-              : s === "denied"
-                ? "denied"
-                : "undetermined",
-          );
-        });
-      })
-      .catch(() => {});
-  }, [isEditTimes]);
-
-  const selectedPrayerIds = useMemo(
-    () =>
-      new Set(
-        focusSchedules
-          .filter((schedule) => schedule.kind === "prayer")
-          .map((schedule) => schedule.id),
-      ),
-    [focusSchedules],
-  );
-
-  const orderedSchedules = useMemo(
-    () =>
-      [...focusSchedules].sort(
-        (a, b) => a.hour * 60 + a.minute - (b.hour * 60 + b.minute),
-      ),
-    [focusSchedules],
-  );
-
-  const setSchedule = useCallback(
-    (next: FocusSchedule[]) => {
-      setFocusSchedules(next);
-      if (!next.length) {
-        setExpandedScheduleId(null);
-        return;
-      }
-      setQuranMinutesToUnblock(getNextDuration(next));
-    },
-    [setFocusSchedules, setQuranMinutesToUnblock],
-  );
-
-  const ensureCanAddSchedule = useCallback(
-    (source: PaywallSource) => {
-      const gate = canAddFocusSchedule({
-        isPremium,
-        focusScheduleCount: focusSchedules.length,
-      });
-      if (gate.allowed) return true;
-      openPaywallForBlockedDecision(router, gate, source);
-      return false;
-    },
-    [focusSchedules.length, isPremium, router],
-  );
-
-  const onTogglePrayer = useCallback(
-    (preset: PrayerPreset) => {
-      const exists = selectedPrayerIds.has(preset.id);
-
-      if (exists) {
-        setSchedule(
-          focusSchedules.filter((schedule) => schedule.id !== preset.id),
-        );
-        if (expandedScheduleId === preset.id) setExpandedScheduleId(null);
-        return;
-      }
-
-      if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_PRAYER)) return;
-
-      setSchedule([
-        ...focusSchedules,
-        {
-          id: preset.id,
-          label: preset.label,
-          kind: "prayer",
-          hour: preset.hour,
-          minute: preset.minute,
-          durationMinutes: 30,
-        },
-      ]);
-      setExpandedScheduleId(preset.id);
-    },
-    [
-      ensureCanAddSchedule,
-      expandedScheduleId,
-      focusSchedules,
-      selectedPrayerIds,
-      setSchedule,
-    ],
-  );
-
-  const onUpdateSchedule = useCallback(
-    (id: string, updates: Partial<FocusSchedule>) => {
-      setSchedule(
-        focusSchedules.map((schedule) =>
-          schedule.id === id ? { ...schedule, ...updates } : schedule,
-        ),
-      );
-    },
-    [focusSchedules, setSchedule],
-  );
-
-  const onRemoveSchedule = useCallback(
-    (id: string) => {
-      setSchedule(focusSchedules.filter((schedule) => schedule.id !== id));
-      if (expandedScheduleId === id) setExpandedScheduleId(null);
-    },
-    [expandedScheduleId, focusSchedules, setSchedule],
-  );
-
-  const toPickerDate = useCallback((hour: number, minute: number) => {
-    const nextDate = new Date();
-    nextDate.setHours(hour, minute, 0, 0);
-    return nextDate;
-  }, []);
-
-  const applyPickedTime = useCallback(
-    (targetId: string, date: Date) => {
-      const hour = date.getHours();
-      const minute = date.getMinutes();
-      if (targetId === "new") {
-        if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_CUSTOM)) {
-          return;
-        }
-        const customIndex = customIndexRef.current++;
-        const id = `custom-${Date.now()}`;
-        setSchedule([
-          ...focusSchedules,
-          {
-            id,
-            label: `Custom ${customIndex}`,
-            kind: "custom",
-            hour,
-            minute,
-            durationMinutes: 30,
-          },
-        ]);
-        setExpandedScheduleId(id);
-      } else {
-        onUpdateSchedule(targetId, { hour, minute });
-      }
-    },
-    [ensureCanAddSchedule, focusSchedules, onUpdateSchedule, setSchedule],
-  );
-
-  const onOpenTimePicker = useCallback(
-    (id: string) => {
-      const active = focusSchedules.find((schedule) => schedule.id === id);
-      const initialDate = active
-        ? toPickerDate(active.hour, active.minute)
-        : toPickerDate(12, 0);
-
-      if (Platform.OS === "android") {
-        DateTimePickerAndroid.open({
-          value: initialDate,
-          mode: "time",
-          is24Hour: false,
-          onChange: (event, selectedDate) => {
-            if (event.type !== "set" || !selectedDate) return;
-            applyPickedTime(id, selectedDate);
-          },
-        });
-        return;
-      }
-
-      setTimePickerTarget((current) => (current === id ? null : id));
-    },
-    [applyPickedTime, focusSchedules, toPickerDate],
-  );
-
-  const onOpenNewCustomTime = useCallback(() => {
-    if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_CUSTOM)) return;
-
-    const initialDate = toPickerDate(12, 0);
-    if (Platform.OS === "android") {
-      DateTimePickerAndroid.open({
-        value: initialDate,
-        mode: "time",
-        is24Hour: false,
-        onChange: (event, selectedDate) => {
-          if (event.type !== "set" || !selectedDate) return;
-          applyPickedTime("new", selectedDate);
-        },
-      });
-      return;
-    }
-
-    const customIndex = customIndexRef.current++;
-    const id = `custom-${Date.now()}`;
-    setSchedule([
-      ...focusSchedules,
-      {
-        id,
-        label: `Custom ${customIndex}`,
-        kind: "custom",
-        hour: initialDate.getHours(),
-        minute: initialDate.getMinutes(),
-        durationMinutes: 30,
-      },
-    ]);
-    setExpandedScheduleId(id);
-    setTimePickerTarget(id);
-  }, [
-    applyPickedTime,
-    ensureCanAddSchedule,
+  const funnelText = useFunnelText();
+  const {
     focusSchedules,
-    setSchedule,
-    toPickerDate,
-  ]);
+    focusDurationMode,
+    goalDaysInput,
+    expandedScheduleId,
+    pickerDate,
+    isTimePickerOpen,
+    notificationStatus,
+    selectedPrayerIds,
+    orderedSchedules,
+    summaryMinutesText,
+    goalRecommendation,
+    setGoalDaysInput,
+    onTogglePrayer,
+    onRemoveSchedule,
+    onOpenTimePicker,
+    onOpenNewCustomTime,
+    onConfirmTimePicker,
+    onCancelTimePicker,
+    onToggleExpandedSchedule,
+    onChangeMode,
+    onStepGoalDays,
+    onCommitGoalDays,
+    onAdjustDuration,
+    onCommitDurationInput,
+    onChangeScheduleLabel,
+    onCommitScheduleLabel,
+  } = useFocusTimes({
+    isEditTimes,
+    onNotificationPermissionChange,
+    onNotificationPermissionStatusChange,
+  });
 
-  const onToggleExpandedSchedule = useCallback((id: string) => {
-    setExpandedScheduleId((current) => {
-      const next = current === id ? null : id;
-      if (next !== id) {
-        setTimePickerTarget(null);
-      }
-      return next;
-    });
-  }, []);
+  const notificationMeta = (() => {
+    if (notificationStatus === "granted") {
+      return {
+        label: "Allowed",
+        tone: colors.success,
+        bg: colors.success + "22",
+      };
+    }
+    if (notificationStatus === "denied") {
+      return {
+        label: "Denied",
+        tone: colors.error,
+        bg: colors.error + "22",
+      };
+    }
+    if (notificationStatus === "undetermined") {
+      return {
+        label: "Not determined",
+        tone: colors.warning,
+        bg: colors.warning + "22",
+      };
+    }
+    return {
+      label: "Checking...",
+      tone: colors.muted,
+      bg: colors.muted + "1A",
+    };
+  })();
+  const showNotificationCard =
+    !isEditTimes &&
+    (notificationStatus === "undetermined" || notificationStatus === "denied");
 
   return (
     <View className="flex-1">
-      <ScrollView
+      <KeyboardAwareScrollView
+        style={{ flex: 1 }}
+        enabled
+        bottomOffset={16}
+        extraKeyboardSpace={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
       >
+        <View className="mb-6 rounded-2xl border border-outline bg-surface px-4 py-4">
+          <Text className="text-xs font-sfPro-semibold tracking-widest text-muted">
+            DURATION MODE
+          </Text>
+          <View className="mt-3 rounded-xl border border-outline bg-backgroundElevated p-2">
+            <View className="flex-row gap-3">
+              {(
+                [
+                  {
+                    id: "goal",
+                    label: "Goal",
+                    icon: "flag-outline",
+                  },
+                  {
+                    id: "manual",
+                    label: "Manual",
+                    icon: "create-outline",
+                  },
+                ] as const
+              ).map((mode) => {
+                const active = focusDurationMode === mode.id;
+                return (
+                  <Pressable
+                    key={mode.id}
+                    onPress={() => onChangeMode(mode.id)}
+                    className={`flex-1 rounded-lg px-3 py-2.5 ${
+                      active ? "bg-primary" : "bg-surface"
+                    }`}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: active
+                        ? colors.primaryVariant
+                        : colors.outline,
+                    }}
+                  >
+                    <View className="flex-row items-center justify-center gap-2">
+                      <Ionicons
+                        name={mode.icon as any}
+                        size={15}
+                        color={active ? colors.primaryForeground : colors.muted}
+                      />
+                      <Text
+                        className={`text-center text-sm font-sfPro-semibold ${
+                          active ? "text-primaryForeground" : "text-foreground"
+                        }`}
+                      >
+                        {mode.label}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {focusDurationMode === "goal" && (
+            <View className="mt-4 rounded-xl border border-outline bg-backgroundElevated px-3 py-3">
+              <Text className="text-xs font-sfPro-semibold tracking-widest text-muted">
+                COMPLETE IN DAYS
+              </Text>
+              <View className="mt-2 flex-row items-center gap-2">
+                <Pressable
+                  onPress={() => onStepGoalDays(-1)}
+                  className="h-10 w-10 items-center justify-center rounded-full border border-outline"
+                >
+                  <Ionicons name="remove" size={18} color={colors.muted} />
+                </Pressable>
+                <View className="flex-1 rounded-xl border border-outline bg-surface px-3 py-2">
+                  <TextInput
+                    value={goalDaysInput}
+                    onChangeText={(text) =>
+                      setGoalDaysInput(text.replace(/\D/g, ""))
+                    }
+                    onBlur={onCommitGoalDays}
+                    onSubmitEditing={onCommitGoalDays}
+                    keyboardType="number-pad"
+                    className="text-center font-sfPro-semibold text-foreground"
+                    placeholder="30"
+                    placeholderTextColor={colors.muted}
+                  />
+                </View>
+                <Pressable
+                  onPress={() => onStepGoalDays(1)}
+                  className="h-10 w-10 items-center justify-center rounded-full border border-outline"
+                >
+                  <Ionicons name="add" size={18} color={colors.muted} />
+                </Pressable>
+              </View>
+              <Text className="mt-2 text-xs font-sfPro text-muted">
+                Range: {GOAL_DAYS_MIN}-{GOAL_DAYS_MAX} days
+              </Text>
+
+              <View className="mt-3 rounded-xl border border-outline bg-surface px-3 py-3">
+                <Text className="text-sm font-sfPro text-muted">
+                  Sessions/day:{" "}
+                  <Text className="font-sfPro-semibold text-foreground">
+                    {focusSchedules.length}
+                  </Text>
+                </Text>
+                <Text className="mt-1 text-sm font-sfPro text-muted">
+                  Pages/session:{" "}
+                  <Text className="font-sfPro-semibold text-foreground">
+                    {goalRecommendation.computable
+                      ? goalRecommendation.pagesPerSession.toFixed(1)
+                      : "—"}
+                  </Text>
+                </Text>
+                <Text className="mt-1 text-sm font-sfPro text-muted">
+                  Suggested duration:{" "}
+                  <Text className="font-sfPro-semibold text-foreground">
+                    {summaryMinutesText}
+                  </Text>
+                </Text>
+              </View>
+
+              {!goalRecommendation.computable ? (
+                <Text className="mt-3 text-sm font-sfPro text-warning">
+                  Add at least one focus time to generate your plan.
+                </Text>
+              ) : null}
+
+              {goalRecommendation.capped ? (
+                <View className="mt-3 rounded-xl border border-warning/60 bg-warning/10 px-3 py-2">
+                  <Text className="text-sm font-sfPro text-warning">
+                    Suggested time was capped at 90 minutes/session. Increase
+                    days or add more sessions for a more realistic plan.
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          )}
+        </View>
+
         <View className="mb-6">
           <Text className="text-xs font-sfPro-semibold tracking-widest text-muted">
             PRAYER TIMES
           </Text>
-          <View className="mt-3 flex-row flex-wrap gap-2">
+          <View className="mt-3 flex-row flex-wrap gap-x-2 gap-y-4">
             {PRAYER_PRESETS.map((preset) => {
               const isSelected = selectedPrayerIds.has(preset.id);
               return (
@@ -350,7 +279,7 @@ export function FocusTimesStep({
           {orderedSchedules.length === 0 ? (
             <View className="rounded-2xl border border-dashed border-outline bg-surface px-4 py-6">
               <Text className="text-center font-sfPro text-muted">
-                Select a prayer time or add a custom time to continue.
+                {funnelText.onboarding.focusEmptyState}
               </Text>
             </View>
           ) : (
@@ -370,7 +299,8 @@ export function FocusTimesStep({
                         {schedule.label}
                       </Text>
                       <Text className="mt-1 text-sm font-sfPro text-muted">
-                        {formatTime(schedule.hour, schedule.minute)}
+                        {formatTime(schedule.hour, schedule.minute)} ·{" "}
+                        {schedule.durationMinutes} min
                       </Text>
                     </View>
                     <Ionicons
@@ -382,9 +312,44 @@ export function FocusTimesStep({
 
                   {expanded && (
                     <View className="px-4 pb-4">
+                      <View className="mt-1">
+                        <Text className="text-xs font-sfPro-semibold tracking-widest text-muted">
+                          FOCUS NAME
+                        </Text>
+                        <View className="mt-2 flex-row items-center rounded-xl border border-outline bg-backgroundElevated px-3 py-2">
+                          <Ionicons
+                            name="bookmark-outline"
+                            size={16}
+                            color={colors.primary}
+                          />
+                          <TextInput
+                            value={schedule.label}
+                            maxLength={FOCUS_LABEL_MAX_LENGTH}
+                            onChangeText={(text) =>
+                              onChangeScheduleLabel(schedule.id, text)
+                            }
+                            onEndEditing={(event) =>
+                              onCommitScheduleLabel(
+                                schedule,
+                                event.nativeEvent.text,
+                              )
+                            }
+                            onSubmitEditing={(event) =>
+                              onCommitScheduleLabel(
+                                schedule,
+                                event.nativeEvent.text,
+                              )
+                            }
+                            className="ml-2 flex-1 py-1.5 font-sfPro text-foreground"
+                            placeholder="Focus name"
+                            placeholderTextColor={colors.muted}
+                          />
+                        </View>
+                      </View>
+
                       <Pressable
                         onPress={() => onOpenTimePicker(schedule.id)}
-                        className="flex-row items-center justify-between rounded-xl border border-outline bg-backgroundElevated px-4 py-3"
+                        className="mt-4 flex-row items-center justify-between rounded-xl border border-outline bg-backgroundElevated px-4 py-3"
                       >
                         <View className="flex-row items-center gap-2">
                           <Ionicons
@@ -392,63 +357,80 @@ export function FocusTimesStep({
                             size={18}
                             color={colors.primary}
                           />
-                          <Text className="font-sfPro text-foreground">Time</Text>
+                          <Text className="font-sfPro text-foreground">
+                            Time
+                          </Text>
                         </View>
                         <Text className="font-sfPro-semibold text-foreground">
                           {formatTime(schedule.hour, schedule.minute)}
                         </Text>
                       </Pressable>
-                      {Platform.OS === "ios" &&
-                      timePickerTarget === schedule.id ? (
-                        <View className="mt-3 rounded-xl border border-outline bg-backgroundElevated px-2 py-2">
-                          <DateTimePicker
-                            value={toPickerDate(schedule.hour, schedule.minute)}
-                            mode="time"
-                            display="spinner"
-                            onChange={(event, selectedDate) => {
-                              if (event.type === "dismissed" || !selectedDate)
-                                return;
-                              onUpdateSchedule(schedule.id, {
-                                hour: selectedDate.getHours(),
-                                minute: selectedDate.getMinutes(),
-                              });
-                            }}
-                          />
-                        </View>
-                      ) : null}
 
                       <View className="mt-4">
                         <Text className="text-xs font-sfPro-semibold tracking-widest text-muted">
                           FOCUS DURATION
                         </Text>
-                        <View className="mt-3 flex-row flex-wrap gap-2">
-                          {DURATION_OPTIONS.map((mins) => {
-                            const isSelected = schedule.durationMinutes === mins;
-                            return (
-                              <Pressable
-                                key={mins}
-                                onPress={() =>
-                                  onUpdateSchedule(schedule.id, {
-                                    durationMinutes: mins,
-                                  })
+                        {focusDurationMode === "manual" ? (
+                          <View className="mt-3 flex-row items-center gap-2">
+                            <Pressable
+                              onPress={() =>
+                                onAdjustDuration(schedule, -FOCUS_DURATION_STEP)
+                              }
+                              className="h-10 w-10 items-center justify-center rounded-full border border-outline bg-backgroundElevated"
+                            >
+                              <Ionicons
+                                name="remove"
+                                size={18}
+                                color={colors.muted}
+                              />
+                            </Pressable>
+                            <View className="flex-1 rounded-xl border border-outline bg-backgroundElevated px-3 py-2">
+                              <TextInput
+                                key={`${schedule.id}-${schedule.durationMinutes}-${focusDurationMode}`}
+                                defaultValue={String(schedule.durationMinutes)}
+                                keyboardType="number-pad"
+                                onEndEditing={(event) =>
+                                  onCommitDurationInput(
+                                    schedule.id,
+                                    event.nativeEvent.text,
+                                  )
                                 }
-                                className={`rounded-full border px-4 py-2 ${
-                                  isSelected
-                                    ? "border-primary bg-primary/20"
-                                    : "border-outline bg-backgroundElevated"
-                                }`}
-                              >
-                                <Text
-                                  className={`font-sfPro-semibold ${
-                                    isSelected ? "text-foreground" : "text-muted"
-                                  }`}
-                                >
-                                  {mins} min
-                                </Text>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
+                                onSubmitEditing={(event) =>
+                                  onCommitDurationInput(
+                                    schedule.id,
+                                    event.nativeEvent.text,
+                                  )
+                                }
+                                className="text-center font-sfPro-semibold text-foreground"
+                                placeholder="30"
+                                placeholderTextColor={colors.muted}
+                              />
+                            </View>
+                            <Pressable
+                              onPress={() =>
+                                onAdjustDuration(schedule, FOCUS_DURATION_STEP)
+                              }
+                              className="h-10 w-10 items-center justify-center rounded-full border border-outline bg-backgroundElevated"
+                            >
+                              <Ionicons
+                                name="add"
+                                size={18}
+                                color={colors.muted}
+                              />
+                            </Pressable>
+                          </View>
+                        ) : (
+                          <View className="mt-3 rounded-xl border border-outline bg-backgroundElevated px-3 py-3">
+                            <Text className="text-center font-sfPro-semibold text-foreground">
+                              {schedule.durationMinutes} min
+                            </Text>
+                          </View>
+                        )}
+                        <Text className="mt-2 text-xs font-sfPro text-muted">
+                          {focusDurationMode === "goal"
+                            ? "Duration is managed automatically by your completion goal."
+                            : "Set this schedule's minutes manually."}
+                        </Text>
                       </View>
 
                       {schedule.kind === "custom" && (
@@ -475,7 +457,7 @@ export function FocusTimesStep({
           </Text>
         ) : null}
 
-        {!isEditTimes && (
+        {showNotificationCard && (
           <View className="mt-6 rounded-2xl border border-outline bg-backgroundElevated px-4 py-4">
             <View className="flex-row items-center gap-3">
               <View
@@ -493,25 +475,36 @@ export function FocusTimesStep({
                   Notifications
                 </Text>
                 <Text className="mt-1 text-sm font-sfPro text-muted">
-                  We will remind you to open QuranLock when the shield appears.
+                  {funnelText.onboarding.focusNotificationDescription}
                 </Text>
               </View>
             </View>
-            {notificationStatus ? (
-              <Text className="mt-3 text-sm font-sfPro text-muted">
-                Status:{" "}
-                <Text className="font-sfPro-semibold text-foreground">
-                  {notificationStatus === "granted"
-                    ? "Allowed"
-                    : notificationStatus === "denied"
-                      ? "Denied"
-                      : "Not determined"}
-                </Text>
+            <View
+              className="mt-3 self-start rounded-full px-3 py-1.5"
+              style={{ backgroundColor: notificationMeta.bg }}
+            >
+              <Text
+                className="text-xs font-sfPro-semibold"
+                style={{ color: notificationMeta.tone }}
+              >
+                Notification status: {notificationMeta.label}
               </Text>
-            ) : null}
+            </View>
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
+      <DatePicker
+        modal
+        mode="time"
+        theme="dark"
+        open={isTimePickerOpen}
+        date={pickerDate}
+        title="Select focus time"
+        confirmText="Set"
+        cancelText="Cancel"
+        onConfirm={onConfirmTimePicker}
+        onCancel={onCancelTimePicker}
+      />
     </View>
   );
 }

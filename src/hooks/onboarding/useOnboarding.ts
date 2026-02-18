@@ -5,6 +5,7 @@ import {
   TOTAL_STEPS,
   getNextDuration,
 } from "@/configs/onboarding";
+import { useFunnelText } from "@/hooks/app";
 import { canProceedScreenTime } from "@/components/onboarding/ScreenTimeStep";
 import { commitSelectApps } from "@/components/onboarding/SelectAppsStep";
 import { SCREEN_TIME } from "@/constants/screenTime";
@@ -12,15 +13,22 @@ import {
   DEFAULT_SHIELD_ACTIONS,
   DEFAULT_SHIELD_CONFIG,
   configureBlockOnly,
+  getAuthStatus,
+  getStableAuthStatus,
+  requestAuthorization,
   startDailyBlockScheduleFor,
   stopMonitoring,
   updateShield,
 } from "@/services/deviceActivity";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore, type FocusSchedule } from "@/store/user";
+import * as Notifications from "expo-notifications";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
-import { Platform } from "react-native";
+import { Linking, Platform } from "react-native";
+
+const AuthorizationStatus = { notDetermined: 0, denied: 1, approved: 2 } as const;
+type NotificationPermissionStatus = "granted" | "denied" | "undetermined" | null;
 
 export interface UseOnboardingResult {
   activeStep: number;
@@ -45,11 +53,15 @@ export interface UseOnboardingResult {
   onBack: () => void;
   onNext: () => Promise<void>;
   onScreenTimeAuthorizationChange: (approved: boolean) => void;
+  onScreenTimeAuthorizationStatusChange: (status: number) => void;
+  onNotificationPermissionChange: (approved: boolean) => void;
+  onNotificationPermissionStatusChange: (status: NotificationPermissionStatus) => void;
   onSetAgeInput: (value: string) => void;
   onSetFamilyActivitySelection: (selection: string | null) => void;
 }
 
 export function useOnboarding(): UseOnboardingResult {
+  const funnelText = useFunnelText();
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string; from?: string }>();
 
@@ -72,6 +84,16 @@ export function useOnboarding(): UseOnboardingResult {
   const [screenTimeApproved, setScreenTimeApproved] = useState(() =>
     canProceedScreenTime(),
   );
+  const [, setScreenTimeStatus] = useState<number>(() =>
+    Platform.OS === "ios" ? getAuthStatus() : AuthorizationStatus.approved,
+  );
+  const [screenTimeResolving, setScreenTimeResolving] = useState(false);
+  const [notificationApproved, setNotificationApproved] = useState(() =>
+    Platform.OS !== "ios",
+  );
+  const [notificationStatus, setNotificationStatus] =
+    useState<NotificationPermissionStatus>(null);
+  const [notificationResolving, setNotificationResolving] = useState(false);
   const [hasAttemptedScheduleSubmit, setHasAttemptedScheduleSubmit] =
     useState(false);
 
@@ -101,6 +123,37 @@ export function useOnboarding(): UseOnboardingResult {
   const onScreenTimeAuthorizationChange = useCallback((approved: boolean) => {
     setScreenTimeApproved(approved);
   }, []);
+
+  const onScreenTimeAuthorizationStatusChange = useCallback((status: number) => {
+    setScreenTimeStatus(status);
+    setScreenTimeApproved(status === AuthorizationStatus.approved);
+  }, []);
+
+  const onNotificationPermissionChange = useCallback((approved: boolean) => {
+    setNotificationApproved(approved);
+  }, []);
+
+  const onNotificationPermissionStatusChange = useCallback(
+    (status: NotificationPermissionStatus) => {
+      setNotificationStatus(status);
+      if (status != null) {
+        setNotificationApproved(status === "granted");
+      }
+    },
+    [],
+  );
+
+  const mapNotificationStatus = useCallback(
+    (
+      status: Notifications.PermissionStatus,
+    ): Exclude<NotificationPermissionStatus, null> =>
+      status === "granted"
+        ? "granted"
+        : status === "denied"
+          ? "denied"
+          : "undetermined",
+    [],
+  );
 
   const applySchedules = useCallback(async () => {
     const schedules = useUserStore.getState().focusSchedules;
@@ -158,8 +211,24 @@ export function useOnboarding(): UseOnboardingResult {
       setAge(parsedAge);
     }
 
-    if (!isEditTimes && activeStep === 7 && !canProceedScreenTime()) {
-      return;
+    if (!isEditTimes && activeStep === 7 && Platform.OS === "ios") {
+      if (!screenTimeApproved) {
+        setScreenTimeResolving(true);
+        try {
+          await requestAuthorization();
+          const nextStatus = await getStableAuthStatus();
+          setScreenTimeStatus(nextStatus);
+          const approved = nextStatus === AuthorizationStatus.approved;
+          setScreenTimeApproved(approved);
+          if (!approved) return;
+        } catch {
+          setScreenTimeStatus(getAuthStatus());
+          setScreenTimeApproved(false);
+          return;
+        } finally {
+          setScreenTimeResolving(false);
+        }
+      }
     }
 
     if (
@@ -172,6 +241,35 @@ export function useOnboarding(): UseOnboardingResult {
     }
 
     if (activeStep === 9) {
+      if (
+        !isEditTimes &&
+        Platform.OS === "ios" &&
+        !notificationApproved
+      ) {
+        setNotificationResolving(true);
+        try {
+          const { status: current } = await Notifications.getPermissionsAsync();
+          const currentMapped = mapNotificationStatus(current);
+          setNotificationStatus(currentMapped);
+          if (currentMapped === "denied") {
+            Linking.openSettings().catch(() => {});
+            return;
+          }
+
+          const { status: requested } =
+            await Notifications.requestPermissionsAsync();
+          const requestedMapped = mapNotificationStatus(requested);
+          const approved = requestedMapped === "granted";
+          setNotificationStatus(requestedMapped);
+          setNotificationApproved(approved);
+          if (!approved) return;
+        } catch {
+          return;
+        } finally {
+          setNotificationResolving(false);
+        }
+      }
+
       if (!focusSchedules.length) {
         setHasAttemptedScheduleSubmit(true);
         return;
@@ -210,8 +308,11 @@ export function useOnboarding(): UseOnboardingResult {
     familyActivitySelection,
     focusSchedules.length,
     isEditTimes,
+    mapNotificationStatus,
     name,
+    notificationApproved,
     router,
+    screenTimeApproved,
     setAge,
     setOnboardingComplete,
   ]);
@@ -231,24 +332,34 @@ export function useOnboarding(): UseOnboardingResult {
     if (activeStep === 4) return !isAgeValid;
     if (activeStep === 5) return !quranFrequency;
     if (activeStep === 6) return reasonsDisconnect.length === 0;
-    if (activeStep === 7) return !screenTimeApproved;
+    if (activeStep === 7) return screenTimeResolving;
     if (activeStep === 8) return !hasSelectedApps;
-    if (activeStep === 9) return focusSchedules.length === 0;
+    if (activeStep === 9) {
+      return focusSchedules.length === 0 || notificationResolving;
+    }
     return false;
   })();
 
-  const nextLabel = isEditTimes
-    ? "Save"
-    : stepIndex === TOTAL_STEPS - 1
-      ? "Finish"
-      : stepIndex === 0
-        ? "Get Started"
-        : stepIndex < 3
-          ? "Next"
-          : "Continue";
+  const nextLabel = (() => {
+    if (isEditTimes) return "Save";
+    if (activeStep === 7 && Platform.OS === "ios" && !screenTimeApproved) {
+      return screenTimeResolving ? "Checking..." : "Give Access";
+    }
+    if (activeStep === 9 && Platform.OS === "ios" && !notificationApproved) {
+      if (notificationResolving) return "Checking...";
+      return notificationStatus === "denied" ? "Open Settings" : "Give Access";
+    }
+    if (stepIndex === TOTAL_STEPS - 1) return "Finish";
+    if (stepIndex === 0) return "Get Started";
+    if (stepIndex < 3) return "Next";
+    return "Continue";
+  })();
 
   const title = STEP_TITLES[activeStep] ?? "";
-  const subtitle = STEP_SUBTITLES[activeStep] ?? "";
+  const subtitle =
+    funnelText.onboarding.stepSubtitles[activeStep] ??
+    STEP_SUBTITLES[activeStep] ??
+    "";
   const icon = STEP_ICONS[activeStep] ?? undefined;
   const scheduleError =
     hasAttemptedScheduleSubmit && focusSchedules.length === 0
@@ -269,7 +380,10 @@ export function useOnboarding(): UseOnboardingResult {
     nextLabel,
     onBack,
     onNext,
+    onNotificationPermissionChange,
+    onNotificationPermissionStatusChange,
     onScreenTimeAuthorizationChange,
+    onScreenTimeAuthorizationStatusChange,
     onSetAgeInput: setAgeInput,
     onSetFamilyActivitySelection: setFamilyActivitySelection,
     progressVariant: isEditTimes ? "full" : "bar",
