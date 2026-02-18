@@ -1,5 +1,6 @@
 export * from "./colors";
 export * from "./entitlements";
+export * from "./funnelText";
 export * from "./routes";
 export * from "./screenTime";
 export * from "./storageKeys";

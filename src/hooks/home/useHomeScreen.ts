@@ -1,4 +1,5 @@
 import { PAYWALL_SOURCES } from "@/constants/entitlements";
+import { useFunnelText } from "@/hooks/app";
 import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
 import {
   getStableAuthStatus,
@@ -45,6 +46,7 @@ const formatTime = (hour: number, minute: number) => {
 };
 
 export const useHomeScreen = () => {
+  const funnelText = useFunnelText();
   const router = useRouter();
   const [screenTimeStatus, setScreenTimeStatus] = useState<number | null>(null);
   const [notificationGranted, setNotificationGranted] = useState<boolean | null>(
@@ -188,7 +190,9 @@ export const useHomeScreen = () => {
   const showSetupTimes = hasSelectedApps && timelineItems.length === 0;
   const showTimeline = hasSelectedApps && timelineItems.length > 0;
 
-  const journeyTitle = isBlockingActive ? "Unlock in progress" : "Today's journey";
+  const journeyTitle = isBlockingActive
+    ? funnelText.home.journeyTitleActive
+    : funnelText.home.journeyTitleIdle;
   const journeySubtitle = isBlockingActive
     ? `${remainingMinutes}:${remainingSecondsPart.toString().padStart(2, "0")} left to unlock apps`
     : `${completedSchedulesCount}/${Math.max(

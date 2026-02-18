@@ -1,4 +1,5 @@
 import { colors } from "@/constants/colors";
+import { useFunnelText } from "@/hooks/app";
 import {
   getAuthStatus,
   getStableAuthStatus,
@@ -28,6 +29,7 @@ export function ScreenTimeStep({
   onAuthorizationChange,
   onAuthorizationStatusChange,
 }: ScreenTimeStepProps = {}) {
+  const funnelText = useFunnelText();
   const [authStatus, setAuthStatus] = useState<number | null>(null);
   const hasRequested = useRef(false);
 
@@ -125,8 +127,7 @@ export function ScreenTimeStep({
               Turn on the Shield
             </Text>
             <Text className="mt-1 text-sm font-sfPro text-muted">
-              Screen Time powers a gentle shield. When it appears, open
-              QuranLock and read to unlock your apps.
+              {funnelText.onboarding.screenTimeShieldBody}
             </Text>
           </View>
         </View>
@@ -139,7 +140,7 @@ export function ScreenTimeStep({
         className="mt-5 gap-3"
       >
         {[
-          "Shield appears only in your scheduled focus times",
+          funnelText.onboarding.screenTimeFirstBullet,
           "Reading on this screen unlocks your apps",
           "You stay in control — no hard lock",
         ].map((item) => (

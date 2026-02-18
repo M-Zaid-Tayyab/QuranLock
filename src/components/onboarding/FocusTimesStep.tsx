@@ -1,5 +1,6 @@
 import { PRAYER_PRESETS, formatTime } from "@/configs/onboarding";
 import { colors } from "@/constants/colors";
+import { useFunnelText } from "@/hooks/app";
 import {
   FOCUS_DURATION_STEP,
   FOCUS_LABEL_MAX_LENGTH,
@@ -25,6 +26,7 @@ export function FocusTimesStep({
   onNotificationPermissionChange,
   onNotificationPermissionStatusChange,
 }: FocusTimesStepProps) {
+  const funnelText = useFunnelText();
   const {
     focusSchedules,
     focusDurationMode,
@@ -277,7 +279,7 @@ export function FocusTimesStep({
           {orderedSchedules.length === 0 ? (
             <View className="rounded-2xl border border-dashed border-outline bg-surface px-4 py-6">
               <Text className="text-center font-sfPro text-muted">
-                Select a prayer time or add a custom time to continue.
+                {funnelText.onboarding.focusEmptyState}
               </Text>
             </View>
           ) : (
@@ -473,7 +475,7 @@ export function FocusTimesStep({
                   Notifications
                 </Text>
                 <Text className="mt-1 text-sm font-sfPro text-muted">
-                  We will remind you to open QuranLock when the shield appears.
+                  {funnelText.onboarding.focusNotificationDescription}
                 </Text>
               </View>
             </View>

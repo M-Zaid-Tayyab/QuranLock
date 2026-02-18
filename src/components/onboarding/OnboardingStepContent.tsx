@@ -3,6 +3,7 @@ import {
   QURAN_FREQUENCY_OPTIONS,
   REASONS_OPTIONS,
 } from "@/configs/onboarding";
+import { useFunnelText } from "@/hooks/app";
 import type { UseOnboardingResult } from "@/hooks/onboarding/useOnboarding";
 import { useUserStore } from "@/store/user";
 import { useCallback } from "react";
@@ -20,6 +21,7 @@ interface OnboardingStepContentProps {
 export function OnboardingStepContent({
   onboarding,
 }: OnboardingStepContentProps) {
+  const funnelText = useFunnelText();
   const name = useUserStore((s) => s.name);
   const setName = useUserStore((s) => s.setName);
   const quranFrequency = useUserStore((s) => s.quranFrequency);
@@ -77,8 +79,8 @@ export function OnboardingStepContent({
   if (onboarding.activeStep === 5) {
     return (
       <QuestionCard
-        question="How often do you read the Quran?"
-        subtitle="This helps us tailor your experience"
+        question={funnelText.onboarding.quranFrequencyQuestion}
+        subtitle={funnelText.onboarding.quranFrequencySubtitle}
         icon="book-outline"
         iconColor={colors.primary}
         options={QURAN_FREQUENCY_OPTIONS}
@@ -91,7 +93,7 @@ export function OnboardingStepContent({
   if (onboarding.activeStep === 6) {
     return (
       <QuestionCard
-        question="What keeps you from staying connected with Allah?"
+        question={funnelText.onboarding.reasonsQuestion}
         subtitle="Select all that apply"
         icon="heart-dislike-outline"
         iconColor={colors.primary}

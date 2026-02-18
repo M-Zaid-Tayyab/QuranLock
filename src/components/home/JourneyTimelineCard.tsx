@@ -1,4 +1,5 @@
 import { colors } from "@/constants/colors";
+import { useFunnelText } from "@/hooks/app";
 import type { HomeTimelineItem } from "@/hooks/home";
 import { Ionicons } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
@@ -26,13 +27,14 @@ export function JourneyTimelineCard({
   nextFocusLabel,
   onManageTimes,
 }: JourneyTimelineCardProps) {
+  const funnelText = useFunnelText();
   return (
     <View className="mb-6 rounded-2xl border border-outline bg-surface px-5 py-5">
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center gap-2">
           <Ionicons name="time-outline" size={18} color={colors.accent} />
           <Text className="text-lg font-sfPro-semibold text-foreground">
-            Today's timeline
+            {funnelText.home.timelineTitle}
           </Text>
         </View>
         <Pressable

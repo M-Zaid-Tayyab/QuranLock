@@ -8,6 +8,8 @@ import {
 import { ensureQuranPack } from "@/services/quranPack";
 import { startGlobalRecitationOfflineDownload } from "@/services/recitationPack";
 import { configureRevenueCat } from "@/services/revenueCat";
+import { useRemoteAppConfig } from "@/hooks/app";
+import { QueryProvider } from "@/providers/QueryProvider";
 import { useUserSync } from "@/hooks/user";
 import { useUserStore } from "@/store/user";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
@@ -63,8 +65,9 @@ function useDeepLinkToVerse() {
   }, [completedUnlockSessions, isPremium, router]);
 }
 
-export default function RootLayout() {
+function RootLayoutContent() {
   useDeepLinkToVerse();
+  useRemoteAppConfig();
   useUserSync();
 
   const appUserId = useUserStore((s) => s.appUserId);
@@ -124,5 +127,13 @@ export default function RootLayout() {
         </BottomSheetModalProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <QueryProvider>
+      <RootLayoutContent />
+    </QueryProvider>
   );
 }

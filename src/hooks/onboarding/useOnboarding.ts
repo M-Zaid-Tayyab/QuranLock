@@ -5,6 +5,7 @@ import {
   TOTAL_STEPS,
   getNextDuration,
 } from "@/configs/onboarding";
+import { useFunnelText } from "@/hooks/app";
 import { canProceedScreenTime } from "@/components/onboarding/ScreenTimeStep";
 import { commitSelectApps } from "@/components/onboarding/SelectAppsStep";
 import { SCREEN_TIME } from "@/constants/screenTime";
@@ -60,6 +61,7 @@ export interface UseOnboardingResult {
 }
 
 export function useOnboarding(): UseOnboardingResult {
+  const funnelText = useFunnelText();
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string; from?: string }>();
 
@@ -354,7 +356,10 @@ export function useOnboarding(): UseOnboardingResult {
   })();
 
   const title = STEP_TITLES[activeStep] ?? "";
-  const subtitle = STEP_SUBTITLES[activeStep] ?? "";
+  const subtitle =
+    funnelText.onboarding.stepSubtitles[activeStep] ??
+    STEP_SUBTITLES[activeStep] ??
+    "";
   const icon = STEP_ICONS[activeStep] ?? undefined;
   const scheduleError =
     hasAttemptedScheduleSubmit && focusSchedules.length === 0

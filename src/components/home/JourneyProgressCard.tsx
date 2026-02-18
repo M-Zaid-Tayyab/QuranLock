@@ -1,4 +1,5 @@
 import { colors } from "@/constants/colors";
+import { useFunnelText } from "@/hooks/app";
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";
 import { FlatList, Text, View } from "react-native";
@@ -38,6 +39,7 @@ export function JourneyProgressCard({
   pagesRead,
   pagesTotal,
 }: JourneyProgressCardProps) {
+  const funnelText = useFunnelText();
   const data = useMemo(() => days ?? getDefaultDays(), [days]);
   const currentStreak = (() => {
     let count = 0;
@@ -110,7 +112,7 @@ export function JourneyProgressCard({
         <View className="flex-row items-center gap-2">
           <Ionicons name="sparkles-outline" size={18} color={colors.accent} />
           <Text className="text-lg font-sfPro-semibold text-foreground">
-            Overall progress
+            {funnelText.home.progressTitle}
           </Text>
         </View>
 
@@ -127,7 +129,7 @@ export function JourneyProgressCard({
                 {lifetimeLabel}
               </Text>
               <Text className="mt-1 text-xs font-sfPro text-muted">
-                Total time spent in focused Qur'an journey
+                {funnelText.home.totalTimeDescription}
               </Text>
             </View>
             <View
@@ -156,7 +158,7 @@ export function JourneyProgressCard({
             <View className="flex-row items-center gap-1.5">
               <Ionicons name="library-outline" size={14} color={colors.primary} />
               <Text className="text-[11px] font-sfPro-semibold tracking-widest text-muted">
-                PAGE JOURNEY
+                {funnelText.home.pageJourneyLabel}
               </Text>
             </View>
             <Text className="text-xs font-sfPro-semibold text-foreground">

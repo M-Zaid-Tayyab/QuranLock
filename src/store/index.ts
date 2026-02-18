@@ -1,3 +1,4 @@
+export { useAppConfigStore } from "./appConfig";
 export { useBlockingStore } from "./blocking";
 export type { BlockingState } from "./blocking";
 export { useUserStore } from "./user";
