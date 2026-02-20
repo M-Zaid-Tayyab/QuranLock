@@ -14,11 +14,13 @@ export interface UserState {
   quranFrequency: string;
   reasonsDisconnect: string[];
   focusSchedules: FocusSchedule[];
+  deferredFocusSchedules: FocusSchedule[];
   focusDurationMode: FocusDurationMode;
   focusCompletionDays: number;
   focusMinutesPerPage: number;
   onboardingComplete: boolean;
   hasSelectedApps: boolean;
+  familyActivitySelection: string | null;
   lastReadPage: number;
   translationEnabled: boolean;
   quranFontScale: number;
@@ -45,11 +47,13 @@ interface UserActions {
   setQuranFrequency: (value: string) => void;
   setReasonsDisconnect: (value: string[]) => void;
   setFocusSchedules: (value: FocusSchedule[]) => void;
+  setDeferredFocusSchedules: (value: FocusSchedule[]) => void;
   setFocusDurationMode: (value: FocusDurationMode) => void;
   setFocusCompletionDays: (value: number) => void;
   setFocusMinutesPerPage: (value: number) => void;
   setOnboardingComplete: (value: boolean) => void;
   setHasSelectedApps: (value: boolean) => void;
+  setFamilyActivitySelection: (value: string | null) => void;
   setLastReadPage: (page: number) => void;
   setTranslationEnabled: (value: boolean) => void;
   setQuranFontScale: (value: number) => void;
@@ -65,11 +69,13 @@ const initialState: UserState = {
   quranFrequency: "",
   reasonsDisconnect: [],
   focusSchedules: [],
+  deferredFocusSchedules: [],
   focusDurationMode: "goal",
   focusCompletionDays: 30,
   focusMinutesPerPage: 3.0,
   onboardingComplete: false,
   hasSelectedApps: false,
+  familyActivitySelection: null,
   lastReadPage: 1,
   translationEnabled: false,
   quranFontScale: 1,
@@ -89,6 +95,8 @@ export const useUserStore = create<UserState & UserActions>()(
       setQuranFrequency: (quranFrequency) => set({ quranFrequency }),
       setReasonsDisconnect: (reasonsDisconnect) => set({ reasonsDisconnect }),
       setFocusSchedules: (focusSchedules) => set({ focusSchedules }),
+      setDeferredFocusSchedules: (deferredFocusSchedules) =>
+        set({ deferredFocusSchedules }),
       setFocusDurationMode: (focusDurationMode) => set({ focusDurationMode }),
       setFocusCompletionDays: (focusCompletionDays) =>
         set({ focusCompletionDays }),
@@ -97,6 +105,8 @@ export const useUserStore = create<UserState & UserActions>()(
       setOnboardingComplete: (onboardingComplete) =>
         set({ onboardingComplete }),
       setHasSelectedApps: (hasSelectedApps) => set({ hasSelectedApps }),
+      setFamilyActivitySelection: (familyActivitySelection) =>
+        set({ familyActivitySelection }),
       setLastReadPage: (lastReadPage) => set({ lastReadPage }),
       setTranslationEnabled: (translationEnabled) =>
         set({ translationEnabled }),

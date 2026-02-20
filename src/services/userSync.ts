@@ -10,6 +10,7 @@ export interface UserSyncPayload {
   quranFrequency: string;
   reasonsDisconnect: string[];
   focusSchedules: FocusSchedule[];
+  deferredFocusSchedules: FocusSchedule[];
   onboardingComplete: boolean;
   hasSelectedApps: boolean;
   lastReadPage: number;

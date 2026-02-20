@@ -10,7 +10,10 @@ import { startGlobalRecitationOfflineDownload } from "@/services/recitationPack"
 import { configureRevenueCat } from "@/services/revenueCat";
 import { useRemoteAppConfig } from "@/hooks/app";
 import { QueryProvider } from "@/providers/QueryProvider";
-import { useUserSync } from "@/hooks/user";
+import {
+  useFocusScheduleEntitlementReconciliation,
+  useUserSync,
+} from "@/hooks/user";
 import { useUserStore } from "@/store/user";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as Notifications from "expo-notifications";
@@ -69,6 +72,7 @@ function RootLayoutContent() {
   useDeepLinkToVerse();
   useRemoteAppConfig();
   useUserSync();
+  useFocusScheduleEntitlementReconciliation();
 
   const appUserId = useUserStore((s) => s.appUserId);
   const setAppUserId = useUserStore((s) => s.setAppUserId);

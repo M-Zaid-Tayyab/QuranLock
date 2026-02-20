@@ -13,6 +13,7 @@ import { QuestionCard } from "./QuestionCard";
 import { ScreenTimeStep } from "./ScreenTimeStep";
 import { SelectAppsStep } from "./SelectAppsStep";
 import { TextInputQuestion } from "./TextInputQuestion";
+import { ReviewsStep } from "./ReviewsStep";
 
 interface OnboardingStepContentProps {
   onboarding: UseOnboardingResult;
@@ -138,6 +139,10 @@ export function OnboardingStepContent({
         }
       />
     );
+  }
+
+  if (onboarding.activeStep === 10) {
+    return <ReviewsStep />;
   }
 
   return null;

@@ -12,6 +12,7 @@ export const useUserSync = () => {
       quranFrequency: s.quranFrequency,
       reasonsDisconnect: s.reasonsDisconnect,
       focusSchedules: s.focusSchedules,
+      deferredFocusSchedules: s.deferredFocusSchedules,
       onboardingComplete: s.onboardingComplete,
       hasSelectedApps: s.hasSelectedApps,
       lastReadPage: s.lastReadPage,

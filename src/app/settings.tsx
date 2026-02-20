@@ -1,22 +1,28 @@
-import { SelectAppsStep } from "@/components/onboarding";
+import { SettingsSelectAppsStep } from "@/components/onboarding";
 import { setSelection } from "@/services/deviceActivity";
+import {
+  ensureCanEditFocusTimes,
+} from "@/services/entitlements";
 import { useUserStore } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
 import * as Application from "expo-application";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { Linking, Pressable, ScrollView, Text, View } from "react-native";
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const [familyActivitySelection, setFamilyActivitySelection] = useState<
-    string | null
-  >(null);
 
   const focusSchedules = useUserStore((s) => s.focusSchedules);
   const focusDurationMode = useUserStore((s) => s.focusDurationMode);
   const focusCompletionDays = useUserStore((s) => s.focusCompletionDays);
+  const familyActivitySelection = useUserStore(
+    (s) => s.familyActivitySelection,
+  );
   const setHasSelectedApps = useUserStore((s) => s.setHasSelectedApps);
+  const setFamilyActivitySelection = useUserStore(
+    (s) => s.setFamilyActivitySelection,
+  );
   const isPremium = useUserStore((s) => s.isPremium);
 
   const normalizeExternalUrl = (value: string | undefined) => {
@@ -56,7 +62,7 @@ export default function SettingsScreen() {
         setHasSelectedApps(false);
       }
     },
-    [setHasSelectedApps],
+    [setFamilyActivitySelection, setHasSelectedApps],
   );
 
   const orderedSchedules = useMemo(
@@ -66,6 +72,16 @@ export default function SettingsScreen() {
       ),
     [focusSchedules],
   );
+
+  const handleEditFocusTimes = useCallback(() => {
+    if (!ensureCanEditFocusTimes(router, { isPremium })) {
+      return;
+    }
+    router.push({
+      pathname: "/onboarding",
+      params: { mode: "edit-times", from: "settings" },
+    });
+  }, [isPremium, router]);
 
   const formatTime = (hour: number, minute: number) => {
     const suffix = hour >= 12 ? "PM" : "AM";
@@ -160,12 +176,7 @@ export default function SettingsScreen() {
             </View>
           )}
           <Pressable
-            onPress={() =>
-              router.push({
-                pathname: "/onboarding",
-                params: { mode: "edit-times", from: "settings" },
-              })
-            }
+            onPress={handleEditFocusTimes}
             className="mt-4 rounded-full bg-primary px-4 py-2"
           >
             <Text className="text-center text-sm font-sfPro-semibold text-primaryForeground">
@@ -182,10 +193,9 @@ export default function SettingsScreen() {
             Choose which apps pause during focus time.
           </Text>
           <View className="mt-4">
-            <SelectAppsStep
+            <SettingsSelectAppsStep
               familyActivitySelection={familyActivitySelection}
               onSelectionChange={handleSelectionChange}
-              autoOpen={false}
             />
           </View>
         </View>

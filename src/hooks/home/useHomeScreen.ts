@@ -6,8 +6,8 @@ import {
   requestAuthorization,
 } from "@/services/deviceActivity";
 import {
-  canAddFocusSchedule,
   canOpenQuran,
+  ensureCanEditFocusTimes,
   openPaywallForBlockedDecision,
 } from "@/services/entitlements";
 import { useBlockingStore } from "@/store/blocking";
@@ -30,7 +30,7 @@ export interface HomeTimelineItem {
   label: string;
   timeLabel: string;
   durationMinutes: number;
-  status: ScheduleStatus;
+  status: ScheduleStatus | "premium_locked";
 }
 
 export interface HomeStreakDay {
@@ -59,8 +59,8 @@ export const useHomeScreen = () => {
   const completedUnlockSessions = useUserStore(
     (s) => s.completedUnlockSessions,
   );
+  const deferredFocusSchedules = useUserStore((s) => s.deferredFocusSchedules);
   const lastReadPage = useUserStore((s) => s.lastReadPage);
-  const focusScheduleCount = useUserStore((s) => s.focusSchedules.length);
   const hasSelectedApps = useUserStore((s) => s.hasSelectedApps);
   const { statuses, activeSchedule } = useFocusScheduleStatus();
 
@@ -163,7 +163,7 @@ export const useHomeScreen = () => {
     Math.max(1, Math.trunc(lastReadPage || 1)),
   );
 
-  const timelineItems = useMemo(
+  const activeTimelineItems = useMemo(
     () =>
       statuses.map((entry) => ({
         id: entry.schedule.id,
@@ -175,7 +175,25 @@ export const useHomeScreen = () => {
     [statuses],
   );
 
-  const nextUpcoming = timelineItems.find((item) => item.status === "upcoming");
+  const timelineItems = useMemo(() => {
+    if (isPremium || deferredFocusSchedules.length === 0) {
+      return activeTimelineItems;
+    }
+
+    const deferredItems = deferredFocusSchedules.map((schedule) => ({
+      id: `deferred-${schedule.id}`,
+      label: schedule.label,
+      timeLabel: formatTime(schedule.hour, schedule.minute),
+      durationMinutes: schedule.durationMinutes,
+      status: "premium_locked" as const,
+    })) satisfies HomeTimelineItem[];
+
+    return [...activeTimelineItems, ...deferredItems];
+  }, [activeTimelineItems, deferredFocusSchedules, isPremium]);
+
+  const nextUpcoming = activeTimelineItems.find(
+    (item) => item.status === "upcoming",
+  );
   const nextFocusLabel = nextUpcoming
     ? `${nextUpcoming.label} • ${nextUpcoming.timeLabel}`
     : "All focus windows for today are done";
@@ -243,20 +261,14 @@ export const useHomeScreen = () => {
   }, [completedUnlockSessions, isPremium, router]);
 
   const handleOpenFocusTimes = useCallback(() => {
-    const gate = canAddFocusSchedule({ isPremium, focusScheduleCount });
-    if (gate.allowed) {
-      router.push({
-        pathname: "/onboarding",
-        params: { mode: "edit-times", from: "home" },
-      });
+    if (!ensureCanEditFocusTimes(router, { isPremium })) {
       return;
     }
-    openPaywallForBlockedDecision(
-      router,
-      gate,
-      PAYWALL_SOURCES.HOME_SET_FOCUS_TIMES,
-    );
-  }, [focusScheduleCount, isPremium, router]);
+    router.push({
+      pathname: "/onboarding",
+      params: { mode: "edit-times", from: "home" },
+    });
+  }, [isPremium, router]);
 
   return {
     header: {

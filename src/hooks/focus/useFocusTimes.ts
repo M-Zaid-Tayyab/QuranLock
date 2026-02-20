@@ -253,6 +253,7 @@ export function useFocusTimes({
 
   const ensureCanAddSchedule = useCallback(
     (source: PaywallSource) => {
+      if (!isEditTimes) return true;
       const gate = canAddFocusSchedule({
         isPremium,
         focusScheduleCount: focusSchedules.length,
@@ -261,7 +262,7 @@ export function useFocusTimes({
       openPaywallForBlockedDecision(router, gate, source);
       return false;
     },
-    [focusSchedules.length, isPremium, router],
+    [focusSchedules.length, isEditTimes, isPremium, router],
   );
 
   const applyManualDuration = useCallback(

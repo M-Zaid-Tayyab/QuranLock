@@ -16,11 +16,14 @@ export default function Onboarding() {
       nextLabel={onboarding.nextLabel}
       showBack={onboarding.showBack}
       hideProgress={onboarding.hideProgress}
+      headerAlign={onboarding.headerAlign}
       progressVariant={onboarding.progressVariant}
       nextDisabled={onboarding.nextDisabled}
       animateCTA={onboarding.animateCTA}
       ctaDelayMs={onboarding.ctaDelayMs}
       ctaKey={onboarding.ctaKey}
+      animateTitleWords={onboarding.animateTitleWords}
+      titleHighlightWords={onboarding.titleHighlightWords}
     >
       <OnboardingStepContent onboarding={onboarding} />
     </StepContainer>

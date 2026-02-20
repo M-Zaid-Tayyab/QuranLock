@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import Animated, {
   Easing,
+  FadeInDown,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -32,6 +33,9 @@ interface StepContainerProps {
   animateCTA?: boolean;
   ctaDelayMs?: number;
   ctaKey?: string | number;
+  headerAlign?: "left" | "center";
+  animateTitleWords?: boolean;
+  titleHighlightWords?: string[];
   children: React.ReactNode;
 }
 
@@ -52,6 +56,9 @@ export function StepContainer({
   animateCTA = false,
   ctaDelayMs = 260,
   ctaKey,
+  headerAlign = "left",
+  animateTitleWords = false,
+  titleHighlightWords = [],
   children,
 }: StepContainerProps) {
   const progress = totalSteps > 0 ? (step + 1) / totalSteps : 0;
@@ -90,6 +97,13 @@ export function StepContainer({
     opacity: ctaOpacity.value,
     transform: [{ scale: ctaScale.value }],
   }));
+  const titleWords = title ? title.split(" ") : [];
+
+  const normalizedHighlightWords = new Set(
+    titleHighlightWords
+      .map((word) => word.replace(/[^a-z]/gi, "").toLowerCase())
+      .filter(Boolean),
+  );
 
   return (
     <View className="flex-1 bg-background pt-safe pb-safe">
@@ -163,12 +177,60 @@ export function StepContainer({
 
           {/* Title + subtitle */}
           {title ? (
-            <View className="mb-6">
-              <Text className="text-2xl font-sfPro-bold text-foreground leading-tight">
-                {title}
-              </Text>
+            <View
+              className={`mb-6 ${
+                headerAlign === "center" ? "items-center" : ""
+              }`}
+            >
+              {animateTitleWords ? (
+                <View
+                  className={`flex-row flex-wrap ${
+                    headerAlign === "center" ? "justify-center" : ""
+                  }`}
+                >
+                  {titleWords.map((word, index) => {
+                    const normalizedWord = word
+                      .replace(/[^a-z]/gi, "")
+                      .toLowerCase();
+                    const isHighlight =
+                      normalizedHighlightWords.has(normalizedWord);
+
+                    return (
+                      <Animated.Text
+                        key={`title-${ctaKey ?? step}-${word}-${index}`}
+                        entering={FadeInDown.delay(index * 120)
+                          .duration(260)
+                          .easing(Easing.out(Easing.cubic))}
+                        className={`text-2xl font-sfPro-bold leading-tight ${
+                          headerAlign === "center" ? "text-center" : ""
+                        }`}
+                        style={{
+                          color: isHighlight
+                            ? colors.primaryVariant
+                            : colors.foreground,
+                        }}
+                      >
+                        {word}
+                        {index < titleWords.length - 1 ? " " : ""}
+                      </Animated.Text>
+                    );
+                  })}
+                </View>
+              ) : (
+                <Text
+                  className={`text-2xl font-sfPro-bold text-foreground leading-tight ${
+                    headerAlign === "center" ? "text-center" : ""
+                  }`}
+                >
+                  {title}
+                </Text>
+              )}
               {subtitle ? (
-                <Text className="mt-2 text-muted font-sfPro text-base leading-6">
+                <Text
+                  className={`mt-2 text-muted font-sfPro text-base leading-6 ${
+                    headerAlign === "center" ? "text-center" : ""
+                  }`}
+                >
                   {subtitle}
                 </Text>
               ) : null}
