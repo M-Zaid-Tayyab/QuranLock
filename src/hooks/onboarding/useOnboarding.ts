@@ -23,6 +23,7 @@ import * as StoreReview from "expo-store-review";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Linking, Platform } from "react-native";
+import { useShallow } from "zustand/react/shallow";
 
 const AuthorizationStatus = { notDetermined: 0, denied: 1, approved: 2 } as const;
 type NotificationPermissionStatus = "granted" | "denied" | "undetermined" | null;
@@ -65,24 +66,35 @@ export function useOnboarding(): UseOnboardingResult {
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string; from?: string }>();
 
-  const name = useUserStore((s) => s.name);
-  const age = useUserStore((s) => s.age);
-  const setAge = useUserStore((s) => s.setAge);
-  const quranFrequency = useUserStore((s) => s.quranFrequency);
-  const reasonsDisconnect = useUserStore((s) => s.reasonsDisconnect);
-  const focusSchedules = useUserStore((s) => s.focusSchedules);
-  const setFocusSchedules = useUserStore((s) => s.setFocusSchedules);
-  const setDeferredFocusSchedules = useUserStore(
-    (s) => s.setDeferredFocusSchedules,
+  const {
+    name,
+    age,
+    setAge,
+    quranFrequency,
+    reasonsDisconnect,
+    focusSchedules,
+    setFocusSchedules,
+    setDeferredFocusSchedules,
+    familyActivitySelection,
+    setFamilyActivitySelection,
+    isPremium,
+    setOnboardingComplete,
+  } = useUserStore(
+    useShallow((s) => ({
+      name: s.name,
+      age: s.age,
+      setAge: s.setAge,
+      quranFrequency: s.quranFrequency,
+      reasonsDisconnect: s.reasonsDisconnect,
+      focusSchedules: s.focusSchedules,
+      setFocusSchedules: s.setFocusSchedules,
+      setDeferredFocusSchedules: s.setDeferredFocusSchedules,
+      familyActivitySelection: s.familyActivitySelection,
+      setFamilyActivitySelection: s.setFamilyActivitySelection,
+      isPremium: s.isPremium,
+      setOnboardingComplete: s.setOnboardingComplete,
+    })),
   );
-  const familyActivitySelection = useUserStore(
-    (s) => s.familyActivitySelection,
-  );
-  const setFamilyActivitySelection = useUserStore(
-    (s) => s.setFamilyActivitySelection,
-  );
-  const isPremium = useUserStore((s) => s.isPremium);
-  const setOnboardingComplete = useUserStore((s) => s.setOnboardingComplete);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [stepError, setStepError] = useState<string | null>(null);
@@ -106,8 +118,10 @@ export function useOnboarding(): UseOnboardingResult {
     useState(false);
   const [hasRequestedReview, setHasRequestedReview] = useState(false);
 
-  const setQuranMinutesToUnblock = useBlockingStore(
-    (s) => s.setQuranMinutesToUnblock,
+  const { setQuranMinutesToUnblock } = useBlockingStore(
+    useShallow((s) => ({
+      setQuranMinutesToUnblock: s.setQuranMinutesToUnblock,
+    })),
   );
   const previousSchedulesRef = useRef<FocusSchedule[]>(
     useUserStore.getState().focusSchedules,

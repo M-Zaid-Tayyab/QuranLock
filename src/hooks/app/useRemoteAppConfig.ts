@@ -20,5 +20,5 @@ export const useRemoteAppConfig = () => {
   useEffect(() => {
     if (!query.data) return;
     applyRemoteConfig(query.data);
-  }, [applyRemoteConfig, query.data]);
+  }, [query.data]);
 };

@@ -17,6 +17,7 @@ import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState, Platform } from "react-native";
+import { useShallow } from "zustand/react/shallow";
 
 const AuthorizationStatus = {
   notDetermined: 0,
@@ -54,23 +55,33 @@ export const useHomeScreen = () => {
   );
   const [requestingScreenTime, setRequestingScreenTime] = useState(false);
 
-  const name = useUserStore((s) => s.name);
-  const isPremium = useUserStore((s) => s.isPremium);
-  const completedUnlockSessions = useUserStore(
-    (s) => s.completedUnlockSessions,
+  const {
+    name,
+    isPremium,
+    completedUnlockSessions,
+    deferredFocusSchedules,
+    lastReadPage,
+    hasSelectedApps,
+  } = useUserStore(
+    useShallow((s) => ({
+      name: s.name,
+      isPremium: s.isPremium,
+      completedUnlockSessions: s.completedUnlockSessions,
+      deferredFocusSchedules: s.deferredFocusSchedules,
+      lastReadPage: s.lastReadPage,
+      hasSelectedApps: s.hasSelectedApps,
+    })),
   );
-  const deferredFocusSchedules = useUserStore((s) => s.deferredFocusSchedules);
-  const lastReadPage = useUserStore((s) => s.lastReadPage);
-  const hasSelectedApps = useUserStore((s) => s.hasSelectedApps);
   const { statuses, activeSchedule } = useFocusScheduleStatus();
 
-  const accumulatedMinutes = useBlockingStore(
-    (s) => s.accumulatedQuranMinutesForCurrentBlock,
-  );
-  const totalQuranMinutesLifetime = useBlockingStore(
-    (s) => s.totalQuranMinutesLifetime,
-  );
-  const getRequiredMinutes = useBlockingStore((s) => s.getRequiredMinutes);
+  const { accumulatedMinutes, totalQuranMinutesLifetime, getRequiredMinutes } =
+    useBlockingStore(
+      useShallow((s) => ({
+        accumulatedMinutes: s.accumulatedQuranMinutesForCurrentBlock,
+        totalQuranMinutesLifetime: s.totalQuranMinutesLifetime,
+        getRequiredMinutes: s.getRequiredMinutes,
+      })),
+    );
 
   const refreshScreenTimeStatus = useCallback(async () => {
     if (Platform.OS !== "ios") return;

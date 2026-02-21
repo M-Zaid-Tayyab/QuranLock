@@ -43,9 +43,7 @@ const useAppsPickerAutoOpen = (
   const openedOnce = useRef(false);
 
   useEffect(() => {
-    if (Platform.OS !== "ios") return;
-    if (!autoOpen) return;
-    if (openedOnce.current) return;
+    if (Platform.OS !== "ios" || !autoOpen || openedOnce.current) return;
     openedOnce.current = true;
     const timer = setTimeout(() => {
       sheetRef.current?.present();

@@ -24,6 +24,7 @@ import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Platform } from "react-native";
+import { useShallow } from "zustand/react/shallow";
 
 export type FocusNotificationStatus =
   | "granted"
@@ -77,16 +78,31 @@ export function useFocusTimes({
   onNotificationPermissionStatusChange,
 }: UseFocusTimesArgs): UseFocusTimesResult {
   const router = useRouter();
-  const focusSchedules = useUserStore((s) => s.focusSchedules);
-  const focusDurationMode = useUserStore((s) => s.focusDurationMode);
-  const focusCompletionDays = useUserStore((s) => s.focusCompletionDays);
-  const focusMinutesPerPage = useUserStore((s) => s.focusMinutesPerPage);
-  const setFocusSchedules = useUserStore((s) => s.setFocusSchedules);
-  const setFocusDurationMode = useUserStore((s) => s.setFocusDurationMode);
-  const setFocusCompletionDays = useUserStore((s) => s.setFocusCompletionDays);
-  const isPremium = useUserStore((s) => s.isPremium);
-  const setQuranMinutesToUnblock = useBlockingStore(
-    (s) => s.setQuranMinutesToUnblock,
+  const {
+    focusSchedules,
+    focusDurationMode,
+    focusCompletionDays,
+    focusMinutesPerPage,
+    setFocusSchedules,
+    setFocusDurationMode,
+    setFocusCompletionDays,
+    isPremium,
+  } = useUserStore(
+    useShallow((s) => ({
+      focusSchedules: s.focusSchedules,
+      focusDurationMode: s.focusDurationMode,
+      focusCompletionDays: s.focusCompletionDays,
+      focusMinutesPerPage: s.focusMinutesPerPage,
+      setFocusSchedules: s.setFocusSchedules,
+      setFocusDurationMode: s.setFocusDurationMode,
+      setFocusCompletionDays: s.setFocusCompletionDays,
+      isPremium: s.isPremium,
+    })),
+  );
+  const { setQuranMinutesToUnblock } = useBlockingStore(
+    useShallow((s) => ({
+      setQuranMinutesToUnblock: s.setQuranMinutesToUnblock,
+    })),
   );
 
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(
@@ -158,7 +174,7 @@ export function useFocusTimes({
 
   useEffect(() => {
     void syncNotificationStatus();
-  }, [syncNotificationStatus]);
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
@@ -168,16 +184,21 @@ export function useFocusTimes({
       }
     });
     return () => subscription.remove();
-  }, [syncNotificationStatus]);
+  }, []);
 
   useEffect(() => {
-    if (isEditTimes || Platform.OS !== "ios") return;
-    if (notificationStatus !== "undetermined") return;
-    if (hasRequestedNotificationsRef.current) return;
+    if (
+      isEditTimes ||
+      Platform.OS !== "ios" ||
+      notificationStatus !== "undetermined" ||
+      hasRequestedNotificationsRef.current
+    ) {
+      return;
+    }
 
     hasRequestedNotificationsRef.current = true;
     void requestNotifications();
-  }, [isEditTimes, notificationStatus, requestNotifications]);
+  }, [isEditTimes, notificationStatus]);
 
   useEffect(() => {
     if (!onNotificationPermissionChange) return;
@@ -187,12 +208,12 @@ export function useFocusTimes({
     }
     if (notificationStatus == null) return;
     onNotificationPermissionChange(notificationStatus === "granted");
-  }, [notificationStatus, onNotificationPermissionChange]);
+  }, [notificationStatus]);
 
   useEffect(() => {
     if (!onNotificationPermissionStatusChange) return;
     onNotificationPermissionStatusChange(notificationStatus);
-  }, [notificationStatus, onNotificationPermissionStatusChange]);
+  }, [notificationStatus]);
 
   const selectedPrayerIds = useMemo(
     () =>
@@ -235,8 +256,7 @@ export function useFocusTimes({
   );
 
   useEffect(() => {
-    if (focusDurationMode !== "goal") return;
-    if (!goalRecommendation.computable) return;
+    if (focusDurationMode !== "goal" || !goalRecommendation.computable) return;
     const nextDuration = goalRecommendation.recommendedMinutes;
     const alreadyApplied = focusSchedules.every(
       (schedule) => schedule.durationMinutes === nextDuration,
@@ -248,7 +268,6 @@ export function useFocusTimes({
     focusSchedules,
     goalRecommendation.computable,
     goalRecommendation.recommendedMinutes,
-    setSchedule,
   ]);
 
   const ensureCanAddSchedule = useCallback(

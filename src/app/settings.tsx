@@ -9,21 +9,30 @@ import * as Application from "expo-application";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
 import { Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { useShallow } from "zustand/react/shallow";
 
 export default function SettingsScreen() {
   const router = useRouter();
 
-  const focusSchedules = useUserStore((s) => s.focusSchedules);
-  const focusDurationMode = useUserStore((s) => s.focusDurationMode);
-  const focusCompletionDays = useUserStore((s) => s.focusCompletionDays);
-  const familyActivitySelection = useUserStore(
-    (s) => s.familyActivitySelection,
+  const {
+    focusSchedules,
+    focusDurationMode,
+    focusCompletionDays,
+    familyActivitySelection,
+    setHasSelectedApps,
+    setFamilyActivitySelection,
+    isPremium,
+  } = useUserStore(
+    useShallow((s) => ({
+      focusSchedules: s.focusSchedules,
+      focusDurationMode: s.focusDurationMode,
+      focusCompletionDays: s.focusCompletionDays,
+      familyActivitySelection: s.familyActivitySelection,
+      setHasSelectedApps: s.setHasSelectedApps,
+      setFamilyActivitySelection: s.setFamilyActivitySelection,
+      isPremium: s.isPremium,
+    })),
   );
-  const setHasSelectedApps = useUserStore((s) => s.setHasSelectedApps);
-  const setFamilyActivitySelection = useUserStore(
-    (s) => s.setFamilyActivitySelection,
-  );
-  const isPremium = useUserStore((s) => s.isPremium);
 
   const normalizeExternalUrl = (value: string | undefined) => {
     const trimmed = value?.trim() ?? "";

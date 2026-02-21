@@ -6,18 +6,30 @@ import {
 } from "@/utils/focusScheduleEntitlement";
 import { applyFocusSchedulesToDevice } from "@/utils/focusScheduleRuntime";
 import { useEffect } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 export const useFocusScheduleEntitlementReconciliation = () => {
-  const onboardingComplete = useUserStore((s) => s.onboardingComplete);
-  const isPremium = useUserStore((s) => s.isPremium);
-  const focusSchedules = useUserStore((s) => s.focusSchedules);
-  const deferredFocusSchedules = useUserStore((s) => s.deferredFocusSchedules);
-  const setFocusSchedules = useUserStore((s) => s.setFocusSchedules);
-  const setDeferredFocusSchedules = useUserStore(
-    (s) => s.setDeferredFocusSchedules,
+  const {
+    onboardingComplete,
+    isPremium,
+    focusSchedules,
+    deferredFocusSchedules,
+    setFocusSchedules,
+    setDeferredFocusSchedules,
+  } = useUserStore(
+    useShallow((s) => ({
+      onboardingComplete: s.onboardingComplete,
+      isPremium: s.isPremium,
+      focusSchedules: s.focusSchedules,
+      deferredFocusSchedules: s.deferredFocusSchedules,
+      setFocusSchedules: s.setFocusSchedules,
+      setDeferredFocusSchedules: s.setDeferredFocusSchedules,
+    })),
   );
-  const setQuranMinutesToUnblock = useBlockingStore(
-    (s) => s.setQuranMinutesToUnblock,
+  const { setQuranMinutesToUnblock } = useBlockingStore(
+    useShallow((s) => ({
+      setQuranMinutesToUnblock: s.setQuranMinutesToUnblock,
+    })),
   );
 
   useEffect(() => {
@@ -55,8 +67,5 @@ export const useFocusScheduleEntitlementReconciliation = () => {
     focusSchedules,
     isPremium,
     onboardingComplete,
-    setDeferredFocusSchedules,
-    setFocusSchedules,
-    setQuranMinutesToUnblock,
   ]);
 };

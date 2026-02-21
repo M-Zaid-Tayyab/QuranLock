@@ -36,6 +36,7 @@ import { getScheduleStatuses } from "@/utils/scheduleEngine";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, AppState, Easing, type AppStateStatus } from "react-native";
+import { useShallow } from "zustand/react/shallow";
 
 const TICK_INTERVAL_MS = 1000;
 const MINUTES_PER_TICK = 1 / 60;
@@ -73,49 +74,77 @@ const getFirstVerseKeyFromPageData = (data: QuranPageData | null) => {
 
 export const useVerseScreen = () => {
   const router = useRouter();
-  const addQuranMinutes = useBlockingStore((s) => s.addQuranMinutes);
-  const getRequiredMinutes = useBlockingStore((s) => s.getRequiredMinutes);
-  const resetAfterUnblock = useBlockingStore((s) => s.resetAfterUnblock);
-  const accumulatedQuranMinutesForCurrentBlock = useBlockingStore(
-    (s) => s.accumulatedQuranMinutesForCurrentBlock,
+  const {
+    addQuranMinutes,
+    getRequiredMinutes,
+    resetAfterUnblock,
+    accumulatedQuranMinutesForCurrentBlock,
+    completedScheduleIds,
+    markScheduleCompleted,
+    setActiveSchedule,
+  } = useBlockingStore(
+    useShallow((s) => ({
+      addQuranMinutes: s.addQuranMinutes,
+      getRequiredMinutes: s.getRequiredMinutes,
+      resetAfterUnblock: s.resetAfterUnblock,
+      accumulatedQuranMinutesForCurrentBlock:
+        s.accumulatedQuranMinutesForCurrentBlock,
+      completedScheduleIds: s.completedScheduleIds,
+      markScheduleCompleted: s.markScheduleCompleted,
+      setActiveSchedule: s.setActiveSchedule,
+    })),
   );
-  const completedScheduleIds = useBlockingStore((s) => s.completedScheduleIds);
-  const markScheduleCompleted = useBlockingStore(
-    (s) => s.markScheduleCompleted,
+  const {
+    lastReadPage,
+    setLastReadPage,
+    syncedTranslationEnabled,
+    setSyncedTranslationEnabled,
+    quranFontScale,
+    setQuranFontScale,
+    isPremium,
+    completedUnlockSessions,
+    incrementCompletedUnlockSessions,
+    focusSchedules,
+  } = useUserStore(
+    useShallow((s) => ({
+      lastReadPage: s.lastReadPage,
+      setLastReadPage: s.setLastReadPage,
+      syncedTranslationEnabled: s.translationEnabled,
+      setSyncedTranslationEnabled: s.setTranslationEnabled,
+      quranFontScale: s.quranFontScale,
+      setQuranFontScale: s.setQuranFontScale,
+      isPremium: s.isPremium,
+      completedUnlockSessions: s.completedUnlockSessions,
+      incrementCompletedUnlockSessions: s.incrementCompletedUnlockSessions,
+      focusSchedules: s.focusSchedules,
+    })),
   );
-  const setActiveSchedule = useBlockingStore((s) => s.setActiveSchedule);
-  const lastReadPage = useUserStore((s) => s.lastReadPage);
-  const setLastReadPage = useUserStore((s) => s.setLastReadPage);
-  const syncedTranslationEnabled = useUserStore((s) => s.translationEnabled);
-  const setSyncedTranslationEnabled = useUserStore(
-    (s) => s.setTranslationEnabled,
-  );
-  const quranFontScale = useUserStore((s) => s.quranFontScale);
-  const setQuranFontScale = useUserStore((s) => s.setQuranFontScale);
-  const isPremium = useUserStore((s) => s.isPremium);
-  const completedUnlockSessions = useUserStore(
-    (s) => s.completedUnlockSessions,
-  );
-  const incrementCompletedUnlockSessions = useUserStore(
-    (s) => s.incrementCompletedUnlockSessions,
-  );
-  const focusSchedules = useUserStore((s) => s.focusSchedules);
-  const hasMigratedFromUserStore = useVerseStore(
-    (s) => s.hasMigratedFromUserStore,
-  );
-  const hydrateFromUserTranslation = useVerseStore(
-    (s) => s.hydrateFromUserTranslation,
-  );
-  const translationEnabled = useVerseStore((s) => s.translationEnabled);
-  const toggleTranslationEnabled = useVerseStore(
-    (s) => s.toggleTranslationEnabled,
-  );
-  const readingMode = useVerseStore((s) => s.readingMode);
-  const setReadingMode = useVerseStore((s) => s.setReadingMode);
-  const toggleReadingMode = useVerseStore((s) => s.toggleReadingMode);
-  const recitationVisible = useVerseStore((s) => s.recitationVisible);
-  const toggleRecitationVisible = useVerseStore(
-    (s) => s.toggleRecitationVisible,
+  const {
+    hasMigratedFromUserStore,
+    hydrateFromUserTranslation,
+    translationEnabled,
+    toggleTranslationEnabled,
+    readingMode,
+    setReadingMode,
+    toggleReadingMode,
+    recitationVisible,
+    toggleRecitationVisible,
+    selectedVerseKey,
+    setSelectedVerseKey,
+  } = useVerseStore(
+    useShallow((s) => ({
+      hasMigratedFromUserStore: s.hasMigratedFromUserStore,
+      hydrateFromUserTranslation: s.hydrateFromUserTranslation,
+      translationEnabled: s.translationEnabled,
+      toggleTranslationEnabled: s.toggleTranslationEnabled,
+      readingMode: s.readingMode,
+      setReadingMode: s.setReadingMode,
+      toggleReadingMode: s.toggleReadingMode,
+      recitationVisible: s.recitationVisible,
+      toggleRecitationVisible: s.toggleRecitationVisible,
+      selectedVerseKey: s.selectedVerseKey,
+      setSelectedVerseKey: s.setSelectedVerseKey,
+    })),
   );
   const translationEnabledRef = useRef(translationEnabled);
   const unlockSessionCountedRef = useRef(false);
@@ -144,8 +173,6 @@ export const useVerseScreen = () => {
   const transition = useRef(new Animated.Value(1)).current;
   const [pageDirection, setPageDirection] = useState<1 | -1>(1);
   const requestIdRef = useRef(0);
-
-  const [selectedVerseKey, setSelectedVerseKey] = useState<string | null>(null);
 
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -259,7 +286,7 @@ export const useVerseScreen = () => {
         intervalRef.current = null;
       }
     };
-  }, [requiredMinutes, appState, tick]);
+  }, [requiredMinutes, appState]);
 
   useEffect(() => {
     translationEnabledRef.current = translationEnabled;
@@ -268,22 +295,17 @@ export const useVerseScreen = () => {
   useEffect(() => {
     if (hasMigratedFromUserStore) return;
     hydrateFromUserTranslation(syncedTranslationEnabled);
-  }, [
-    hasMigratedFromUserStore,
-    hydrateFromUserTranslation,
-    syncedTranslationEnabled,
-  ]);
+  }, [hasMigratedFromUserStore, syncedTranslationEnabled]);
 
   useEffect(() => {
-    if (!hasMigratedFromUserStore) return;
-    if (syncedTranslationEnabled === translationEnabled) return;
+    if (
+      !hasMigratedFromUserStore ||
+      syncedTranslationEnabled === translationEnabled
+    ) {
+      return;
+    }
     setSyncedTranslationEnabled(translationEnabled);
-  }, [
-    hasMigratedFromUserStore,
-    setSyncedTranslationEnabled,
-    syncedTranslationEnabled,
-    translationEnabled,
-  ]);
+  }, [hasMigratedFromUserStore, syncedTranslationEnabled, translationEnabled]);
 
   useEffect(() => {
     return subscribeRecitationOfflineDownloadStatus((status) => {
@@ -321,14 +343,14 @@ export const useVerseScreen = () => {
 
   useEffect(() => {
     checkPack();
-  }, [checkPack]);
+  }, []);
 
   useEffect(() => {
     if (packState === "missing" && !autoDownloadAttempted) {
       setAutoDownloadAttempted(true);
       handleDownload();
     }
-  }, [autoDownloadAttempted, handleDownload, packState]);
+  }, [autoDownloadAttempted, packState]);
 
   const loadPage = useCallback(
     async (page: number) => {
@@ -379,7 +401,7 @@ export const useVerseScreen = () => {
     if (packState === "ready") {
       loadPage(currentPage);
     }
-  }, [packState, currentPage, loadPage]);
+  }, [packState, currentPage]);
 
   useEffect(() => {
     if (!pageData || loadingPage) return;
@@ -458,7 +480,6 @@ export const useVerseScreen = () => {
 
   useEffect(() => {
     if (!displayVerses.length) {
-      setSelectedVerseKey(null);
       return;
     }
     const exists = selectedVerseKey
@@ -499,7 +520,7 @@ export const useVerseScreen = () => {
     } catch {
       return null;
     }
-  }, [currentPage]);
+  }, [currentPage, setSelectedVerseKey]);
 
   const recitation = useVerseRecitation({
     verseKeys,
@@ -580,7 +601,7 @@ export const useVerseScreen = () => {
       executeSearch(searchQuery);
     }, 350);
     return () => clearTimeout(timer);
-  }, [executeSearch, searchQuery, searchVisible]);
+  }, [searchQuery, searchVisible]);
 
   const handleCloseSearch = useCallback(() => {
     searchWasVisibleRef.current = false;
@@ -611,7 +632,7 @@ export const useVerseScreen = () => {
       }
       setPageError("Verse found in search but unavailable in your local pack.");
     },
-    [currentPage],
+    [currentPage, setSelectedVerseKey],
   );
 
   const handleSearchPick = useCallback(

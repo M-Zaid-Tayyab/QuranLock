@@ -7,18 +7,29 @@ import {
   getScheduleStatuses,
 } from "@/utils/scheduleEngine";
 import { useEffect, useMemo, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 
 export const useFocusScheduleStatus = () => {
-  const focusSchedules = useUserStore((s) => s.focusSchedules);
-  const completedScheduleDate = useBlockingStore(
-    (s) => s.completedScheduleDate,
+  const { focusSchedules } = useUserStore(
+    useShallow((s) => ({
+      focusSchedules: s.focusSchedules,
+    })),
   );
-  const completedScheduleIds = useBlockingStore(
-    (s) => s.completedScheduleIds,
+  const {
+    completedScheduleDate,
+    completedScheduleIds,
+    activeScheduleId,
+    ensureCompletionDate,
+    setActiveSchedule,
+  } = useBlockingStore(
+    useShallow((s) => ({
+      completedScheduleDate: s.completedScheduleDate,
+      completedScheduleIds: s.completedScheduleIds,
+      activeScheduleId: s.activeScheduleId,
+      ensureCompletionDate: s.ensureCompletionDate,
+      setActiveSchedule: s.setActiveSchedule,
+    })),
   );
-  const activeScheduleId = useBlockingStore((s) => s.activeScheduleId);
-  const ensureCompletionDate = useBlockingStore((s) => s.ensureCompletionDate);
-  const setActiveSchedule = useBlockingStore((s) => s.setActiveSchedule);
 
   const [now, setNow] = useState(() => new Date());
 
@@ -33,7 +44,7 @@ export const useFocusScheduleStatus = () => {
     if (completedScheduleDate !== dateKey) {
       ensureCompletionDate(dateKey);
     }
-  }, [completedScheduleDate, dateKey, ensureCompletionDate]);
+  }, [completedScheduleDate, dateKey]);
 
   const statuses = useMemo(
     () => getScheduleStatuses(focusSchedules, completedScheduleIds, now),
@@ -54,7 +65,7 @@ export const useFocusScheduleStatus = () => {
         dateKey,
       );
     }
-  }, [activeSchedule, activeScheduleId, dateKey, setActiveSchedule]);
+  }, [activeSchedule, activeScheduleId, dateKey]);
 
   return {
     dateKey,

@@ -318,12 +318,7 @@ export const useVerseRecitation = ({
     }
 
     wasPlayingRef.current = status.playing;
-  }, [
-    advanceToNextVerse,
-    player,
-    setPlayIntent,
-    status,
-  ]);
+  }, [player, status]);
 
   const loadVerse = useCallback(
     async (verseKey: string, shouldPlay: boolean, options?: LoadVerseOptions) => {
@@ -502,7 +497,7 @@ export const useVerseRecitation = ({
         // noop
       }
     };
-  }, [player, setPlayIntent]);
+  }, [player]);
 
   useEffect(() => {
     if (!selectedVerseKey) {
@@ -538,7 +533,7 @@ export const useVerseRecitation = ({
       setPositionMillis(0);
       setDurationMillis(0);
     }
-  }, [isPlaying, player, reciterId, selectedVerseKey, setLoadedSource, setPlayIntent]);
+  }, [isPlaying, player, reciterId, selectedVerseKey]);
 
   return {
     playbackRate,

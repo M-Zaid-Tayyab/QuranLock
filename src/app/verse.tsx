@@ -146,11 +146,7 @@ export default function VerseScreen() {
     }
     const didScroll = tryAutoScrollToVerse(selectedVerseKey);
     pendingAutoScrollVerseKeyRef.current = didScroll ? null : selectedVerseKey;
-  }, [
-    tryAutoScrollToVerse,
-    vm.content.selectedVerseKey,
-    vm.recitation.isPlaying,
-  ]);
+  }, [vm.content.selectedVerseKey, vm.recitation.isPlaying]);
 
   return (
     <View className="flex-1 bg-background py-safe">
