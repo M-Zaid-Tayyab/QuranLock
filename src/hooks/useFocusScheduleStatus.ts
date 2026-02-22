@@ -7,25 +7,61 @@ import {
   getScheduleStatuses,
 } from "@/utils/scheduleEngine";
 import { useEffect, useMemo, useState } from "react";
+import { AppState, type AppStateStatus } from "react-native";
+import { useShallow } from "zustand/react/shallow";
 
 export const useFocusScheduleStatus = () => {
-  const focusSchedules = useUserStore((s) => s.focusSchedules);
-  const completedScheduleDate = useBlockingStore(
-    (s) => s.completedScheduleDate,
+  const { focusSchedules } = useUserStore(
+    useShallow((s) => ({
+      focusSchedules: s.focusSchedules,
+    })),
   );
-  const completedScheduleIds = useBlockingStore(
-    (s) => s.completedScheduleIds,
+  const {
+    completedScheduleDate,
+    completedScheduleIds,
+    activeScheduleId,
+    ensureCompletionDate,
+    setActiveSchedule,
+  } = useBlockingStore(
+    useShallow((s) => ({
+      completedScheduleDate: s.completedScheduleDate,
+      completedScheduleIds: s.completedScheduleIds,
+      activeScheduleId: s.activeScheduleId,
+      ensureCompletionDate: s.ensureCompletionDate,
+      setActiveSchedule: s.setActiveSchedule,
+    })),
   );
-  const activeScheduleId = useBlockingStore((s) => s.activeScheduleId);
-  const ensureCompletionDate = useBlockingStore((s) => s.ensureCompletionDate);
-  const setActiveSchedule = useBlockingStore((s) => s.setActiveSchedule);
 
   const [now, setNow] = useState(() => new Date());
+  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(id);
+    const sub = AppState.addEventListener("change", (nextState) => {
+      setAppState(nextState);
+      if (nextState === "active") {
+        setNow(new Date());
+      }
+    });
+    return () => sub.remove();
   }, []);
+
+  useEffect(() => {
+    if (appState !== "active") return;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleNextTick = () => {
+      const msUntilNextMinute = 60_000 - (Date.now() % 60_000) + 24;
+      timeoutId = setTimeout(() => {
+        setNow(new Date());
+        scheduleNextTick();
+      }, msUntilNextMinute);
+    };
+
+    scheduleNextTick();
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [appState]);
 
   const dateKey = useMemo(() => getDateKey(now), [now]);
 
@@ -33,7 +69,7 @@ export const useFocusScheduleStatus = () => {
     if (completedScheduleDate !== dateKey) {
       ensureCompletionDate(dateKey);
     }
-  }, [completedScheduleDate, dateKey, ensureCompletionDate]);
+  }, [completedScheduleDate, dateKey]);
 
   const statuses = useMemo(
     () => getScheduleStatuses(focusSchedules, completedScheduleIds, now),
@@ -54,7 +90,7 @@ export const useFocusScheduleStatus = () => {
         dateKey,
       );
     }
-  }, [activeSchedule, activeScheduleId, dateKey, setActiveSchedule]);
+  }, [activeSchedule, activeScheduleId, dateKey]);
 
   return {
     dateKey,

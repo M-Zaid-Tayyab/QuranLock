@@ -6,17 +6,18 @@ import {
   requestAuthorization,
 } from "@/services/deviceActivity";
 import {
-  canAddFocusSchedule,
   canOpenQuran,
+  ensureCanEditFocusTimes,
   openPaywallForBlockedDecision,
 } from "@/services/entitlements";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
-import type { ScheduleStatus } from "@/utils/scheduleEngine";
+import { getDateKey, type ScheduleStatus } from "@/utils/scheduleEngine";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState, Platform } from "react-native";
+import { useShallow } from "zustand/react/shallow";
 
 const AuthorizationStatus = {
   notDetermined: 0,
@@ -30,7 +31,7 @@ export interface HomeTimelineItem {
   label: string;
   timeLabel: string;
   durationMinutes: number;
-  status: ScheduleStatus;
+  status: ScheduleStatus | "premium_locked";
 }
 
 export interface HomeStreakDay {
@@ -54,23 +55,42 @@ export const useHomeScreen = () => {
   );
   const [requestingScreenTime, setRequestingScreenTime] = useState(false);
 
-  const name = useUserStore((s) => s.name);
-  const isPremium = useUserStore((s) => s.isPremium);
-  const completedUnlockSessions = useUserStore(
-    (s) => s.completedUnlockSessions,
+  const {
+    name,
+    isPremium,
+    completedUnlockSessions,
+    deferredFocusSchedules,
+    lastReadPage,
+    hasSelectedApps,
+    streakCompletedDates,
+    markStreakDayCompleted,
+  } = useUserStore(
+    useShallow((s) => ({
+      name: s.name,
+      isPremium: s.isPremium,
+      completedUnlockSessions: s.completedUnlockSessions,
+      deferredFocusSchedules: s.deferredFocusSchedules,
+      lastReadPage: s.lastReadPage,
+      hasSelectedApps: s.hasSelectedApps,
+      streakCompletedDates: s.streakCompletedDates,
+      markStreakDayCompleted: s.markStreakDayCompleted,
+    })),
   );
-  const lastReadPage = useUserStore((s) => s.lastReadPage);
-  const focusScheduleCount = useUserStore((s) => s.focusSchedules.length);
-  const hasSelectedApps = useUserStore((s) => s.hasSelectedApps);
   const { statuses, activeSchedule } = useFocusScheduleStatus();
 
-  const accumulatedMinutes = useBlockingStore(
-    (s) => s.accumulatedQuranMinutesForCurrentBlock,
-  );
-  const totalQuranMinutesLifetime = useBlockingStore(
-    (s) => s.totalQuranMinutesLifetime,
-  );
-  const getRequiredMinutes = useBlockingStore((s) => s.getRequiredMinutes);
+  const {
+    getAccumulatedMinutesSnapshot,
+    totalQuranMinutesLifetime,
+    getRequiredMinutes,
+  } =
+    useBlockingStore(
+      useShallow((s) => ({
+        getAccumulatedMinutesSnapshot: s.getAccumulatedMinutesSnapshot,
+        totalQuranMinutesLifetime: s.totalQuranMinutesLifetime,
+        getRequiredMinutes: s.getRequiredMinutes,
+      })),
+    );
+  const accumulatedMinutes = getAccumulatedMinutesSnapshot(Date.now());
 
   const refreshScreenTimeStatus = useCallback(async () => {
     if (Platform.OS !== "ios") return;
@@ -163,7 +183,7 @@ export const useHomeScreen = () => {
     Math.max(1, Math.trunc(lastReadPage || 1)),
   );
 
-  const timelineItems = useMemo(
+  const activeTimelineItems = useMemo(
     () =>
       statuses.map((entry) => ({
         id: entry.schedule.id,
@@ -175,7 +195,25 @@ export const useHomeScreen = () => {
     [statuses],
   );
 
-  const nextUpcoming = timelineItems.find((item) => item.status === "upcoming");
+  const timelineItems = useMemo(() => {
+    if (isPremium || deferredFocusSchedules.length === 0) {
+      return activeTimelineItems;
+    }
+
+    const deferredItems = deferredFocusSchedules.map((schedule) => ({
+      id: `deferred-${schedule.id}`,
+      label: schedule.label,
+      timeLabel: formatTime(schedule.hour, schedule.minute),
+      durationMinutes: schedule.durationMinutes,
+      status: "premium_locked" as const,
+    })) satisfies HomeTimelineItem[];
+
+    return [...activeTimelineItems, ...deferredItems];
+  }, [activeTimelineItems, deferredFocusSchedules, isPremium]);
+
+  const nextUpcoming = activeTimelineItems.find(
+    (item) => item.status === "upcoming",
+  );
   const nextFocusLabel = nextUpcoming
     ? `${nextUpcoming.label} • ${nextUpcoming.timeLabel}`
     : "All focus windows for today are done";
@@ -199,31 +237,53 @@ export const useHomeScreen = () => {
         1,
         totalSchedules,
       )} focus windows completed`;
+  const hasCompletedAllGoalsToday =
+    totalSchedules > 0 && completedSchedulesCount === totalSchedules;
 
   const streakDays = useMemo(() => {
+    const todayKey = getDateKey(new Date());
+    const completedSet = new Set(streakCompletedDates);
+    if (hasCompletedAllGoalsToday) {
+      completedSet.add(todayKey);
+    }
+
     const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
     const days: HomeStreakDay[] = Array.from({ length: 7 }, (_, index) => {
-      const d = new Date(now);
-      d.setDate(now.getDate() - (6 - index));
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + index);
+      const dateKey = getDateKey(d);
       return {
-        date: d.toISOString().slice(0, 10),
+        date: dateKey,
         dayLabel: d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2),
-        completed: false,
+        completed: completedSet.has(dateKey),
       };
     });
-
-    const hasAnyProgressToday =
-      completedSchedulesCount > 0 ||
-      accumulatedMinutes > 0 ||
-      journeyCompletionPercent >= 100;
-    if (hasAnyProgressToday) {
-      days[days.length - 1] = {
-        ...days[days.length - 1],
-        completed: true,
-      };
-    }
     return days;
-  }, [accumulatedMinutes, completedSchedulesCount, journeyCompletionPercent]);
+  }, [hasCompletedAllGoalsToday, streakCompletedDates]);
+
+  useEffect(() => {
+    if (!hasCompletedAllGoalsToday) return;
+    markStreakDayCompleted(getDateKey(new Date()));
+  }, [hasCompletedAllGoalsToday, markStreakDayCompleted]);
+
+  const currentStreakCount = useMemo(() => {
+    const completedSet = new Set(streakCompletedDates);
+    if (hasCompletedAllGoalsToday) {
+      completedSet.add(getDateKey(new Date()));
+    }
+
+    let count = 0;
+    const cursor = new Date();
+    while (true) {
+      const key = getDateKey(cursor);
+      if (!completedSet.has(key)) break;
+      count += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return count;
+  }, [hasCompletedAllGoalsToday, streakCompletedDates]);
 
   const handleOpenSettings = useCallback(() => {
     router.push("/settings");
@@ -243,20 +303,14 @@ export const useHomeScreen = () => {
   }, [completedUnlockSessions, isPremium, router]);
 
   const handleOpenFocusTimes = useCallback(() => {
-    const gate = canAddFocusSchedule({ isPremium, focusScheduleCount });
-    if (gate.allowed) {
-      router.push({
-        pathname: "/onboarding",
-        params: { mode: "edit-times", from: "home" },
-      });
+    if (!ensureCanEditFocusTimes(router, { isPremium })) {
       return;
     }
-    openPaywallForBlockedDecision(
-      router,
-      gate,
-      PAYWALL_SOURCES.HOME_SET_FOCUS_TIMES,
-    );
-  }, [focusScheduleCount, isPremium, router]);
+    router.push({
+      pathname: "/onboarding",
+      params: { mode: "edit-times", from: "home" },
+    });
+  }, [isPremium, router]);
 
   return {
     header: {
@@ -281,6 +335,7 @@ export const useHomeScreen = () => {
     streak: {
       days: streakDays,
       completedThisWeek: streakDays.filter((day) => day.completed).length,
+      currentStreakCount,
     },
     timeline: {
       items: timelineItems,

@@ -1,8 +1,13 @@
 import { BottomSheetModal } from "@/components/common";
 import { colors } from "@/constants/colors";
+import {
+  getRecitationOfflineDownloadStatus,
+  startGlobalRecitationOfflineDownload,
+  subscribeRecitationOfflineDownloadStatus,
+} from "@/services/recitationPack";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal as GorhomBottomSheetModal } from "@gorhom/bottom-sheet";
-import { type RefObject } from "react";
+import { useCallback, useEffect, useState, type RefObject } from "react";
 import { Pressable, Text, View } from "react-native";
 import type { ReadingMode } from "./types";
 
@@ -10,16 +15,9 @@ interface VerseSettingsSheetProps {
   sheetRef: RefObject<GorhomBottomSheetModal | null>;
   readingMode: ReadingMode;
   recitationVisible: boolean;
-  recitationDownloadProgressPercent: number;
-  recitationDownloadCompletedChapters: number;
-  recitationDownloadTotalChapters: number;
-  recitationDownloadCurrentChapter: number | null;
-  recitationDownloadError: string | null;
-  recitationDownloadInProgress: boolean;
   translationEnabled: boolean;
   onSetReadingMode: (mode: ReadingMode) => void;
   onToggleRecitationVisible: () => void;
-  onResumeRecitationDownload: () => void;
   onToggleTranslation: () => void;
   onIncreaseFont: () => void;
   onDecreaseFont: () => void;
@@ -60,22 +58,38 @@ export function VerseSettingsSheet({
   sheetRef,
   readingMode,
   recitationVisible,
-  recitationDownloadProgressPercent,
-  recitationDownloadCompletedChapters,
-  recitationDownloadTotalChapters,
-  recitationDownloadCurrentChapter,
-  recitationDownloadError,
-  recitationDownloadInProgress,
   translationEnabled,
   onSetReadingMode,
   onToggleRecitationVisible,
-  onResumeRecitationDownload,
   onToggleTranslation,
   onIncreaseFont,
   onDecreaseFont,
   onOpenSearch,
   onClose,
 }: VerseSettingsSheetProps) {
+  const [recitationDownloadStatus, setRecitationDownloadStatus] = useState(
+    getRecitationOfflineDownloadStatus,
+  );
+
+  useEffect(() => {
+    return subscribeRecitationOfflineDownloadStatus((status) => {
+      setRecitationDownloadStatus(status);
+    });
+  }, []);
+
+  const handleResumeRecitationDownload = useCallback(() => {
+    void startGlobalRecitationOfflineDownload();
+  }, []);
+
+  const recitationDownloadProgressPercent =
+    recitationDownloadStatus.progressPercent;
+  const recitationDownloadCompletedChapters =
+    recitationDownloadStatus.completedChapters;
+  const recitationDownloadTotalChapters = recitationDownloadStatus.totalChapters;
+  const recitationDownloadCurrentChapter =
+    recitationDownloadStatus.currentChapter;
+  const recitationDownloadError = recitationDownloadStatus.lastError;
+  const recitationDownloadInProgress = recitationDownloadStatus.isDownloading;
   const isRecitationDownloadComplete = recitationDownloadProgressPercent >= 100;
   const isRecitationDownloadActionDisabled =
     isRecitationDownloadComplete || recitationDownloadInProgress;
@@ -209,7 +223,7 @@ export function VerseSettingsSheet({
             ) : null}
 
             <Pressable
-              onPress={onResumeRecitationDownload}
+              onPress={handleResumeRecitationDownload}
               disabled={isRecitationDownloadActionDisabled}
               className={`mt-3 rounded-xl border px-4 py-3 ${
                 isRecitationDownloadActionDisabled

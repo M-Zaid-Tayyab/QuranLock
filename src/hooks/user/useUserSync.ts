@@ -12,6 +12,7 @@ export const useUserSync = () => {
       quranFrequency: s.quranFrequency,
       reasonsDisconnect: s.reasonsDisconnect,
       focusSchedules: s.focusSchedules,
+      deferredFocusSchedules: s.deferredFocusSchedules,
       onboardingComplete: s.onboardingComplete,
       hasSelectedApps: s.hasSelectedApps,
       lastReadPage: s.lastReadPage,
@@ -19,6 +20,7 @@ export const useUserSync = () => {
       isPremium: s.isPremium,
       subscriptionTier: s.subscriptionTier,
       completedUnlockSessions: s.completedUnlockSessions,
+      streakCompletedDates: s.streakCompletedDates,
     })),
   );
 

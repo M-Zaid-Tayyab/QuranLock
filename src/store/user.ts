@@ -14,17 +14,20 @@ export interface UserState {
   quranFrequency: string;
   reasonsDisconnect: string[];
   focusSchedules: FocusSchedule[];
+  deferredFocusSchedules: FocusSchedule[];
   focusDurationMode: FocusDurationMode;
   focusCompletionDays: number;
   focusMinutesPerPage: number;
   onboardingComplete: boolean;
   hasSelectedApps: boolean;
+  familyActivitySelection: string | null;
   lastReadPage: number;
   translationEnabled: boolean;
   quranFontScale: number;
   isPremium: boolean;
   subscriptionTier: SubscriptionTier;
   completedUnlockSessions: number;
+  streakCompletedDates: string[];
 }
 
 export interface FocusSchedule {
@@ -45,18 +48,29 @@ interface UserActions {
   setQuranFrequency: (value: string) => void;
   setReasonsDisconnect: (value: string[]) => void;
   setFocusSchedules: (value: FocusSchedule[]) => void;
+  setDeferredFocusSchedules: (value: FocusSchedule[]) => void;
   setFocusDurationMode: (value: FocusDurationMode) => void;
   setFocusCompletionDays: (value: number) => void;
   setFocusMinutesPerPage: (value: number) => void;
   setOnboardingComplete: (value: boolean) => void;
   setHasSelectedApps: (value: boolean) => void;
+  setFamilyActivitySelection: (value: string | null) => void;
   setLastReadPage: (page: number) => void;
   setTranslationEnabled: (value: boolean) => void;
   setQuranFontScale: (value: number) => void;
   setIsPremium: (value: boolean) => void;
   setSubscriptionTier: (value: SubscriptionTier) => void;
   incrementCompletedUnlockSessions: () => void;
+  setStreakCompletedDates: (value: string[]) => void;
+  markStreakDayCompleted: (dateKey?: string) => void;
 }
+
+const getLocalDateKey = (date: Date = new Date()) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const initialState: UserState = {
   appUserId: "",
@@ -65,17 +79,20 @@ const initialState: UserState = {
   quranFrequency: "",
   reasonsDisconnect: [],
   focusSchedules: [],
+  deferredFocusSchedules: [],
   focusDurationMode: "goal",
   focusCompletionDays: 30,
   focusMinutesPerPage: 3.0,
   onboardingComplete: false,
   hasSelectedApps: false,
+  familyActivitySelection: null,
   lastReadPage: 1,
   translationEnabled: false,
   quranFontScale: 1,
   isPremium: false,
   subscriptionTier: SUBSCRIPTION_TIERS.FREE,
   completedUnlockSessions: 0,
+  streakCompletedDates: [],
 };
 
 export const useUserStore = create<UserState & UserActions>()(
@@ -89,6 +106,8 @@ export const useUserStore = create<UserState & UserActions>()(
       setQuranFrequency: (quranFrequency) => set({ quranFrequency }),
       setReasonsDisconnect: (reasonsDisconnect) => set({ reasonsDisconnect }),
       setFocusSchedules: (focusSchedules) => set({ focusSchedules }),
+      setDeferredFocusSchedules: (deferredFocusSchedules) =>
+        set({ deferredFocusSchedules }),
       setFocusDurationMode: (focusDurationMode) => set({ focusDurationMode }),
       setFocusCompletionDays: (focusCompletionDays) =>
         set({ focusCompletionDays }),
@@ -97,6 +116,8 @@ export const useUserStore = create<UserState & UserActions>()(
       setOnboardingComplete: (onboardingComplete) =>
         set({ onboardingComplete }),
       setHasSelectedApps: (hasSelectedApps) => set({ hasSelectedApps }),
+      setFamilyActivitySelection: (familyActivitySelection) =>
+        set({ familyActivitySelection }),
       setLastReadPage: (lastReadPage) => set({ lastReadPage }),
       setTranslationEnabled: (translationEnabled) =>
         set({ translationEnabled }),
@@ -117,6 +138,16 @@ export const useUserStore = create<UserState & UserActions>()(
         set((state) => ({
           completedUnlockSessions: state.completedUnlockSessions + 1,
         })),
+      setStreakCompletedDates: (streakCompletedDates) =>
+        set({ streakCompletedDates }),
+      markStreakDayCompleted: (dateKey) =>
+        set((state) => {
+          const key = dateKey ?? getLocalDateKey();
+          if (state.streakCompletedDates.includes(key)) return state;
+          return {
+            streakCompletedDates: [...state.streakCompletedDates, key].sort(),
+          };
+        }),
     }),
     {
       name: STORE_KEYS.USER_STORE,

@@ -7,12 +7,14 @@ import { useFunnelText } from "@/hooks/app";
 import type { UseOnboardingResult } from "@/hooks/onboarding/useOnboarding";
 import { useUserStore } from "@/store/user";
 import { useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { FocusTimesStep } from "./FocusTimesStep";
 import { IntroStep } from "./IntroStep";
 import { QuestionCard } from "./QuestionCard";
 import { ScreenTimeStep } from "./ScreenTimeStep";
 import { SelectAppsStep } from "./SelectAppsStep";
 import { TextInputQuestion } from "./TextInputQuestion";
+import { ReviewsStep } from "./ReviewsStep";
 
 interface OnboardingStepContentProps {
   onboarding: UseOnboardingResult;
@@ -22,12 +24,23 @@ export function OnboardingStepContent({
   onboarding,
 }: OnboardingStepContentProps) {
   const funnelText = useFunnelText();
-  const name = useUserStore((s) => s.name);
-  const setName = useUserStore((s) => s.setName);
-  const quranFrequency = useUserStore((s) => s.quranFrequency);
-  const setQuranFrequency = useUserStore((s) => s.setQuranFrequency);
-  const reasonsDisconnect = useUserStore((s) => s.reasonsDisconnect);
-  const setReasonsDisconnect = useUserStore((s) => s.setReasonsDisconnect);
+  const {
+    name,
+    setName,
+    quranFrequency,
+    setQuranFrequency,
+    reasonsDisconnect,
+    setReasonsDisconnect,
+  } = useUserStore(
+    useShallow((s) => ({
+      name: s.name,
+      setName: s.setName,
+      quranFrequency: s.quranFrequency,
+      setQuranFrequency: s.setQuranFrequency,
+      reasonsDisconnect: s.reasonsDisconnect,
+      setReasonsDisconnect: s.setReasonsDisconnect,
+    })),
+  );
 
   const onToggleReason = useCallback(
     (value: string) => {
@@ -138,6 +151,10 @@ export function OnboardingStepContent({
         }
       />
     );
+  }
+
+  if (onboarding.activeStep === 10) {
+    return <ReviewsStep />;
   }
 
   return null;

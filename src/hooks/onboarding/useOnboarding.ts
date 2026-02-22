@@ -1,31 +1,29 @@
 import {
+  REVIEW_STEP,
   STEP_ICONS,
   STEP_SUBTITLES,
   STEP_TITLES,
   TOTAL_STEPS,
-  getNextDuration,
 } from "@/configs/onboarding";
 import { useFunnelText } from "@/hooks/app";
 import { canProceedScreenTime } from "@/components/onboarding/ScreenTimeStep";
 import { commitSelectApps } from "@/components/onboarding/SelectAppsStep";
-import { SCREEN_TIME } from "@/constants/screenTime";
 import {
-  DEFAULT_SHIELD_ACTIONS,
-  DEFAULT_SHIELD_CONFIG,
-  configureBlockOnly,
   getAuthStatus,
   getStableAuthStatus,
   requestAuthorization,
-  startDailyBlockScheduleFor,
-  stopMonitoring,
-  updateShield,
 } from "@/services/deviceActivity";
+import { ensureCanEditFocusTimes } from "@/services/entitlements";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore, type FocusSchedule } from "@/store/user";
+import { resolveFocusSchedulesByEntitlement } from "@/utils/focusScheduleEntitlement";
+import { applyFocusSchedulesToDevice } from "@/utils/focusScheduleRuntime";
 import * as Notifications from "expo-notifications";
+import * as StoreReview from "expo-store-review";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Linking, Platform } from "react-native";
+import { useShallow } from "zustand/react/shallow";
 
 const AuthorizationStatus = { notDetermined: 0, denied: 1, approved: 2 } as const;
 type NotificationPermissionStatus = "granted" | "denied" | "undetermined" | null;
@@ -36,8 +34,10 @@ export interface UseOnboardingResult {
   animateCTA: boolean;
   ctaDelayMs: number;
   ctaKey: string | number;
+  animateTitleWords: boolean;
   familyActivitySelection: string | null;
   hideProgress: boolean;
+  headerAlign: "left" | "center";
   icon?: string;
   isEditTimes: boolean;
   nextDisabled: boolean;
@@ -49,6 +49,7 @@ export interface UseOnboardingResult {
   stepError: string | null;
   subtitle: string;
   title: string;
+  titleHighlightWords: string[];
   totalSteps: number;
   onBack: () => void;
   onNext: () => Promise<void>;
@@ -65,19 +66,38 @@ export function useOnboarding(): UseOnboardingResult {
   const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string; from?: string }>();
 
-  const name = useUserStore((s) => s.name);
-  const age = useUserStore((s) => s.age);
-  const setAge = useUserStore((s) => s.setAge);
-  const quranFrequency = useUserStore((s) => s.quranFrequency);
-  const reasonsDisconnect = useUserStore((s) => s.reasonsDisconnect);
-  const focusSchedules = useUserStore((s) => s.focusSchedules);
-  const setOnboardingComplete = useUserStore((s) => s.setOnboardingComplete);
+  const {
+    name,
+    age,
+    setAge,
+    quranFrequency,
+    reasonsDisconnect,
+    focusSchedules,
+    setFocusSchedules,
+    setDeferredFocusSchedules,
+    familyActivitySelection,
+    setFamilyActivitySelection,
+    isPremium,
+    setOnboardingComplete,
+  } = useUserStore(
+    useShallow((s) => ({
+      name: s.name,
+      age: s.age,
+      setAge: s.setAge,
+      quranFrequency: s.quranFrequency,
+      reasonsDisconnect: s.reasonsDisconnect,
+      focusSchedules: s.focusSchedules,
+      setFocusSchedules: s.setFocusSchedules,
+      setDeferredFocusSchedules: s.setDeferredFocusSchedules,
+      familyActivitySelection: s.familyActivitySelection,
+      setFamilyActivitySelection: s.setFamilyActivitySelection,
+      isPremium: s.isPremium,
+      setOnboardingComplete: s.setOnboardingComplete,
+    })),
+  );
 
   const [stepIndex, setStepIndex] = useState(0);
   const [stepError, setStepError] = useState<string | null>(null);
-  const [familyActivitySelection, setFamilyActivitySelection] = useState<
-    string | null
-  >(null);
   const [ageInput, setAgeInput] = useState(() =>
     age != null ? String(age) : "",
   );
@@ -96,9 +116,12 @@ export function useOnboarding(): UseOnboardingResult {
   const [notificationResolving, setNotificationResolving] = useState(false);
   const [hasAttemptedScheduleSubmit, setHasAttemptedScheduleSubmit] =
     useState(false);
+  const [hasRequestedReview, setHasRequestedReview] = useState(false);
 
-  const setQuranMinutesToUnblock = useBlockingStore(
-    (s) => s.setQuranMinutesToUnblock,
+  const { setQuranMinutesToUnblock } = useBlockingStore(
+    useShallow((s) => ({
+      setQuranMinutesToUnblock: s.setQuranMinutesToUnblock,
+    })),
   );
   const previousSchedulesRef = useRef<FocusSchedule[]>(
     useUserStore.getState().focusSchedules,
@@ -155,38 +178,23 @@ export function useOnboarding(): UseOnboardingResult {
     [],
   );
 
-  const applySchedules = useCallback(async () => {
-    const schedules = useUserStore.getState().focusSchedules;
+  useEffect(() => {
+    if (!isEditTimes) return;
+    ensureCanEditFocusTimes(
+      router,
+      { isPremium },
+      { replace: true },
+    );
+  }, [isEditTimes, isPremium, router]);
+
+  const applySchedules = useCallback(async (schedules: FocusSchedule[]) => {
     if (!schedules.length) return;
-
-    setQuranMinutesToUnblock(getNextDuration(schedules));
-
-    const previousNames = previousSchedulesRef.current.map(
-      (schedule) => `${SCREEN_TIME.ACTIVITY_NAME}-${schedule.id}`,
-    );
-    const activityNames = schedules.map(
-      (schedule) => `${SCREEN_TIME.ACTIVITY_NAME}-${schedule.id}`,
-    );
-
-    if (Platform.OS === "ios") {
-      stopMonitoring(Array.from(new Set([...previousNames, ...activityNames])));
-
-      for (const schedule of schedules) {
-        const activityName = `${SCREEN_TIME.ACTIVITY_NAME}-${schedule.id}`;
-        configureBlockOnly(
-          activityName,
-          SCREEN_TIME.SELECTION_ID,
-          SCREEN_TIME.SHIELD_ID,
-        );
-        await startDailyBlockScheduleFor(
-          activityName,
-          schedule.hour,
-          schedule.minute,
-        );
-      }
-
-      previousSchedulesRef.current = schedules;
-    }
+    await applyFocusSchedulesToDevice({
+      previousSchedules: previousSchedulesRef.current,
+      nextSchedules: schedules,
+      setQuranMinutesToUnblock,
+    });
+    previousSchedulesRef.current = schedules;
   }, [setQuranMinutesToUnblock]);
 
   const onNext = useCallback(async () => {
@@ -276,27 +284,49 @@ export function useOnboarding(): UseOnboardingResult {
       }
 
       setHasAttemptedScheduleSubmit(false);
-
-      if (Platform.OS === "ios") {
-        try {
-          updateShield(
-            DEFAULT_SHIELD_CONFIG,
-            DEFAULT_SHIELD_ACTIONS,
-            SCREEN_TIME.SHIELD_ID,
-          );
-          await applySchedules();
-        } catch {}
-      }
+      const selectedSchedules = useUserStore.getState().focusSchedules;
+      let schedulesToActivate = selectedSchedules;
 
       if (!isEditTimes) {
-        setOnboardingComplete(true);
-        router.replace({
-          pathname: "/paywall",
-          params: { entry: "onboarding" },
+        const resolved = resolveFocusSchedulesByEntitlement({
+          isPremium,
+          activeSchedules: selectedSchedules,
+          deferredSchedules: [],
         });
+        schedulesToActivate = resolved.activeSchedules;
+        setFocusSchedules(resolved.activeSchedules);
+        setDeferredFocusSchedules(resolved.deferredSchedules);
+      }
+
+      try {
+        await applySchedules(schedulesToActivate);
+      } catch {}
+
+      if (!isEditTimes) {
+        setStepIndex(REVIEW_STEP);
       } else {
         router.back();
       }
+      return;
+    }
+
+    if (!isEditTimes && activeStep === REVIEW_STEP) {
+      if (!hasRequestedReview) {
+        setHasRequestedReview(true);
+        try {
+          const isReviewAvailable = await StoreReview.isAvailableAsync();
+          if (isReviewAvailable) {
+            await StoreReview.requestReview();
+          }
+        } catch {}
+        return;
+      }
+
+      setOnboardingComplete(true);
+      router.replace({
+        pathname: "/paywall",
+        params: { entry: "onboarding" },
+      });
       return;
     }
 
@@ -307,13 +337,17 @@ export function useOnboarding(): UseOnboardingResult {
     applySchedules,
     familyActivitySelection,
     focusSchedules.length,
+    hasRequestedReview,
     isEditTimes,
+    isPremium,
     mapNotificationStatus,
     name,
     notificationApproved,
     router,
     screenTimeApproved,
     setAge,
+    setDeferredFocusSchedules,
+    setFocusSchedules,
     setOnboardingComplete,
   ]);
 
@@ -349,7 +383,6 @@ export function useOnboarding(): UseOnboardingResult {
       if (notificationResolving) return "Checking...";
       return notificationStatus === "denied" ? "Open Settings" : "Give Access";
     }
-    if (stepIndex === TOTAL_STEPS - 1) return "Finish";
     if (stepIndex === 0) return "Get Started";
     if (stepIndex < 3) return "Next";
     return "Continue";
@@ -365,15 +398,18 @@ export function useOnboarding(): UseOnboardingResult {
     hasAttemptedScheduleSubmit && focusSchedules.length === 0
       ? "Please select at least one focus time."
       : null;
+  const isReviewStep = !isEditTimes && activeStep === REVIEW_STEP;
 
   return {
     activeStep,
     ageInput,
     animateCTA: !isEditTimes && stepIndex <= 2,
+    animateTitleWords: isReviewStep,
     ctaDelayMs: 360,
     ctaKey: isEditTimes ? "edit-times" : stepIndex,
     familyActivitySelection,
     hideProgress: isEditTimes,
+    headerAlign: isReviewStep ? "center" : "left",
     icon,
     isEditTimes,
     nextDisabled,
@@ -389,8 +425,9 @@ export function useOnboarding(): UseOnboardingResult {
     progressVariant: isEditTimes ? "full" : "bar",
     scheduleError,
     showBack: isEditTimes,
-    step: isEditTimes ? 0 : stepIndex,
+    step: isEditTimes ? 0 : Math.min(stepIndex, TOTAL_STEPS - 1),
     stepError,
+    titleHighlightWords: isReviewStep ? ["ummah", "quran"] : [],
     subtitle,
     title,
     totalSteps: isEditTimes ? 1 : TOTAL_STEPS,

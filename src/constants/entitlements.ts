@@ -1,6 +1,6 @@
 export const FREE_ENTITLEMENT_LIMITS = {
-  MAX_FOCUS_SCHEDULES: 5,
-  MAX_UNLOCK_SESSIONS: 5,
+  MAX_FOCUS_SCHEDULES: 1,
+  MAX_UNLOCK_SESSIONS: 1,
 } as const;
 
 export const SUBSCRIPTION_TIERS = {
@@ -29,7 +29,7 @@ export type EntitlementReason =
 
 export const PAYWALL_SOURCES = {
   HOME_READ_QURAN: "home_read_quran",
-  HOME_SET_FOCUS_TIMES: "home_set_focus_times",
+  FOCUS_TIMES_EDIT: "focus_times_edit",
   DEEP_LINK_VERSE: "deep_link_verse",
   VERSE_GUARD: "verse_guard",
   FOCUS_TIMES_ADD_PRAYER: "focus_times_add_prayer",

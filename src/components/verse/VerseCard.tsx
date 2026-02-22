@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { useCallback } from "react";
 import { Pressable, Text } from "react-native";
 import type { DisplayVerse } from "./types";
 import { getArabicTextStyle } from "@/utils/arabicTypography";
@@ -10,7 +11,7 @@ interface VerseCardProps {
   arabicFontSize: number;
   arabicLineHeight: number;
   translationFontSize: number;
-  onSelect: () => void;
+  onSelectVerse: (verseKey: string) => void;
 }
 
 export function VerseCard({
@@ -20,11 +21,15 @@ export function VerseCard({
   arabicFontSize,
   arabicLineHeight,
   translationFontSize,
-  onSelect,
+  onSelectVerse,
 }: VerseCardProps) {
+  const handleSelect = useCallback(() => {
+    onSelectVerse(verse.key);
+  }, [onSelectVerse, verse.key]);
+
   return (
     <Pressable
-      onPress={onSelect}
+      onPress={handleSelect}
       className={clsx(
         "rounded-2xl border px-4 py-4",
         isSelected

@@ -1,7 +1,7 @@
 import { colors } from "@/constants/colors";
 import { useFunnelText } from "@/hooks/app";
 import type { HomeTimelineItem } from "@/hooks/home";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Pressable, Text, View } from "react-native";
 
 interface JourneyTimelineCardProps {
@@ -13,13 +13,23 @@ interface JourneyTimelineCardProps {
 const statusAccent = (status: HomeTimelineItem["status"]) => {
   if (status === "completed") return colors.success;
   if (status === "pending") return colors.warning;
+  if (status === "premium_locked") return colors.accent;
   return colors.muted;
 };
 
 const statusLabel = (status: HomeTimelineItem["status"]) => {
   if (status === "completed") return "Done";
   if (status === "pending") return "Now";
+  if (status === "premium_locked") return "Pro";
   return "Upcoming";
+};
+
+const statusIcon = (
+  status: Exclude<HomeTimelineItem["status"], "premium_locked">,
+) => {
+  if (status === "completed") return "checkmark-circle-outline";
+  if (status === "pending") return "time-outline";
+  return "ellipse-outline";
 };
 
 export function JourneyTimelineCard({
@@ -71,17 +81,19 @@ export function JourneyTimelineCard({
                 </View>
               </View>
               <View className="flex-row items-center gap-2">
-                <Ionicons
-                  name={
-                    item.status === "completed"
-                      ? "checkmark-circle-outline"
-                      : item.status === "pending"
-                        ? "time-outline"
-                        : "ellipse-outline"
-                  }
-                  size={16}
-                  color={statusAccent(item.status)}
-                />
+                {item.status === "premium_locked" ? (
+                  <MaterialCommunityIcons
+                    name="crown"
+                    size={16}
+                    color={statusAccent(item.status)}
+                  />
+                ) : (
+                  <Ionicons
+                    name={statusIcon(item.status)}
+                    size={16}
+                    color={statusAccent(item.status)}
+                  />
+                )}
                 <Text
                   className="text-xs font-sfPro-semibold"
                   style={{ color: statusAccent(item.status) }}

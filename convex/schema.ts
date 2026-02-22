@@ -23,6 +23,7 @@ export default defineSchema({
     quranFrequency: v.optional(v.string()),
     reasonsDisconnect: v.array(v.string()),
     focusSchedules: v.array(focusSchedule),
+    deferredFocusSchedules: v.optional(v.array(focusSchedule)),
     onboardingComplete: v.boolean(),
     hasSelectedApps: v.boolean(),
     lastReadPage: v.number(),
@@ -33,6 +34,7 @@ export default defineSchema({
       v.literal(SUBSCRIPTION_TIERS.PRO),
     ),
     completedUnlockSessions: v.number(),
+    streakCompletedDates: v.array(v.string()),
     updatedAt: v.number(),
   }).index("by_appUserId", ["appUserId"]),
 });

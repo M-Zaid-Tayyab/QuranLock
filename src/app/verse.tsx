@@ -1,43 +1,41 @@
 import {
-  MushafTranslationPanel,
-  MushafVerseFlow,
-  MushafWordLines,
-  VerseCard,
+  VerseBottomBarPane,
+  VerseContentPane,
   VerseHeader,
-  VerseNavigationBar,
-  VersePackCard,
-  VerseRecitationControls,
+  VerseRecitationPane,
   VerseSearchModal,
   VerseSettingsSheet,
+  type VerseScrollableRef,
 } from "@/components/verse";
 import { useVerseScreen } from "@/hooks/verse";
+import { useVerseStore } from "@/store/verse";
 import { BottomSheetModal as GorhomBottomSheetModal } from "@gorhom/bottom-sheet";
-import { useCallback, useEffect, useRef } from "react";
-import {
-  ActivityIndicator,
-  Animated,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { useIsFocused } from "@react-navigation/native";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { View } from "react-native";
 
 export default function VerseScreen() {
   const vm = useVerseScreen();
+  const isFocused = useIsFocused();
   const settingsSheetRef = useRef<GorhomBottomSheetModal | null>(null);
-  const scrollViewRef = useRef<ScrollView | null>(null);
-  const verseLayoutsRef = useRef<Map<string, { y: number; height: number }>>(
+  const scrollViewRef = useRef<VerseScrollableRef | null>(null);
+  const verseLayoutsRef = useRef<Map<string, { top: number; bottom: number }>>(
     new Map(),
   );
   const pendingAutoScrollVerseKeyRef = useRef<string | null>(null);
+  const pendingEntryAutoScrollRef = useRef(false);
   const suppressAutoScrollOnceRef = useRef(false);
   const scrollMetricsRef = useRef({ y: 0, viewportHeight: 0 });
   const bottomOverlayHeightRef = useRef(0);
-  const contentContainerYRef = useRef(0);
-  const studySectionYRef = useRef(0);
-  const mushafWordSectionYRef = useRef(0);
-  const mushafFlowSectionYRef = useRef(0);
-  const translationSectionYRef = useRef(0);
+  const isRecitationPlayingRef = useRef(false);
+  const selectedVerseKeyRef = useRef<string | null>(
+    useVerseStore.getState().selectedVerseKey,
+  );
+  const studyVerseIndexByKey = useMemo(
+    () =>
+      new Map(vm.content.displayVerses.map((verse, index) => [verse.key, index])),
+    [vm.content.displayVerses],
+  );
 
   const handleOpenSettings = useCallback(() => {
     settingsSheetRef.current?.present();
@@ -50,12 +48,29 @@ export default function VerseScreen() {
   const handleOpenSearchFromSettings = useCallback(() => {
     settingsSheetRef.current?.dismiss();
     vm.actions.openSearch();
-  }, [vm.actions]);
+  }, [vm.actions.openSearch]);
 
   const tryAutoScrollToVerse = useCallback((verseKey: string) => {
-    const layout = verseLayoutsRef.current.get(verseKey);
     const scrollView = scrollViewRef.current;
-    if (!layout || !scrollView) {
+    if (!scrollView) {
+      return false;
+    }
+
+    if (vm.readingMode === "study" && scrollView.scrollToIndex) {
+      const targetIndex = studyVerseIndexByKey.get(verseKey) ?? -1;
+      if (targetIndex < 0) {
+        return false;
+      }
+      scrollView.scrollToIndex({
+        index: targetIndex,
+        animated: true,
+        viewPosition: 0.5,
+      });
+      return true;
+    }
+
+    const bounds = verseLayoutsRef.current.get(verseKey);
+    if (!bounds) {
       return false;
     }
 
@@ -66,7 +81,7 @@ export default function VerseScreen() {
 
     const overlayOffset = bottomOverlayHeightRef.current + 24;
     const usableViewportHeight = Math.max(140, viewportHeight - overlayOffset);
-    const verseCenter = layout.y + layout.height / 2;
+    const verseCenter = (bounds.top + bounds.bottom) / 2;
     const viewportCenter = scrollY + usableViewportHeight / 2;
     const centerTolerance = Math.max(
       40,
@@ -83,22 +98,34 @@ export default function VerseScreen() {
       return true;
     }
 
-    scrollView.scrollTo({
-      y: targetY,
-      animated: true,
-    });
+    if (scrollView.scrollTo) {
+      scrollView.scrollTo({
+        y: targetY,
+        animated: true,
+      });
+    } else if (scrollView.scrollToOffset) {
+      scrollView.scrollToOffset({
+        offset: targetY,
+        animated: true,
+      });
+    }
     return true;
-  }, []);
+  }, [studyVerseIndexByKey, vm.readingMode]);
 
   const registerVerseLayout = useCallback(
     (verseKey: string, y: number, height: number) => {
+      const nextTop = y;
+      const nextBottom = y + height;
       const existing = verseLayoutsRef.current.get(verseKey);
       if (!existing) {
-        verseLayoutsRef.current.set(verseKey, { y, height });
+        verseLayoutsRef.current.set(verseKey, {
+          top: nextTop,
+          bottom: nextBottom,
+        });
       } else {
         verseLayoutsRef.current.set(verseKey, {
-          y: Math.min(existing.y, y),
-          height,
+          top: Math.min(existing.top, nextTop),
+          bottom: Math.max(existing.bottom, nextBottom),
         });
       }
 
@@ -106,21 +133,81 @@ export default function VerseScreen() {
         const didScroll = tryAutoScrollToVerse(verseKey);
         if (didScroll) {
           pendingAutoScrollVerseKeyRef.current = null;
+          pendingEntryAutoScrollRef.current = false;
         }
       }
     },
     [tryAutoScrollToVerse],
   );
 
-  const registerVerseLayoutWithBase = useCallback(
-    (verseKey: string, y: number, height: number, baseY: number) => {
-      registerVerseLayout(verseKey, baseY + y, height);
-    },
-    [registerVerseLayout],
+  const handleViewportHeightChange = useCallback((height: number) => {
+    scrollMetricsRef.current.viewportHeight = height;
+  }, []);
+
+  const handleScrollYChange = useCallback((y: number) => {
+    scrollMetricsRef.current.y = y;
+  }, []);
+
+  const handleBottomOverlayHeightChange = useCallback((height: number) => {
+    bottomOverlayHeightRef.current = height;
+  }, []);
+
+  const scrollToSelectedVerse = useCallback((bypassSuppress: boolean) => {
+    const selectedVerseKey = selectedVerseKeyRef.current;
+    if (!selectedVerseKey) {
+      return false;
+    }
+    if (suppressAutoScrollOnceRef.current && !bypassSuppress) {
+      suppressAutoScrollOnceRef.current = false;
+      return false;
+    }
+    const didScroll = tryAutoScrollToVerse(selectedVerseKey);
+    pendingAutoScrollVerseKeyRef.current = didScroll ? null : selectedVerseKey;
+    return didScroll;
+  }, [tryAutoScrollToVerse]);
+
+  const attemptAutoScrollToSelectedVerse = useCallback(
+    () => scrollToSelectedVerse(false),
+    [scrollToSelectedVerse],
   );
 
+  const attemptEntryAutoScrollToSelectedVerse = useCallback(() => {
+    const didScroll = scrollToSelectedVerse(true);
+    if (didScroll) {
+      pendingEntryAutoScrollRef.current = false;
+    }
+  }, [scrollToSelectedVerse]);
+
+  const handleStudyListLayout = useCallback(() => {
+    if (!isFocused || !pendingEntryAutoScrollRef.current) {
+      return;
+    }
+    attemptEntryAutoScrollToSelectedVerse();
+  }, [attemptEntryAutoScrollToSelectedVerse, isFocused]);
+
+  const handleRecitationPlayingChange = useCallback((isPlaying: boolean) => {
+    isRecitationPlayingRef.current = isPlaying;
+    if (!isPlaying) {
+      return;
+    }
+    attemptAutoScrollToSelectedVerse();
+  }, [attemptAutoScrollToSelectedVerse]);
+
   useEffect(() => {
-    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    if (!isFocused) {
+      pendingEntryAutoScrollRef.current = false;
+      return;
+    }
+    pendingEntryAutoScrollRef.current = true;
+    attemptEntryAutoScrollToSelectedVerse();
+  }, [attemptEntryAutoScrollToSelectedVerse, isFocused]);
+
+  useEffect(() => {
+    if (scrollViewRef.current?.scrollTo) {
+      scrollViewRef.current.scrollTo({ y: 0, animated: false });
+    } else if (scrollViewRef.current?.scrollToOffset) {
+      scrollViewRef.current.scrollToOffset({ offset: 0, animated: false });
+    }
     scrollMetricsRef.current.y = 0;
     suppressAutoScrollOnceRef.current = true;
   }, [vm.navigation.currentPage]);
@@ -138,19 +225,25 @@ export default function VerseScreen() {
   ]);
 
   useEffect(() => {
-    const selectedVerseKey = vm.content.selectedVerseKey;
-    if (!selectedVerseKey || !vm.recitation.isPlaying) return;
-    if (suppressAutoScrollOnceRef.current) {
-      suppressAutoScrollOnceRef.current = false;
-      return;
-    }
-    const didScroll = tryAutoScrollToVerse(selectedVerseKey);
-    pendingAutoScrollVerseKeyRef.current = didScroll ? null : selectedVerseKey;
-  }, [
-    tryAutoScrollToVerse,
-    vm.content.selectedVerseKey,
-    vm.recitation.isPlaying,
-  ]);
+    const unsubscribe = useVerseStore.subscribe((state, previousState) => {
+      if (state.selectedVerseKey === previousState.selectedVerseKey) {
+        return;
+      }
+      const selectedVerseKey = state.selectedVerseKey;
+      selectedVerseKeyRef.current = selectedVerseKey;
+      if (!selectedVerseKey) {
+        return;
+      }
+      if (pendingEntryAutoScrollRef.current) {
+        attemptEntryAutoScrollToSelectedVerse();
+        return;
+      }
+      if (isRecitationPlayingRef.current) {
+        attemptAutoScrollToSelectedVerse();
+      }
+    });
+    return unsubscribe;
+  }, [attemptAutoScrollToSelectedVerse, attemptEntryAutoScrollToSelectedVerse]);
 
   return (
     <View className="flex-1 bg-background py-safe">
@@ -161,238 +254,58 @@ export default function VerseScreen() {
         onOpenSettings={handleOpenSettings}
       />
 
-      {vm.content.packState === "ready" && vm.recitation.visible && (
-        <VerseRecitationControls
-          selectedVerseKey={vm.content.selectedVerseKey}
-          playbackRate={vm.recitation.playbackRate}
-          isLoadingAudio={vm.recitation.isLoadingAudio}
-          isPlaying={vm.recitation.isPlaying}
-          error={vm.recitation.error}
-          canGoNext={vm.recitation.canGoNext}
-          canGoPrevious={vm.recitation.canGoPrevious}
-          positionLabel={vm.recitation.positionLabel}
-          durationLabel={vm.recitation.durationLabel}
-          onTogglePlayback={vm.actions.toggleRecitationPlayback}
-          onPlayNext={vm.actions.playNextRecitationVerse}
-          onPlayPrevious={vm.actions.playPreviousRecitationVerse}
-          onCycleRate={vm.actions.cycleRecitationRate}
-        />
-      )}
-
-      <ScrollView
-        ref={scrollViewRef}
-        className="flex-1 px-6"
-        contentContainerStyle={
-          vm.progress.pendingSchedulesCount > 0
-            ? { paddingBottom: 200 }
-            : { paddingBottom: 40 }
+      <VerseRecitationPane
+        visible={
+          isFocused && vm.content.packState === "ready" && vm.recitation.visible
         }
-        showsVerticalScrollIndicator={false}
-        onLayout={(event) => {
-          scrollMetricsRef.current.viewportHeight =
-            event.nativeEvent.layout.height;
-        }}
-        onScroll={(event) => {
-          scrollMetricsRef.current.y = event.nativeEvent.contentOffset.y;
-        }}
-        scrollEventThrottle={16}
-      >
-        {vm.content.packState !== "ready" && (
-          <VersePackCard
-            packState={vm.content.packState}
-            packError={vm.pack.error}
-            downloadProgress={vm.pack.downloadProgress}
-            onDownload={vm.actions.downloadPack}
-          />
-        )}
+        verseKeys={vm.recitation.verseKeys}
+        onSelectVerse={vm.actions.selectVerse}
+        onRequestNextPageVerse={vm.recitation.requestNextPageVerse}
+        onPlayingChange={handleRecitationPlayingChange}
+      />
 
-        {vm.content.packState === "ready" && (
-          <View
-            className="mt-6 rounded-3xl border border-outline bg-surface px-5 py-6"
-            onLayout={(event) => {
-              contentContainerYRef.current = event.nativeEvent.layout.y;
-            }}
-          >
-            {vm.content.loadingPage && (
-              <View className="items-center py-6">
-                <ActivityIndicator />
-                <Text className="mt-3 text-sm font-sfPro text-muted">
-                  Loading page…
-                </Text>
-              </View>
-            )}
+      <VerseContentPane
+        scrollViewRef={scrollViewRef}
+        pendingSchedulesCount={vm.progress.pendingSchedulesCount}
+        packState={vm.content.packState}
+        packError={vm.pack.error}
+        downloadProgress={vm.pack.downloadProgress}
+        onDownloadPack={vm.actions.downloadPack}
+        loadingPage={vm.content.loadingPage}
+        pageError={vm.content.pageError}
+        hasPageData={Boolean(vm.content.pageData)}
+        animatedContentStyle={vm.content.animatedContentStyle}
+        readingMode={vm.readingMode}
+        hasWordData={vm.content.hasWordData}
+        groupedLines={vm.content.groupedLines}
+        displayVerses={vm.content.displayVerses}
+        translationEnabled={vm.header.translationEnabled}
+        arabicFontSize={vm.content.arabicFontSize}
+        arabicLineHeight={vm.content.arabicLineHeight}
+        translationFontSize={vm.content.translationFontSize}
+        onSelectVerse={vm.actions.selectVerse}
+        onRedownloadPack={vm.actions.redownloadPack}
+        onViewportHeightChange={handleViewportHeightChange}
+        onScrollYChange={handleScrollYChange}
+        onRegisterVerseLayout={registerVerseLayout}
+        onStudyListLayout={handleStudyListLayout}
+      />
 
-            {!vm.content.loadingPage && vm.content.pageError && (
-              <View className="items-center">
-                <Text className="text-center text-sm font-sfPro text-error">
-                  {vm.content.pageError}
-                </Text>
-                <Pressable
-                  onPress={vm.actions.redownloadPack}
-                  className="mt-4 rounded-full bg-primary px-5 py-2"
-                >
-                  <Text className="text-center text-sm font-sfPro-semibold text-primaryForeground">
-                    Redownload pack
-                  </Text>
-                </Pressable>
-              </View>
-            )}
-
-            {!vm.content.loadingPage &&
-              !vm.content.pageError &&
-              !vm.content.pageData && (
-                <Text className="text-center text-sm font-sfPro text-muted">
-                  Page data not found.
-                </Text>
-              )}
-
-            {vm.content.pageData && (
-              <Animated.View
-                className="gap-4"
-                style={vm.content.animatedContentStyle}
-              >
-                {vm.readingMode === "mushaf" ? (
-                  <View>
-                    {vm.content.hasWordData ? (
-                      <View
-                        onLayout={(event) => {
-                          mushafWordSectionYRef.current =
-                            event.nativeEvent.layout.y;
-                        }}
-                      >
-                        <MushafWordLines
-                          groupedLines={vm.content.groupedLines}
-                          selectedVerseKey={vm.content.selectedVerseKey}
-                          arabicFontSize={vm.content.arabicFontSize}
-                          arabicLineHeight={vm.content.arabicLineHeight}
-                          onSelectVerse={vm.actions.selectVerse}
-                          onVerseLayout={(verseKey, y, height) => {
-                            registerVerseLayoutWithBase(
-                              verseKey,
-                              y,
-                              height,
-                              contentContainerYRef.current +
-                                mushafWordSectionYRef.current,
-                            );
-                          }}
-                        />
-                      </View>
-                    ) : (
-                      <View
-                        onLayout={(event) => {
-                          mushafFlowSectionYRef.current =
-                            event.nativeEvent.layout.y;
-                        }}
-                      >
-                        <MushafVerseFlow
-                          verses={vm.content.displayVerses}
-                          selectedVerseKey={vm.content.selectedVerseKey}
-                          arabicFontSize={vm.content.arabicFontSize}
-                          arabicLineHeight={vm.content.arabicLineHeight}
-                          onSelectVerse={vm.actions.selectVerse}
-                          onVerseLayout={(verseKey, y, height) => {
-                            registerVerseLayoutWithBase(
-                              verseKey,
-                              y,
-                              height,
-                              contentContainerYRef.current +
-                                mushafFlowSectionYRef.current,
-                            );
-                          }}
-                        />
-                      </View>
-                    )}
-                    {vm.header.translationEnabled && (
-                      <View
-                        onLayout={(event) => {
-                          translationSectionYRef.current =
-                            event.nativeEvent.layout.y;
-                        }}
-                      >
-                        <MushafTranslationPanel
-                          verses={vm.content.displayVerses}
-                          selectedVerseKey={vm.content.selectedVerseKey}
-                          translationFontSize={vm.content.translationFontSize}
-                          onSelectVerse={vm.actions.selectVerse}
-                          onVerseLayout={(verseKey, y, height) => {
-                            registerVerseLayoutWithBase(
-                              verseKey,
-                              y,
-                              height,
-                              contentContainerYRef.current +
-                                translationSectionYRef.current,
-                            );
-                          }}
-                        />
-                      </View>
-                    )}
-                  </View>
-                ) : (
-                  <View
-                    className="gap-4"
-                    onLayout={(event) => {
-                      studySectionYRef.current = event.nativeEvent.layout.y;
-                    }}
-                  >
-                    {vm.content.displayVerses.map((verse) => (
-                      <View
-                        key={verse.key}
-                        onLayout={(event) => {
-                          registerVerseLayoutWithBase(
-                            verse.key,
-                            event.nativeEvent.layout.y,
-                            event.nativeEvent.layout.height,
-                            contentContainerYRef.current +
-                              studySectionYRef.current,
-                          );
-                        }}
-                      >
-                        <VerseCard
-                          verse={verse}
-                          isSelected={vm.content.selectedVerseKey === verse.key}
-                          translationEnabled={vm.header.translationEnabled}
-                          arabicFontSize={vm.content.arabicFontSize}
-                          arabicLineHeight={vm.content.arabicLineHeight}
-                          translationFontSize={vm.content.translationFontSize}
-                          onSelect={() => vm.actions.selectVerse(verse.key)}
-                        />
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </Animated.View>
-            )}
-          </View>
-        )}
-      </ScrollView>
-
-      {vm.content.packState === "ready" && (
-        <VerseNavigationBar
-          currentPage={vm.navigation.currentPage}
-          totalPages={vm.navigation.totalPages}
-          canGoNext={vm.navigation.canGoNext}
-          canGoPrevious={vm.navigation.canGoPrevious}
-          onNext={vm.actions.goNextPage}
-          onPrevious={vm.actions.goPreviousPage}
-          isBlockSessionActive={vm.progress.isBlockSessionActive}
-          requiredMinutes={vm.progress.requiredMinutes}
-          remainingMinutes={vm.progress.remainingMinutes}
-          remainingSeconds={vm.progress.remainingSeconds}
-          pendingSchedulesCount={vm.progress.pendingSchedulesCount}
-          onMeasuredHeight={(height) => {
-            bottomOverlayHeightRef.current = height;
-          }}
-        />
-      )}
+      <VerseBottomBarPane
+        visible={vm.content.packState === "ready"}
+        currentPage={vm.navigation.currentPage}
+        totalPages={vm.navigation.totalPages}
+        canGoNext={vm.navigation.canGoNext}
+        canGoPrevious={vm.navigation.canGoPrevious}
+        onNext={vm.actions.goNextPage}
+        onPrevious={vm.actions.goPreviousPage}
+        pendingSchedulesCount={vm.progress.pendingSchedulesCount}
+        onMeasuredHeight={handleBottomOverlayHeightChange}
+      />
 
       <VerseSearchModal
         visible={vm.search.visible}
-        query={vm.search.query}
-        searching={vm.search.searching}
-        error={vm.search.error}
-        results={vm.search.results}
         onClose={vm.actions.closeSearch}
-        onQueryChange={vm.actions.setSearchQuery}
         onPickResult={vm.actions.pickSearchResult}
       />
 
@@ -400,20 +313,9 @@ export default function VerseScreen() {
         sheetRef={settingsSheetRef}
         readingMode={vm.readingMode}
         recitationVisible={vm.recitation.visible}
-        recitationDownloadProgressPercent={
-          vm.recitation.downloadProgressPercent
-        }
-        recitationDownloadCompletedChapters={
-          vm.recitation.downloadCompletedChapters
-        }
-        recitationDownloadTotalChapters={vm.recitation.downloadTotalChapters}
-        recitationDownloadCurrentChapter={vm.recitation.downloadCurrentChapter}
-        recitationDownloadError={vm.recitation.downloadError}
-        recitationDownloadInProgress={vm.recitation.isDownloadingOfflinePack}
         translationEnabled={vm.header.translationEnabled}
         onSetReadingMode={vm.actions.setReadingMode}
         onToggleRecitationVisible={vm.actions.toggleRecitationVisible}
-        onResumeRecitationDownload={vm.actions.resumeRecitationDownload}
         onToggleTranslation={vm.actions.toggleTranslation}
         onIncreaseFont={vm.actions.increaseFont}
         onDecreaseFont={vm.actions.decreaseFont}

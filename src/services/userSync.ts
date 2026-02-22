@@ -10,6 +10,7 @@ export interface UserSyncPayload {
   quranFrequency: string;
   reasonsDisconnect: string[];
   focusSchedules: FocusSchedule[];
+  deferredFocusSchedules: FocusSchedule[];
   onboardingComplete: boolean;
   hasSelectedApps: boolean;
   lastReadPage: number;
@@ -17,6 +18,7 @@ export interface UserSyncPayload {
   isPremium: boolean;
   subscriptionTier: SubscriptionTier;
   completedUnlockSessions: number;
+  streakCompletedDates: string[];
 }
 
 export const syncUserProfile = async (payload: UserSyncPayload) => {

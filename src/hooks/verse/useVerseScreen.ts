@@ -1,162 +1,83 @@
 import { PAYWALL_SOURCES } from "@/constants/entitlements";
-import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
-import { useVerseRecitation } from "@/hooks/verse/useVerseRecitation";
-import { unblockSelection } from "@/services/deviceActivity";
+import { useVerseFocusSessionTicker } from "@/hooks/verse/useVerseFocusSessionTicker";
+import { useVersePackLifecycle } from "@/hooks/verse/useVersePackLifecycle";
+import { useVersePageData } from "@/hooks/verse/useVersePageData";
 import {
   canOpenQuran,
   openPaywallForBlockedDecision,
 } from "@/services/entitlements";
 import {
-  searchQuranVerses,
   type QuranSearchResult,
 } from "@/services/quranFoundation";
 import {
-  getRecitationOfflineDownloadStatus,
-  startGlobalRecitationOfflineDownload,
-  subscribeRecitationOfflineDownloadStatus,
-} from "@/services/recitationPack";
-import {
   QURAN_TOTAL_PAGES,
-  deleteQuranPack,
-  ensureQuranPack,
   findVerseLocationByKey,
-  getPackInfo,
-  getQuranPage,
-  prefetchQuranPages,
-  pruneQuranCache,
-  resetPrefetchQueue,
-  type QuranPageData,
-  type QuranWord,
 } from "@/services/quranPack";
-import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
 import { useVerseStore, type ReadingMode } from "@/store/verse";
-import { getArabicLineHeight } from "@/utils/arabicTypography";
-import { getScheduleStatuses } from "@/utils/scheduleEngine";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, AppState, Easing, type AppStateStatus } from "react-native";
+import { useShallow } from "zustand/react/shallow";
 
-const TICK_INTERVAL_MS = 1000;
-const MINUTES_PER_TICK = 1 / 60;
 const FONT_SCALES = [0.9, 1, 1.15, 1.3];
-
-type PackState = "checking" | "missing" | "downloading" | "ready" | "error";
-
-interface DisplayVerse {
-  key: string;
-  arabic: string;
-  translation?: string;
-}
-
-const deriveVersesFromWords = (words: QuranWord[]) => {
-  const byKey = new Map<string, string[]>();
-  words.forEach((word) => {
-    const existing = byKey.get(word.verseKey) ?? [];
-    existing.push(word.text);
-    byKey.set(word.verseKey, existing);
-  });
-  return [...byKey.entries()].map(([key, parts]) => ({
-    key,
-    arabic: parts.join(" "),
-  }));
-};
-
-const getFirstVerseKeyFromPageData = (data: QuranPageData | null) => {
-  const firstVerseKey = data?.verses?.[0]?.key;
-  if (firstVerseKey) return firstVerseKey;
-  if (data?.words?.length) {
-    return deriveVersesFromWords(data.words)[0]?.key ?? null;
-  }
-  return null;
-};
 
 export const useVerseScreen = () => {
   const router = useRouter();
-  const addQuranMinutes = useBlockingStore((s) => s.addQuranMinutes);
-  const getRequiredMinutes = useBlockingStore((s) => s.getRequiredMinutes);
-  const resetAfterUnblock = useBlockingStore((s) => s.resetAfterUnblock);
-  const accumulatedQuranMinutesForCurrentBlock = useBlockingStore(
-    (s) => s.accumulatedQuranMinutesForCurrentBlock,
+  const {
+    lastReadPage,
+    setLastReadPage,
+    syncedTranslationEnabled,
+    setSyncedTranslationEnabled,
+    quranFontScale,
+    setQuranFontScale,
+    isPremium,
+    completedUnlockSessions,
+  } = useUserStore(
+    useShallow((s) => ({
+      lastReadPage: s.lastReadPage,
+      setLastReadPage: s.setLastReadPage,
+      syncedTranslationEnabled: s.translationEnabled,
+      setSyncedTranslationEnabled: s.setTranslationEnabled,
+      quranFontScale: s.quranFontScale,
+      setQuranFontScale: s.setQuranFontScale,
+      isPremium: s.isPremium,
+      completedUnlockSessions: s.completedUnlockSessions,
+    })),
   );
-  const completedScheduleIds = useBlockingStore((s) => s.completedScheduleIds);
-  const markScheduleCompleted = useBlockingStore(
-    (s) => s.markScheduleCompleted,
-  );
-  const setActiveSchedule = useBlockingStore((s) => s.setActiveSchedule);
-  const lastReadPage = useUserStore((s) => s.lastReadPage);
-  const setLastReadPage = useUserStore((s) => s.setLastReadPage);
-  const syncedTranslationEnabled = useUserStore((s) => s.translationEnabled);
-  const setSyncedTranslationEnabled = useUserStore(
-    (s) => s.setTranslationEnabled,
-  );
-  const quranFontScale = useUserStore((s) => s.quranFontScale);
-  const setQuranFontScale = useUserStore((s) => s.setQuranFontScale);
-  const isPremium = useUserStore((s) => s.isPremium);
-  const completedUnlockSessions = useUserStore(
-    (s) => s.completedUnlockSessions,
-  );
-  const incrementCompletedUnlockSessions = useUserStore(
-    (s) => s.incrementCompletedUnlockSessions,
-  );
-  const focusSchedules = useUserStore((s) => s.focusSchedules);
-  const hasMigratedFromUserStore = useVerseStore(
-    (s) => s.hasMigratedFromUserStore,
-  );
-  const hydrateFromUserTranslation = useVerseStore(
-    (s) => s.hydrateFromUserTranslation,
-  );
-  const translationEnabled = useVerseStore((s) => s.translationEnabled);
-  const toggleTranslationEnabled = useVerseStore(
-    (s) => s.toggleTranslationEnabled,
-  );
-  const readingMode = useVerseStore((s) => s.readingMode);
-  const setReadingMode = useVerseStore((s) => s.setReadingMode);
-  const toggleReadingMode = useVerseStore((s) => s.toggleReadingMode);
-  const recitationVisible = useVerseStore((s) => s.recitationVisible);
-  const toggleRecitationVisible = useVerseStore(
-    (s) => s.toggleRecitationVisible,
+  const {
+    hasMigratedFromUserStore,
+    hydrateFromUserTranslation,
+    translationEnabled,
+    toggleTranslationEnabled,
+    readingMode,
+    setReadingMode,
+    toggleReadingMode,
+    recitationVisible,
+    toggleRecitationVisible,
+    setSelectedVerseKey,
+  } = useVerseStore(
+    useShallow((s) => ({
+      hasMigratedFromUserStore: s.hasMigratedFromUserStore,
+      hydrateFromUserTranslation: s.hydrateFromUserTranslation,
+      translationEnabled: s.translationEnabled,
+      toggleTranslationEnabled: s.toggleTranslationEnabled,
+      readingMode: s.readingMode,
+      setReadingMode: s.setReadingMode,
+      toggleReadingMode: s.toggleReadingMode,
+      recitationVisible: s.recitationVisible,
+      toggleRecitationVisible: s.toggleRecitationVisible,
+      setSelectedVerseKey: s.setSelectedVerseKey,
+    })),
   );
   const translationEnabledRef = useRef(translationEnabled);
-  const unlockSessionCountedRef = useRef(false);
   const gateCheckedRef = useRef(false);
-  const searchRequestIdRef = useRef(0);
-  const searchWasVisibleRef = useRef(false);
-
-  const { dateKey, activeSchedule, pendingSchedules } =
-    useFocusScheduleStatus();
-
-  const [appState, setAppState] = useState<AppStateStatus>(
-    AppState.currentState,
-  );
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const focusSessionVm = useVerseFocusSessionTicker();
 
   const [currentPage, setCurrentPage] = useState(
     Math.min(Math.max(lastReadPage || 1, 1), QURAN_TOTAL_PAGES),
   );
-  const [packState, setPackState] = useState<PackState>("checking");
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [packError, setPackError] = useState<string | null>(null);
-  const [pageData, setPageData] = useState<QuranPageData | null>(null);
-  const [loadingPage, setLoadingPage] = useState(false);
-  const [pageError, setPageError] = useState<string | null>(null);
-  const [autoDownloadAttempted, setAutoDownloadAttempted] = useState(false);
-  const transition = useRef(new Animated.Value(1)).current;
   const [pageDirection, setPageDirection] = useState<1 | -1>(1);
-  const requestIdRef = useRef(0);
-
-  const [selectedVerseKey, setSelectedVerseKey] = useState<string | null>(null);
-
   const [searchVisible, setSearchVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searching, setSearching] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<QuranSearchResult[]>([]);
-  const [recitationDownloadStatus, setRecitationDownloadStatus] = useState(
-    getRecitationOfflineDownloadStatus,
-  );
-
-  const requiredMinutes = getRequiredMinutes();
 
   useEffect(() => {
     if (gateCheckedRef.current) return;
@@ -169,357 +90,50 @@ export const useVerseScreen = () => {
   }, [completedUnlockSessions, isPremium, router]);
 
   useEffect(() => {
-    if (
-      requiredMinutes > 0 &&
-      accumulatedQuranMinutesForCurrentBlock < requiredMinutes
-    ) {
-      unlockSessionCountedRef.current = false;
-    }
-  }, [accumulatedQuranMinutesForCurrentBlock, requiredMinutes]);
-
-  const tick = useCallback(() => {
-    const shouldUnblock = addQuranMinutes(MINUTES_PER_TICK);
-    if (!shouldUnblock) return;
-    if (!unlockSessionCountedRef.current) {
-      incrementCompletedUnlockSessions();
-      unlockSessionCountedRef.current = true;
-    }
-    if (activeSchedule) {
-      const completedIds = completedScheduleIds.includes(
-        activeSchedule.schedule.id,
-      )
-        ? completedScheduleIds
-        : [...completedScheduleIds, activeSchedule.schedule.id];
-      markScheduleCompleted(activeSchedule.schedule.id, dateKey);
-      const statuses = getScheduleStatuses(
-        focusSchedules,
-        completedIds,
-        new Date(),
-      );
-      const nextPending = statuses.find((entry) => entry.status === "pending");
-      if (nextPending) {
-        setActiveSchedule(
-          nextPending.schedule.id,
-          nextPending.schedule.durationMinutes,
-          dateKey,
-        );
-      } else {
-        setActiveSchedule(null, 0, dateKey);
-        unblockSelection();
-        resetAfterUnblock();
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
-      }
-      return;
-    }
-    unblockSelection();
-    resetAfterUnblock();
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, [
-    addQuranMinutes,
-    activeSchedule,
-    completedScheduleIds,
-    dateKey,
-    focusSchedules,
-    incrementCompletedUnlockSessions,
-    markScheduleCompleted,
-    resetAfterUnblock,
-    setActiveSchedule,
-  ]);
-
-  useEffect(() => {
-    if (requiredMinutes <= 0) return;
-
-    const handleAppStateChange = (next: AppStateStatus) => {
-      setAppState(next);
-      if (next !== "active") {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
-      } else {
-        intervalRef.current = setInterval(tick, TICK_INTERVAL_MS);
-      }
-    };
-
-    if (appState === "active") {
-      intervalRef.current = setInterval(tick, TICK_INTERVAL_MS);
-    }
-
-    const sub = AppState.addEventListener("change", handleAppStateChange);
-    return () => {
-      sub.remove();
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [requiredMinutes, appState, tick]);
-
-  useEffect(() => {
     translationEnabledRef.current = translationEnabled;
   }, [translationEnabled]);
 
   useEffect(() => {
     if (hasMigratedFromUserStore) return;
     hydrateFromUserTranslation(syncedTranslationEnabled);
-  }, [
-    hasMigratedFromUserStore,
-    hydrateFromUserTranslation,
-    syncedTranslationEnabled,
-  ]);
+  }, [hasMigratedFromUserStore, syncedTranslationEnabled]);
 
   useEffect(() => {
-    if (!hasMigratedFromUserStore) return;
-    if (syncedTranslationEnabled === translationEnabled) return;
+    if (
+      !hasMigratedFromUserStore ||
+      syncedTranslationEnabled === translationEnabled
+    ) {
+      return;
+    }
     setSyncedTranslationEnabled(translationEnabled);
-  }, [
-    hasMigratedFromUserStore,
-    setSyncedTranslationEnabled,
-    syncedTranslationEnabled,
-    translationEnabled,
-  ]);
+  }, [hasMigratedFromUserStore, syncedTranslationEnabled, translationEnabled]);
 
-  useEffect(() => {
-    return subscribeRecitationOfflineDownloadStatus((status) => {
-      setRecitationDownloadStatus(status);
-    });
-  }, []);
-
-  const checkPack = useCallback(async () => {
-    try {
-      const info = await getPackInfo();
-      setPackState(info.exists ? "ready" : "missing");
-      if (!info.exists) {
-        setPackError(null);
-      }
-    } catch (error) {
-      setPackError(
-        error instanceof Error ? error.message : "Unable to read Quran pack",
-      );
-      setPackState("error");
-    }
-  }, []);
-
-  const handleDownload = useCallback(async () => {
-    setPackError(null);
-    setPackState("downloading");
-    setDownloadProgress(0);
-    try {
-      await ensureQuranPack((progress) => setDownloadProgress(progress));
-      setPackState("ready");
-    } catch (error) {
-      setPackError(error instanceof Error ? error.message : "Download failed");
-      setPackState("error");
-    }
-  }, []);
-
-  useEffect(() => {
-    checkPack();
-  }, [checkPack]);
-
-  useEffect(() => {
-    if (packState === "missing" && !autoDownloadAttempted) {
-      setAutoDownloadAttempted(true);
-      handleDownload();
-    }
-  }, [autoDownloadAttempted, handleDownload, packState]);
-
-  const loadPage = useCallback(
-    async (page: number) => {
-      const requestId = ++requestIdRef.current;
-      resetPrefetchQueue();
-      setLoadingPage(true);
-      setPageError(null);
-      setPageData(null);
-      transition.setValue(0);
-      try {
-        const timeout = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Loading timed out")), 8000);
-        });
-        const data = await Promise.race([
-          getQuranPage(page, {
-            priority: "high",
-            shouldAbort: () => requestId !== requestIdRef.current,
-          }),
-          timeout,
-        ]);
-        if (requestId !== requestIdRef.current) return;
-        setPageData(data);
-        setLastReadPage(page);
-        pruneQuranCache(page, 2);
-        const prefetchRadius = translationEnabledRef.current ? 1 : 2;
-        const pagesToPrefetch =
-          prefetchRadius === 1
-            ? [page - 1, page + 1]
-            : [page - 2, page - 1, page + 1, page + 2];
-        prefetchQuranPages(pagesToPrefetch);
-        if (!data) {
-          setPageError("Pack missing or corrupted. Please redownload.");
-        }
-      } catch (error) {
-        if (requestId !== requestIdRef.current) return;
-        setPageError(
-          error instanceof Error ? error.message : "Unable to load page",
-        );
-      } finally {
-        if (requestId !== requestIdRef.current) return;
-        setLoadingPage(false);
-      }
-    },
-    [setLastReadPage, transition],
-  );
-
-  useEffect(() => {
-    if (packState === "ready") {
-      loadPage(currentPage);
-    }
-  }, [packState, currentPage, loadPage]);
-
-  useEffect(() => {
-    if (!pageData || loadingPage) return;
-    Animated.timing(transition, {
-      toValue: 1,
-      duration: 260,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [pageData, loadingPage, transition]);
-
-  const handleRedownloadPack = useCallback(async () => {
-    setPackError(null);
-    setPageError(null);
-    setPackState("downloading");
-    setDownloadProgress(0);
-    await deleteQuranPack();
-    try {
-      await ensureQuranPack((progress) => setDownloadProgress(progress));
-      setPackState("ready");
-    } catch (error) {
-      setPackError(error instanceof Error ? error.message : "Download failed");
-      setPackState("error");
-    }
-  }, []);
+  const packVm = useVersePackLifecycle({
+    currentPage,
+    setLastReadPage,
+    translationEnabledRef,
+  });
 
   const handlePageChange = useCallback(
     (next: number) => {
-      if (loadingPage) return;
+      if (packVm.loadingPage) return;
       const clamped = Math.min(Math.max(next, 1), QURAN_TOTAL_PAGES);
       if (clamped !== currentPage) {
         setPageDirection(clamped > currentPage ? 1 : -1);
       }
       setCurrentPage(clamped);
     },
-    [currentPage, loadingPage],
+    [currentPage, packVm.loadingPage],
   );
 
-  const groupedLines = useMemo(() => {
-    if (!pageData?.words?.length) return [] as [number, QuranWord[]][];
-    const map = new Map<number, QuranWord[]>();
-    pageData.words.forEach((word) => {
-      const line = word.line ?? 1;
-      if (!map.has(line)) map.set(line, []);
-      map.get(line)?.push(word);
-    });
-    return [...map.entries()].sort((a, b) => a[0] - b[0]);
-  }, [pageData]);
-
-  const verseTextByKey = useMemo(() => {
-    const map = new Map<string, string>();
-    if (!pageData?.words?.length) return map;
-    pageData.words.forEach((word) => {
-      const existing = map.get(word.verseKey) ?? "";
-      map.set(word.verseKey, existing ? `${existing} ${word.text}` : word.text);
-    });
-    return map;
-  }, [pageData]);
-
-  const displayVerses = useMemo(() => {
-    if (pageData?.verses?.length) {
-      return pageData.verses.map((verse) => ({
-        key: verse.key,
-        arabic: verse.arabic ?? verseTextByKey.get(verse.key) ?? "",
-        translation: verse.translation ?? verse.text,
-      })) satisfies DisplayVerse[];
-    }
-    if (pageData?.words?.length) {
-      return deriveVersesFromWords(pageData.words).map((verse) => ({
-        ...verse,
-        translation: undefined,
-      })) satisfies DisplayVerse[];
-    }
-    return [] as DisplayVerse[];
-  }, [pageData, verseTextByKey]);
-
-  useEffect(() => {
-    if (!displayVerses.length) {
-      setSelectedVerseKey(null);
-      return;
-    }
-    const exists = selectedVerseKey
-      ? displayVerses.some((verse) => verse.key === selectedVerseKey)
-      : false;
-    if (!exists) {
-      setSelectedVerseKey(displayVerses[0].key);
-    }
-  }, [displayVerses, selectedVerseKey]);
-
-  const selectedVerse = useMemo(
-    () =>
-      selectedVerseKey
-        ? (displayVerses.find((verse) => verse.key === selectedVerseKey) ??
-          null)
-        : null,
-    [displayVerses, selectedVerseKey],
-  );
-  const verseKeys = useMemo(
-    () => displayVerses.map((verse) => verse.key),
-    [displayVerses],
-  );
-  const handleRecitationAdvanceToNextPage = useCallback(async () => {
-    if (currentPage >= QURAN_TOTAL_PAGES) {
-      return null;
-    }
-
-    const nextPage = currentPage + 1;
-    setPageDirection(1);
-    setCurrentPage(nextPage);
-
-    try {
-      const nextPageData = await getQuranPage(nextPage, { priority: "high" });
-      const nextVerseKey = getFirstVerseKeyFromPageData(nextPageData);
-      if (!nextVerseKey) return null;
-      setSelectedVerseKey(nextVerseKey);
-      return nextVerseKey;
-    } catch {
-      return null;
-    }
-  }, [currentPage]);
-
-  const recitation = useVerseRecitation({
-    verseKeys,
-    selectedVerseKey,
-    onSelectVerse: setSelectedVerseKey,
-    onRequestNextPageVerse: handleRecitationAdvanceToNextPage,
+  const pageVm = useVersePageData({
+    pageData: packVm.pageData,
+    quranFontScale,
+    setSelectedVerseKey,
+    currentPage,
+    setCurrentPage,
+    setPageDirection,
   });
-
-  const hasWordData = Boolean(pageData?.words?.length);
-  const arabicFontSize = Math.round(28 * quranFontScale);
-  const arabicLineHeight = getArabicLineHeight(arabicFontSize);
-  const translationFontSize = Math.round(14 * Math.min(1.1, quranFontScale));
-  const isBlockSessionActive = activeSchedule != null;
-
-  const remaining = Math.max(
-    0,
-    Math.ceil((requiredMinutes - accumulatedQuranMinutesForCurrentBlock) * 60),
-  );
-  const remainingMinutes = Math.floor(remaining / 60);
-  const remainingSeconds = remaining % 60;
 
   const handleFontAdjust = useCallback(
     (delta: number) => {
@@ -537,56 +151,7 @@ export const useVerseScreen = () => {
     [quranFontScale, setQuranFontScale],
   );
 
-  const executeSearch = useCallback(async (query: string) => {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setSearchResults([]);
-      setSearchError(null);
-      setSearching(false);
-      return;
-    }
-    const requestId = ++searchRequestIdRef.current;
-    setSearching(true);
-    setSearchError(null);
-    try {
-      const results = await searchQuranVerses(trimmed, { page: 1, size: 15 });
-      if (requestId !== searchRequestIdRef.current) return;
-      setSearchResults(results);
-    } catch (error) {
-      if (requestId !== searchRequestIdRef.current) return;
-      setSearchError(
-        error instanceof Error
-          ? error.message
-          : "Unable to search right now. Please try again.",
-      );
-      setSearchResults([]);
-    } finally {
-      if (requestId !== searchRequestIdRef.current) return;
-      setSearching(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!searchVisible) {
-      searchWasVisibleRef.current = false;
-      return;
-    }
-    const justOpened = !searchWasVisibleRef.current;
-    searchWasVisibleRef.current = true;
-    if (justOpened) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      executeSearch(searchQuery);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [executeSearch, searchQuery, searchVisible]);
-
   const handleCloseSearch = useCallback(() => {
-    searchWasVisibleRef.current = false;
-    searchRequestIdRef.current += 1;
-    setSearching(false);
-    setSearchError(null);
     setSearchVisible(false);
   }, []);
 
@@ -609,61 +174,130 @@ export const useVerseScreen = () => {
         setSelectedVerseKey(verseKey);
         return;
       }
-      setPageError("Verse found in search but unavailable in your local pack.");
+      packVm.actions.setPageErrorMessage(
+        "Verse found in search but unavailable in your local pack.",
+      );
     },
-    [currentPage],
+    [currentPage, packVm.actions, setSelectedVerseKey],
   );
 
   const handleSearchPick = useCallback(
     async (item: QuranSearchResult) => {
-      handleCloseSearch();
       await jumpToVerse(item.verseKey, item.pageNumber);
     },
-    [handleCloseSearch, jumpToVerse],
+    [jumpToVerse],
+  );
+
+  const handleGoBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+    router.replace("/home");
+  }, [router]);
+
+  const handleIncreaseFont = useCallback(() => {
+    handleFontAdjust(1);
+  }, [handleFontAdjust]);
+
+  const handleDecreaseFont = useCallback(() => {
+    handleFontAdjust(-1);
+  }, [handleFontAdjust]);
+
+  const handleOpenSearch = useCallback(() => {
+    setSearchVisible(true);
+  }, []);
+
+  const handleSetReadingMode = useCallback(
+    (mode: ReadingMode) => {
+      setReadingMode(mode);
+    },
+    [setReadingMode],
+  );
+
+  const handleGoNextPage = useCallback(() => {
+    handlePageChange(currentPage + 1);
+  }, [currentPage, handlePageChange]);
+
+  const handleGoPreviousPage = useCallback(() => {
+    handlePageChange(currentPage - 1);
+  }, [currentPage, handlePageChange]);
+
+  const actions = useMemo(
+    () => ({
+      goBack: handleGoBack,
+      increaseFont: handleIncreaseFont,
+      decreaseFont: handleDecreaseFont,
+      toggleTranslation: toggleTranslationEnabled,
+      openSearch: handleOpenSearch,
+      closeSearch: handleCloseSearch,
+      pickSearchResult: handleSearchPick,
+      toggleReadingMode,
+      setReadingMode: handleSetReadingMode,
+      readingMode,
+      downloadPack: packVm.actions.downloadPack,
+      redownloadPack: packVm.actions.redownloadPack,
+      goNextPage: handleGoNextPage,
+      goPreviousPage: handleGoPreviousPage,
+      selectVerse: setSelectedVerseKey,
+      toggleRecitationVisible,
+    }),
+    [
+      handleGoBack,
+      handleIncreaseFont,
+      handleDecreaseFont,
+      toggleTranslationEnabled,
+      handleOpenSearch,
+      handleCloseSearch,
+      handleSearchPick,
+      toggleReadingMode,
+      handleSetReadingMode,
+      readingMode,
+      packVm.actions.downloadPack,
+      packVm.actions.redownloadPack,
+      handleGoNextPage,
+      handleGoPreviousPage,
+      setSelectedVerseKey,
+      toggleRecitationVisible,
+    ],
   );
 
   const animatedContentStyle = useMemo(
     () => ({
-      opacity: transition,
+      opacity: packVm.transition,
       transform: [
         {
-          translateX: transition.interpolate({
+          translateX: packVm.transition.interpolate({
             inputRange: [0, 1],
             outputRange: [pageDirection * 18, 0],
           }),
         },
       ],
     }),
-    [pageDirection, transition],
+    [packVm.transition, pageDirection],
   );
 
   return {
     header: {
-      title: pageData?.surahName ?? "The Qur'an",
-      subtitle: pageData?.rangeLabel ?? `Page ${currentPage}`,
+      title: packVm.pageData?.surahName ?? "The Qur'an",
+      subtitle: packVm.pageData?.rangeLabel ?? `Page ${currentPage}`,
       translationEnabled,
     },
     content: {
-      packState,
-      loadingPage,
-      pageError,
-      pageData,
+      packState: packVm.packState,
+      loadingPage: packVm.loadingPage,
+      pageError: packVm.pageError,
+      pageData: packVm.pageData,
       animatedContentStyle,
-      hasWordData,
-      groupedLines,
-      displayVerses,
-      selectedVerse,
-      selectedVerseKey,
-      arabicFontSize,
-      arabicLineHeight,
-      translationFontSize,
+      hasWordData: pageVm.hasWordData,
+      groupedLines: pageVm.groupedLines,
+      displayVerses: pageVm.displayVerses,
+      arabicFontSize: pageVm.arabicFontSize,
+      arabicLineHeight: pageVm.arabicLineHeight,
+      translationFontSize: pageVm.translationFontSize,
     },
     progress: {
-      isBlockSessionActive,
-      requiredMinutes,
-      remainingMinutes,
-      remainingSeconds,
-      pendingSchedulesCount: pendingSchedules.length,
+      pendingSchedulesCount: focusSessionVm.pendingSchedulesCount,
     },
     navigation: {
       currentPage,
@@ -673,64 +307,17 @@ export const useVerseScreen = () => {
     },
     search: {
       visible: searchVisible,
-      query: searchQuery,
-      searching,
-      error: searchError,
-      results: searchResults,
     },
     pack: {
-      error: packError,
-      downloadProgress,
+      error: packVm.packError,
+      downloadProgress: packVm.downloadProgress,
     },
     recitation: {
       visible: recitationVisible,
-      playbackRate: recitation.playbackRate,
-      isLoadingAudio: recitation.isLoadingAudio,
-      isPlaying: recitation.isPlaying,
-      error: recitation.error,
-      canGoNext: recitation.canGoNext,
-      canGoPrevious: recitation.canGoPrevious,
-      positionLabel: recitation.positionLabel,
-      durationLabel: recitation.durationLabel,
-      downloadProgressPercent: recitationDownloadStatus.progressPercent,
-      downloadCompletedChapters: recitationDownloadStatus.completedChapters,
-      downloadTotalChapters: recitationDownloadStatus.totalChapters,
-      downloadCurrentChapter: recitationDownloadStatus.currentChapter,
-      downloadError: recitationDownloadStatus.lastError,
-      isDownloadingOfflinePack: recitationDownloadStatus.isDownloading,
+      verseKeys: pageVm.verseKeys,
+      requestNextPageVerse: pageVm.requestNextPageVerse,
     },
-    actions: {
-      goBack: () => {
-        if (router.canGoBack()) {
-          router.back();
-          return;
-        }
-        router.replace("/home");
-      },
-      increaseFont: () => handleFontAdjust(1),
-      decreaseFont: () => handleFontAdjust(-1),
-      toggleTranslation: toggleTranslationEnabled,
-      openSearch: () => setSearchVisible(true),
-      closeSearch: handleCloseSearch,
-      setSearchQuery,
-      pickSearchResult: handleSearchPick,
-      toggleReadingMode,
-      setReadingMode: (mode: ReadingMode) => setReadingMode(mode),
-      readingMode,
-      downloadPack: handleDownload,
-      redownloadPack: handleRedownloadPack,
-      goNextPage: () => handlePageChange(currentPage + 1),
-      goPreviousPage: () => handlePageChange(currentPage - 1),
-      selectVerse: setSelectedVerseKey,
-      toggleRecitationVisible,
-      resumeRecitationDownload: () => {
-        void startGlobalRecitationOfflineDownload();
-      },
-      toggleRecitationPlayback: recitation.actions.togglePlayback,
-      playNextRecitationVerse: recitation.actions.playNext,
-      playPreviousRecitationVerse: recitation.actions.playPrevious,
-      cycleRecitationRate: recitation.actions.cycleRate,
-    },
+    actions,
     readingMode,
   };
 };

@@ -112,6 +112,24 @@ export const useVerseRecitation = ({
   const [positionMillis, setPositionMillis] = useState(0);
   const [durationMillis, setDurationMillis] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const positionDisplaySecondRef = useRef(0);
+  const durationDisplaySecondRef = useRef(0);
+
+  const setPositionForDisplay = (nextMillis: number, force = false) => {
+    const safeMillis = Math.max(0, Math.round(nextMillis));
+    const nextSecond = Math.floor(safeMillis / 1000);
+    if (!force && nextSecond === positionDisplaySecondRef.current) return;
+    positionDisplaySecondRef.current = nextSecond;
+    setPositionMillis(nextSecond * 1000);
+  };
+
+  const setDurationForDisplay = (nextMillis: number, force = false) => {
+    const safeMillis = Math.max(0, Math.round(nextMillis));
+    const nextSecond = Math.floor(safeMillis / 1000);
+    if (!force && nextSecond === durationDisplaySecondRef.current) return;
+    durationDisplaySecondRef.current = nextSecond;
+    setDurationMillis(nextSecond * 1000);
+  };
 
   verseKeysRef.current = verseKeys;
   onSelectVerseRef.current = onSelectVerse;
@@ -242,9 +260,9 @@ export const useVerseRecitation = ({
       setIsPlaying(shouldHoldPlaying ? true : status.playing);
     }
 
-    setPositionMillis(Math.max(0, Math.round((status.currentTime ?? 0) * 1000)));
+    setPositionForDisplay((status.currentTime ?? 0) * 1000);
     if (Number.isFinite(status.duration) && status.duration > 0) {
-      setDurationMillis(Math.round(status.duration * 1000));
+      setDurationForDisplay(status.duration * 1000);
     }
     if (status.isLoaded) {
       setIsLoadingAudio(false);
@@ -306,7 +324,7 @@ export const useVerseRecitation = ({
         return;
       }
 
-      setPositionMillis(0);
+      setPositionForDisplay(0, true);
       const finishedVerseKey = loadedSourceRef.current.verseKey;
       if (!finishedVerseKey) {
         setPlayIntent(false, activeLoadIdRef.current, null);
@@ -318,12 +336,7 @@ export const useVerseRecitation = ({
     }
 
     wasPlayingRef.current = status.playing;
-  }, [
-    advanceToNextVerse,
-    player,
-    setPlayIntent,
-    status,
-  ]);
+  }, [player, status]);
 
   const loadVerse = useCallback(
     async (verseKey: string, shouldPlay: boolean, options?: LoadVerseOptions) => {
@@ -376,11 +389,12 @@ export const useVerseRecitation = ({
         player.shouldCorrectPitch = true;
         player.setPlaybackRate(playbackRate, "high");
         setLoadedSource(trimmedVerseKey, reciterId);
-        setPositionMillis(0);
-        setDurationMillis(
+        setPositionForDisplay(0, true);
+        setDurationForDisplay(
           source.durationMs != null && Number.isFinite(source.durationMs)
             ? source.durationMs
             : 0,
+          true,
         );
 
         if (shouldPlay) {
@@ -485,6 +499,24 @@ export const useVerseRecitation = ({
     }
   }, [playbackRate, player]);
 
+  const handlePlayNext = useCallback(() => {
+    playRelative(1);
+  }, [playRelative]);
+
+  const handlePlayPrevious = useCallback(() => {
+    playRelative(-1);
+  }, [playRelative]);
+
+  const actions = useMemo(
+    () => ({
+      togglePlayback,
+      playNext: handlePlayNext,
+      playPrevious: handlePlayPrevious,
+      cycleRate,
+    }),
+    [cycleRate, handlePlayNext, handlePlayPrevious, togglePlayback],
+  );
+
   useEffect(() => {
     return () => {
       unmountedRef.current = true;
@@ -502,7 +534,7 @@ export const useVerseRecitation = ({
         // noop
       }
     };
-  }, [player, setPlayIntent]);
+  }, [player]);
 
   useEffect(() => {
     if (!selectedVerseKey) {
@@ -516,8 +548,8 @@ export const useVerseRecitation = ({
       setPlayIntent(false, activeLoadIdRef.current, null);
       setIsPlaying(false);
       setIsLoadingAudio(false);
-      setPositionMillis(0);
-      setDurationMillis(0);
+      setPositionForDisplay(0, true);
+      setDurationForDisplay(0, true);
       setError(null);
       setLoadedSource(null, null);
       return;
@@ -535,10 +567,10 @@ export const useVerseRecitation = ({
     }
 
     if (!isPlaying && !isLoadedSelection) {
-      setPositionMillis(0);
-      setDurationMillis(0);
+      setPositionForDisplay(0);
+      setDurationForDisplay(0);
     }
-  }, [isPlaying, player, reciterId, selectedVerseKey, setLoadedSource, setPlayIntent]);
+  }, [isPlaying, player, reciterId, selectedVerseKey]);
 
   return {
     playbackRate,
@@ -549,11 +581,6 @@ export const useVerseRecitation = ({
     canGoPrevious,
     positionLabel: formatMillis(positionMillis),
     durationLabel: formatMillis(durationMillis),
-    actions: {
-      togglePlayback,
-      playNext: () => playRelative(1),
-      playPrevious: () => playRelative(-1),
-      cycleRate,
-    },
+    actions,
   };
 };

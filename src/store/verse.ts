@@ -9,6 +9,7 @@ export interface VerseState {
   translationEnabled: boolean;
   readingMode: ReadingMode;
   recitationVisible: boolean;
+  selectedVerseKey: string | null;
   hasMigratedFromUserStore: boolean;
 }
 
@@ -20,12 +21,14 @@ interface VerseActions {
   toggleReadingMode: () => void;
   setRecitationVisible: (value: boolean) => void;
   toggleRecitationVisible: () => void;
+  setSelectedVerseKey: (value: string | null) => void;
 }
 
 const initialState: VerseState = {
   translationEnabled: false,
   readingMode: "mushaf",
   recitationVisible: false,
+  selectedVerseKey: null,
   hasMigratedFromUserStore: false,
 };
 
@@ -51,6 +54,7 @@ export const useVerseStore = create<VerseState & VerseActions>()(
       setRecitationVisible: (recitationVisible) => set({ recitationVisible }),
       toggleRecitationVisible: () =>
         set((state) => ({ recitationVisible: !state.recitationVisible })),
+      setSelectedVerseKey: (selectedVerseKey) => set({ selectedVerseKey }),
     }),
     {
       name: STORE_KEYS.VERSE_STORE,

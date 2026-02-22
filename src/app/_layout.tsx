@@ -10,7 +10,10 @@ import { startGlobalRecitationOfflineDownload } from "@/services/recitationPack"
 import { configureRevenueCat } from "@/services/revenueCat";
 import { useRemoteAppConfig } from "@/hooks/app";
 import { QueryProvider } from "@/providers/QueryProvider";
-import { useUserSync } from "@/hooks/user";
+import {
+  useFocusScheduleEntitlementReconciliation,
+  useUserSync,
+} from "@/hooks/user";
 import { useUserStore } from "@/store/user";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as Notifications from "expo-notifications";
@@ -22,6 +25,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import Purchases, { type CustomerInfo } from "react-native-purchases";
 import { identifyDevice, vexo } from "vexo-analytics";
+import { useShallow } from "zustand/react/shallow";
 
 const vexoApiKey = process.env.EXPO_PUBLIC_VEXO_API_KEY;
 if (vexoApiKey) {
@@ -30,8 +34,12 @@ if (vexoApiKey) {
 
 function useDeepLinkToVerse() {
   const router = useRouter();
-  const isPremium = useUserStore((s) => s.isPremium);
-  const completedUnlockSessions = useUserStore((s) => s.completedUnlockSessions);
+  const { isPremium, completedUnlockSessions } = useUserStore(
+    useShallow((s) => ({
+      isPremium: s.isPremium,
+      completedUnlockSessions: s.completedUnlockSessions,
+    })),
+  );
 
   useEffect(() => {
     ensureQuranPack().catch(() => undefined);
@@ -69,10 +77,15 @@ function RootLayoutContent() {
   useDeepLinkToVerse();
   useRemoteAppConfig();
   useUserSync();
+  useFocusScheduleEntitlementReconciliation();
 
-  const appUserId = useUserStore((s) => s.appUserId);
-  const setAppUserId = useUserStore((s) => s.setAppUserId);
-  const setIsPremium = useUserStore((s) => s.setIsPremium);
+  const { appUserId, setAppUserId, setIsPremium } = useUserStore(
+    useShallow((s) => ({
+      appUserId: s.appUserId,
+      setAppUserId: s.setAppUserId,
+      setIsPremium: s.setIsPremium,
+    })),
+  );
 
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -105,7 +118,7 @@ function RootLayoutContent() {
         Purchases.removeCustomerInfoUpdateListener(listener);
       }
     };
-  }, [appUserId, setAppUserId, setIsPremium]);
+  }, [appUserId]);
 
   useEffect(() => {
     if (!appUserId) return;
@@ -122,6 +135,7 @@ function RootLayoutContent() {
               headerShown: false,
               contentStyle: { backgroundColor: colors.background },
               animation: "slide_from_right",
+              freezeOnBlur: true,
             }}
           />
         </BottomSheetModalProvider>

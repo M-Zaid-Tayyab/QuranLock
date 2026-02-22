@@ -46,7 +46,7 @@ export function ScreenTimeStep({
   useEffect(() => {
     if (Platform.OS !== "ios") return;
     void refreshStatus();
-  }, [refreshStatus]);
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
@@ -56,7 +56,7 @@ export function ScreenTimeStep({
       }
     });
     return () => subscription.remove();
-  }, [refreshStatus]);
+  }, []);
 
   const effectiveStatus =
     authStatus === AuthorizationStatus.notDetermined && hasRequested.current
@@ -71,7 +71,7 @@ export function ScreenTimeStep({
     }
     if (effectiveStatus == null) return;
     onAuthorizationChange(effectiveStatus === AuthorizationStatus.approved);
-  }, [effectiveStatus, onAuthorizationChange]);
+  }, [effectiveStatus]);
 
   useEffect(() => {
     if (!onAuthorizationStatusChange) return;
@@ -81,17 +81,21 @@ export function ScreenTimeStep({
     }
     if (effectiveStatus == null) return;
     onAuthorizationStatusChange(effectiveStatus);
-  }, [effectiveStatus, onAuthorizationStatusChange]);
+  }, [effectiveStatus]);
 
   useEffect(() => {
-    if (Platform.OS !== "ios") return;
-    if (authStatus !== AuthorizationStatus.notDetermined) return;
-    if (hasRequested.current) return;
+    if (
+      Platform.OS !== "ios" ||
+      authStatus !== AuthorizationStatus.notDetermined ||
+      hasRequested.current
+    ) {
+      return;
+    }
     hasRequested.current = true;
     requestAuthorization()
       .then(() => refreshStatus())
       .catch(() => refreshStatus());
-  }, [authStatus, refreshStatus]);
+  }, [authStatus]);
 
   if (Platform.OS !== "ios") {
     return (

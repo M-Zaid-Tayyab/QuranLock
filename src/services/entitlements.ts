@@ -2,6 +2,7 @@ import {
   ENTITLEMENT_FEATURES,
   ENTITLEMENT_REASONS,
   FREE_ENTITLEMENT_LIMITS,
+  PAYWALL_SOURCES,
   type EntitlementFeature,
   type EntitlementReason,
   type PaywallSource,
@@ -48,6 +49,33 @@ export const canOpenQuran = (input: {
     feature: ENTITLEMENT_FEATURES.QURAN_READ,
     reason: ENTITLEMENT_REASONS.FREE_UNLOCK_SESSION_LIMIT_REACHED,
   };
+};
+
+export const canEditFocusTimes = (input: {
+  isPremium: boolean;
+}): EntitlementGateDecision => {
+  if (input.isPremium) return { allowed: true };
+  return {
+    allowed: false,
+    feature: ENTITLEMENT_FEATURES.FOCUS_SCHEDULE,
+    reason: ENTITLEMENT_REASONS.FREE_FOCUS_SCHEDULE_LIMIT_REACHED,
+  };
+};
+
+export const ensureCanEditFocusTimes = (
+  router: Router,
+  input: { isPremium: boolean },
+  options?: OpenPaywallOptions,
+) => {
+  const gate = canEditFocusTimes(input);
+  if (gate.allowed) return true;
+  openPaywallForBlockedDecision(
+    router,
+    gate,
+    PAYWALL_SOURCES.FOCUS_TIMES_EDIT,
+    options,
+  );
+  return false;
 };
 
 export const openPaywallForBlockedDecision = (
