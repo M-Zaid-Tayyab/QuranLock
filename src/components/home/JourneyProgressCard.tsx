@@ -1,5 +1,6 @@
 import { colors } from "@/constants/colors";
 import { useFunnelText } from "@/hooks/app";
+import { getDateKey } from "@/utils/scheduleEngine";
 import { Ionicons } from "@expo/vector-icons";
 import { useMemo } from "react";
 import { FlatList, Text, View } from "react-native";
@@ -13,6 +14,7 @@ export interface JourneyProgressDay {
 interface JourneyProgressCardProps {
   days?: JourneyProgressDay[];
   completedThisWeek: number;
+  currentStreakCount: number;
   unlockSessions: number;
   totalMinutesWithAllah: number;
   pagesRead: number;
@@ -24,7 +26,7 @@ function getDefaultDays(): JourneyProgressDay[] {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
     return {
-      date: d.toISOString().slice(0, 10),
+      date: getDateKey(d),
       dayLabel: d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2),
       completed: false,
     };
@@ -34,6 +36,7 @@ function getDefaultDays(): JourneyProgressDay[] {
 export function JourneyProgressCard({
   days,
   completedThisWeek,
+  currentStreakCount,
   unlockSessions,
   totalMinutesWithAllah,
   pagesRead,
@@ -41,14 +44,7 @@ export function JourneyProgressCard({
 }: JourneyProgressCardProps) {
   const funnelText = useFunnelText();
   const data = useMemo(() => days ?? getDefaultDays(), [days]);
-  const currentStreak = (() => {
-    let count = 0;
-    for (let i = data.length - 1; i >= 0; i -= 1) {
-      if (!data[i].completed) break;
-      count += 1;
-    }
-    return count;
-  })();
+  const todayKey = getDateKey(new Date());
   const clampedTotalPages = Math.max(1, pagesTotal);
   const clampedReadPages = Math.min(clampedTotalPages, Math.max(0, pagesRead));
   const pagesLeft = Math.max(0, clampedTotalPages - clampedReadPages);
@@ -71,7 +67,7 @@ export function JourneyProgressCard({
           <Ionicons name="flame-outline" size={24} color={colors.accent} />
         </View>
         <Text className="mt-2 text-lg font-sfPro-semibold text-foreground">
-          {currentStreak} Day Streak
+          {currentStreakCount} Day Streak
         </Text>
         <Text className="mt-1 text-xs font-sfPro text-muted">
           {completedThisWeek}/7 days this week
@@ -83,28 +79,41 @@ export function JourneyProgressCard({
         horizontal
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.date}
-        renderItem={({ item }) => (
-          <View className="mr-3 items-center">
-            <View
-              className={`h-11 w-11 items-center justify-center rounded-full border ${
-                item.completed
-                  ? "border-primary bg-primary/20"
-                  : "border-outline bg-backgroundElevated"
-              }`}
-            >
-              {item.completed ? (
-                <Ionicons name="flame" size={14} color={colors.accent} />
-              ) : (
-                <Text className="text-xs font-sfPro-semibold text-muted">
-                  {item.dayLabel}
-                </Text>
-              )}
+        renderItem={({ item }) => {
+          const isToday = item.date === todayKey;
+          return (
+            <View className="mr-3 items-center">
+              <View
+                className={`h-11 w-11 items-center justify-center rounded-full border ${
+                  isToday
+                    ? "border-accent/40 bg-accent/10"
+                    : item.completed
+                      ? "border-primary bg-primary/20"
+                      : "border-outline bg-backgroundElevated"
+                }`}
+              >
+                {item.completed ? (
+                  <Ionicons
+                    name="checkmark"
+                    size={16}
+                    color={isToday ? colors.accent : colors.primary}
+                  />
+                ) : (
+                  <Text
+                    className={`text-xs font-sfPro-semibold ${
+                      isToday ? "text-accent" : "text-muted"
+                    }`}
+                  >
+                    {item.dayLabel}
+                  </Text>
+                )}
+              </View>
+              <Text className="mt-1 text-xs font-sfPro text-muted">
+                {item.date.slice(8)}
+              </Text>
             </View>
-            <Text className="mt-1 text-xs font-sfPro text-muted">
-              {item.date.slice(8)}
-            </Text>
-          </View>
-        )}
+          );
+        }}
         className="mt-4"
       />
 

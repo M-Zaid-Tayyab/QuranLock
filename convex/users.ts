@@ -45,6 +45,7 @@ export const upsertUser = mutation({
       v.literal(SUBSCRIPTION_TIERS.PRO),
     ),
     completedUnlockSessions: v.number(),
+    streakCompletedDates: v.array(v.string()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db

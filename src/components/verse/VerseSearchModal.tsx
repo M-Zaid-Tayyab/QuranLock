@@ -1,8 +1,12 @@
 import { Input } from "@/components/common";
 import { colors } from "@/constants/colors";
-import type { QuranSearchResult } from "@/services/quranFoundation";
+import {
+  searchQuranVerses,
+  type QuranSearchResult,
+} from "@/services/quranFoundation";
 import { getArabicLineHeight, getArabicTextStyle } from "@/utils/arabicTypography";
 import { Ionicons } from "@expo/vector-icons";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -24,31 +28,89 @@ const SEARCH_ARABIC_LINE_HEIGHT = getArabicLineHeight(SEARCH_ARABIC_FONT_SIZE);
 
 interface VerseSearchModalProps {
   visible: boolean;
-  query: string;
-  searching: boolean;
-  error: string | null;
-  results: QuranSearchResult[];
   onClose: () => void;
-  onQueryChange: (value: string) => void;
   onPickResult: (item: QuranSearchResult) => void;
 }
 
 export function VerseSearchModal({
   visible,
-  query,
-  searching,
-  error,
-  results,
   onClose,
-  onQueryChange,
   onPickResult,
 }: VerseSearchModalProps) {
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [results, setResults] = useState<QuranSearchResult[]>([]);
+  const searchRequestIdRef = useRef(0);
+
+  const executeSearch = useCallback(async (value: string) => {
+    const trimmed = value.trim();
+    if (trimmed.length < 2) {
+      setResults([]);
+      setError(null);
+      setSearching(false);
+      return;
+    }
+
+    const requestId = ++searchRequestIdRef.current;
+    setSearching(true);
+    setError(null);
+    try {
+      const nextResults = await searchQuranVerses(trimmed, { page: 1, size: 15 });
+      if (requestId !== searchRequestIdRef.current) return;
+      setResults(nextResults);
+    } catch (searchError) {
+      if (requestId !== searchRequestIdRef.current) return;
+      setError(
+        searchError instanceof Error
+          ? searchError.message
+          : "Unable to search right now. Please try again.",
+      );
+      setResults([]);
+    } finally {
+      if (requestId !== searchRequestIdRef.current) return;
+      setSearching(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!visible) {
+      searchRequestIdRef.current += 1;
+      setSearching(false);
+      setError(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      executeSearch(query);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [executeSearch, query, visible]);
+
+  const handleClose = useCallback(() => {
+    searchRequestIdRef.current += 1;
+    setSearching(false);
+    setError(null);
+    onClose();
+  }, [onClose]);
+
+  const handlePickResult = useCallback(
+    (item: QuranSearchResult) => {
+      searchRequestIdRef.current += 1;
+      setSearching(false);
+      setError(null);
+      onClose();
+      onPickResult(item);
+    },
+    [onClose, onPickResult],
+  );
+
   return (
     <Modal
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
@@ -60,7 +122,7 @@ export function VerseSearchModal({
               Search Quran
             </Text>
             <Pressable
-              onPress={onClose}
+              onPress={handleClose}
               className="h-10 w-10 items-center justify-center rounded-full border border-outline bg-surface"
             >
               <Ionicons name="close" size={18} color={colors.muted} />
@@ -69,7 +131,7 @@ export function VerseSearchModal({
 
           <Input
             value={query}
-            onChangeText={onQueryChange}
+            onChangeText={setQuery}
             placeholder="Search ayah, e.g. sabr, mercy, guidance"
             autoCapitalize="none"
             autoCorrect={false}
@@ -111,7 +173,7 @@ export function VerseSearchModal({
 
               return (
                 <Pressable
-                  onPress={() => onPickResult(item)}
+                  onPress={() => handlePickResult(item)}
                   className="mb-3 rounded-2xl border border-outline bg-surface px-4 py-4"
                 >
                   <View className="flex-row items-center justify-between">

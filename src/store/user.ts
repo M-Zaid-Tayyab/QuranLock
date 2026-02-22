@@ -27,6 +27,7 @@ export interface UserState {
   isPremium: boolean;
   subscriptionTier: SubscriptionTier;
   completedUnlockSessions: number;
+  streakCompletedDates: string[];
 }
 
 export interface FocusSchedule {
@@ -60,7 +61,16 @@ interface UserActions {
   setIsPremium: (value: boolean) => void;
   setSubscriptionTier: (value: SubscriptionTier) => void;
   incrementCompletedUnlockSessions: () => void;
+  setStreakCompletedDates: (value: string[]) => void;
+  markStreakDayCompleted: (dateKey?: string) => void;
 }
+
+const getLocalDateKey = (date: Date = new Date()) => {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 const initialState: UserState = {
   appUserId: "",
@@ -82,6 +92,7 @@ const initialState: UserState = {
   isPremium: false,
   subscriptionTier: SUBSCRIPTION_TIERS.FREE,
   completedUnlockSessions: 0,
+  streakCompletedDates: [],
 };
 
 export const useUserStore = create<UserState & UserActions>()(
@@ -127,6 +138,16 @@ export const useUserStore = create<UserState & UserActions>()(
         set((state) => ({
           completedUnlockSessions: state.completedUnlockSessions + 1,
         })),
+      setStreakCompletedDates: (streakCompletedDates) =>
+        set({ streakCompletedDates }),
+      markStreakDayCompleted: (dateKey) =>
+        set((state) => {
+          const key = dateKey ?? getLocalDateKey();
+          if (state.streakCompletedDates.includes(key)) return state;
+          return {
+            streakCompletedDates: [...state.streakCompletedDates, key].sort(),
+          };
+        }),
     }),
     {
       name: STORE_KEYS.USER_STORE,

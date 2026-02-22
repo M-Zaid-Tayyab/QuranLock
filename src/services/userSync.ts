@@ -18,6 +18,7 @@ export interface UserSyncPayload {
   isPremium: boolean;
   subscriptionTier: SubscriptionTier;
   completedUnlockSessions: number;
+  streakCompletedDates: string[];
 }
 
 export const syncUserProfile = async (payload: UserSyncPayload) => {

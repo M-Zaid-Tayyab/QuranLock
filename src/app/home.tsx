@@ -31,6 +31,7 @@ export default function HomeScreen() {
         <JourneyHeroCard
           title={vm.journey.title}
           subtitle={vm.journey.subtitle}
+          isBlockingActive={vm.journey.isBlockingActive}
           progressPercent={vm.journey.progressPercent}
           pagesRead={vm.journey.pagesRead}
           pagesTotal={vm.journey.pagesTotal}
@@ -81,6 +82,7 @@ export default function HomeScreen() {
         <JourneyProgressCard
           days={vm.streak.days}
           completedThisWeek={vm.streak.completedThisWeek}
+          currentStreakCount={vm.streak.currentStreakCount}
           unlockSessions={vm.snapshot.unlockSessions}
           totalMinutesWithAllah={vm.snapshot.totalMinutesWithAllah}
           pagesRead={vm.journey.pagesRead}

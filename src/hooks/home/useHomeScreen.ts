@@ -12,7 +12,7 @@ import {
 } from "@/services/entitlements";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
-import type { ScheduleStatus } from "@/utils/scheduleEngine";
+import { getDateKey, type ScheduleStatus } from "@/utils/scheduleEngine";
 import * as Notifications from "expo-notifications";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -62,6 +62,8 @@ export const useHomeScreen = () => {
     deferredFocusSchedules,
     lastReadPage,
     hasSelectedApps,
+    streakCompletedDates,
+    markStreakDayCompleted,
   } = useUserStore(
     useShallow((s) => ({
       name: s.name,
@@ -70,18 +72,25 @@ export const useHomeScreen = () => {
       deferredFocusSchedules: s.deferredFocusSchedules,
       lastReadPage: s.lastReadPage,
       hasSelectedApps: s.hasSelectedApps,
+      streakCompletedDates: s.streakCompletedDates,
+      markStreakDayCompleted: s.markStreakDayCompleted,
     })),
   );
   const { statuses, activeSchedule } = useFocusScheduleStatus();
 
-  const { accumulatedMinutes, totalQuranMinutesLifetime, getRequiredMinutes } =
+  const {
+    getAccumulatedMinutesSnapshot,
+    totalQuranMinutesLifetime,
+    getRequiredMinutes,
+  } =
     useBlockingStore(
       useShallow((s) => ({
-        accumulatedMinutes: s.accumulatedQuranMinutesForCurrentBlock,
+        getAccumulatedMinutesSnapshot: s.getAccumulatedMinutesSnapshot,
         totalQuranMinutesLifetime: s.totalQuranMinutesLifetime,
         getRequiredMinutes: s.getRequiredMinutes,
       })),
     );
+  const accumulatedMinutes = getAccumulatedMinutesSnapshot(Date.now());
 
   const refreshScreenTimeStatus = useCallback(async () => {
     if (Platform.OS !== "ios") return;
@@ -228,31 +237,53 @@ export const useHomeScreen = () => {
         1,
         totalSchedules,
       )} focus windows completed`;
+  const hasCompletedAllGoalsToday =
+    totalSchedules > 0 && completedSchedulesCount === totalSchedules;
 
   const streakDays = useMemo(() => {
+    const todayKey = getDateKey(new Date());
+    const completedSet = new Set(streakCompletedDates);
+    if (hasCompletedAllGoalsToday) {
+      completedSet.add(todayKey);
+    }
+
     const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
     const days: HomeStreakDay[] = Array.from({ length: 7 }, (_, index) => {
-      const d = new Date(now);
-      d.setDate(now.getDate() - (6 - index));
+      const d = new Date(startOfWeek);
+      d.setDate(startOfWeek.getDate() + index);
+      const dateKey = getDateKey(d);
       return {
-        date: d.toISOString().slice(0, 10),
+        date: dateKey,
         dayLabel: d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2),
-        completed: false,
+        completed: completedSet.has(dateKey),
       };
     });
-
-    const hasAnyProgressToday =
-      completedSchedulesCount > 0 ||
-      accumulatedMinutes > 0 ||
-      journeyCompletionPercent >= 100;
-    if (hasAnyProgressToday) {
-      days[days.length - 1] = {
-        ...days[days.length - 1],
-        completed: true,
-      };
-    }
     return days;
-  }, [accumulatedMinutes, completedSchedulesCount, journeyCompletionPercent]);
+  }, [hasCompletedAllGoalsToday, streakCompletedDates]);
+
+  useEffect(() => {
+    if (!hasCompletedAllGoalsToday) return;
+    markStreakDayCompleted(getDateKey(new Date()));
+  }, [hasCompletedAllGoalsToday, markStreakDayCompleted]);
+
+  const currentStreakCount = useMemo(() => {
+    const completedSet = new Set(streakCompletedDates);
+    if (hasCompletedAllGoalsToday) {
+      completedSet.add(getDateKey(new Date()));
+    }
+
+    let count = 0;
+    const cursor = new Date();
+    while (true) {
+      const key = getDateKey(cursor);
+      if (!completedSet.has(key)) break;
+      count += 1;
+      cursor.setDate(cursor.getDate() - 1);
+    }
+    return count;
+  }, [hasCompletedAllGoalsToday, streakCompletedDates]);
 
   const handleOpenSettings = useCallback(() => {
     router.push("/settings");
@@ -304,6 +335,7 @@ export const useHomeScreen = () => {
     streak: {
       days: streakDays,
       completedThisWeek: streakDays.filter((day) => day.completed).length,
+      currentStreakCount,
     },
     timeline: {
       items: timelineItems,

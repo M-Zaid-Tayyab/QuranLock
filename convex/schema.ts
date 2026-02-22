@@ -34,6 +34,7 @@ export default defineSchema({
       v.literal(SUBSCRIPTION_TIERS.PRO),
     ),
     completedUnlockSessions: v.number(),
+    streakCompletedDates: v.array(v.string()),
     updatedAt: v.number(),
   }).index("by_appUserId", ["appUserId"]),
 });

@@ -135,6 +135,7 @@ function RootLayoutContent() {
               headerShown: false,
               contentStyle: { backgroundColor: colors.background },
               animation: "slide_from_right",
+              freezeOnBlur: true,
             }}
           />
         </BottomSheetModalProvider>

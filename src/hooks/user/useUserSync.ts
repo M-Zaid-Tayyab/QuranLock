@@ -20,6 +20,7 @@ export const useUserSync = () => {
       isPremium: s.isPremium,
       subscriptionTier: s.subscriptionTier,
       completedUnlockSessions: s.completedUnlockSessions,
+      streakCompletedDates: s.streakCompletedDates,
     })),
   );
 

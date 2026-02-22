@@ -7,6 +7,7 @@ import {
   getScheduleStatuses,
 } from "@/utils/scheduleEngine";
 import { useEffect, useMemo, useState } from "react";
+import { AppState, type AppStateStatus } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
 export const useFocusScheduleStatus = () => {
@@ -32,11 +33,35 @@ export const useFocusScheduleStatus = () => {
   );
 
   const [now, setNow] = useState(() => new Date());
+  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(id);
+    const sub = AppState.addEventListener("change", (nextState) => {
+      setAppState(nextState);
+      if (nextState === "active") {
+        setNow(new Date());
+      }
+    });
+    return () => sub.remove();
   }, []);
+
+  useEffect(() => {
+    if (appState !== "active") return;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const scheduleNextTick = () => {
+      const msUntilNextMinute = 60_000 - (Date.now() % 60_000) + 24;
+      timeoutId = setTimeout(() => {
+        setNow(new Date());
+        scheduleNextTick();
+      }, msUntilNextMinute);
+    };
+
+    scheduleNextTick();
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [appState]);
 
   const dateKey = useMemo(() => getDateKey(now), [now]);
 

@@ -1,11 +1,16 @@
 import { PrimaryButton } from "@/components/common";
 import { colors } from "@/constants/colors";
+import { useBlockingStore } from "@/store/blocking";
+import { useIsFocused } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
-import { Text, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { AppState, type AppStateStatus, Text, View } from "react-native";
+import { useShallow } from "zustand/react/shallow";
 
 interface JourneyHeroCardProps {
   title: string;
   subtitle: string;
+  isBlockingActive: boolean;
   progressPercent: number;
   pagesRead: number;
   pagesTotal: number;
@@ -13,9 +18,132 @@ interface JourneyHeroCardProps {
   onPressRead: () => void;
 }
 
+interface JourneyHeroSubtitleProps {
+  subtitle: string;
+  isBlockingActive: boolean;
+  fallbackProgressPercent: number;
+  pagesRead: number;
+  pagesTotal: number;
+}
+
+function JourneyHeroSessionMetrics({
+  subtitle,
+  isBlockingActive,
+  fallbackProgressPercent,
+  pagesRead,
+  pagesTotal,
+}: JourneyHeroSubtitleProps) {
+  const isFocused = useIsFocused();
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  const {
+    requiredQuranMinutes,
+    quranMinutesToUnblock,
+    lastBlockedAt,
+    getAccumulatedMinutesSnapshot,
+  } = useBlockingStore(
+    useShallow((s) => ({
+      requiredQuranMinutes: s.requiredQuranMinutes,
+      quranMinutesToUnblock: s.quranMinutesToUnblock,
+      lastBlockedAt: s.lastBlockedAt,
+      getAccumulatedMinutesSnapshot: s.getAccumulatedMinutesSnapshot,
+    })),
+  );
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (nextState) => {
+      setAppState(nextState);
+      if (nextState === "active") {
+        setNowMs(Date.now());
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!isBlockingActive || !isFocused || appState !== "active") return;
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [appState, isBlockingActive, isFocused]);
+
+  const requiredMinutes = useMemo(
+    () =>
+      requiredQuranMinutes > 0
+        ? requiredQuranMinutes
+        : lastBlockedAt != null
+          ? quranMinutesToUnblock
+          : 0,
+    [lastBlockedAt, quranMinutesToUnblock, requiredQuranMinutes],
+  );
+
+  const progressPercent = useMemo(() => {
+    if (!isBlockingActive || requiredMinutes <= 0) {
+      return Math.min(100, Math.max(0, fallbackProgressPercent));
+    }
+    const accumulated = getAccumulatedMinutesSnapshot(nowMs);
+    return Math.min(100, Math.max(0, Math.round((accumulated / requiredMinutes) * 100)));
+  }, [
+    fallbackProgressPercent,
+    getAccumulatedMinutesSnapshot,
+    isBlockingActive,
+    nowMs,
+    requiredMinutes,
+  ]);
+
+  const text = useMemo(() => {
+    if (!isBlockingActive || requiredMinutes <= 0) return subtitle;
+    const accumulated = getAccumulatedMinutesSnapshot(nowMs);
+    const remainingSeconds = Math.max(
+      0,
+      Math.ceil((requiredMinutes - accumulated) * 60),
+    );
+    const remainingMinutes = Math.floor(remainingSeconds / 60);
+    const remainingSecondsPart = remainingSeconds % 60;
+    return `${remainingMinutes}:${remainingSecondsPart
+      .toString()
+      .padStart(2, "0")} left to unlock apps`;
+  }, [
+    getAccumulatedMinutesSnapshot,
+    isBlockingActive,
+    nowMs,
+    requiredMinutes,
+    subtitle,
+  ]);
+
+  return (
+    <>
+      <Text className="mt-1 text-sm font-sfPro text-muted">{text}</Text>
+
+      <View className="mt-5 w-full">
+        <View className="h-2 rounded-full bg-backgroundElevated">
+          <View
+            className="h-2 rounded-full bg-primary"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </View>
+        <View className="mt-3 flex-row items-center justify-between">
+          <View className="flex-row items-center gap-1.5">
+            <Ionicons name="book-outline" size={13} color={colors.muted} />
+            <Text className="text-xs font-sfPro text-muted">
+              {pagesRead}/{pagesTotal} pages
+            </Text>
+          </View>
+          <View className="flex-row items-center gap-1.5">
+            <Ionicons name="trending-up-outline" size={13} color={colors.primary} />
+            <Text className="text-xs font-sfPro-semibold text-foreground">
+              {progressPercent}%
+            </Text>
+          </View>
+        </View>
+      </View>
+    </>
+  );
+}
+
 export function JourneyHeroCard({
   title,
   subtitle,
+  isBlockingActive,
   progressPercent,
   pagesRead,
   pagesTotal,
@@ -32,30 +160,13 @@ export function JourneyHeroCard({
           <Ionicons name="bar-chart-outline" size={24} color={colors.accent} />
         </View>
         <Text className="mt-4 text-2xl font-sfPro-bold text-foreground">{title}</Text>
-        <Text className="mt-1 text-sm font-sfPro text-muted">{subtitle}</Text>
-      </View>
-
-      <View className="mt-5">
-        <View className="h-2 rounded-full bg-backgroundElevated">
-          <View
-            className="h-2 rounded-full bg-primary"
-            style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
-          />
-        </View>
-        <View className="mt-3 flex-row items-center justify-between">
-          <View className="flex-row items-center gap-1.5">
-            <Ionicons name="book-outline" size={13} color={colors.muted} />
-            <Text className="text-xs font-sfPro text-muted">
-              {pagesRead}/{pagesTotal} pages
-            </Text>
-          </View>
-          <View className="flex-row items-center gap-1.5">
-            <Ionicons name="trending-up-outline" size={13} color={colors.primary} />
-            <Text className="text-xs font-sfPro-semibold text-foreground">
-              {Math.min(100, Math.max(0, progressPercent))}%
-            </Text>
-          </View>
-        </View>
+        <JourneyHeroSessionMetrics
+          subtitle={subtitle}
+          isBlockingActive={isBlockingActive}
+          fallbackProgressPercent={progressPercent}
+          pagesRead={pagesRead}
+          pagesTotal={pagesTotal}
+        />
       </View>
 
       <PrimaryButton
