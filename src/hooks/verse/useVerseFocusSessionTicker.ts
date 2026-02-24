@@ -1,8 +1,9 @@
-import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
+import { useVerseScheduleController } from "@/hooks/verse/useVerseScheduleController";
 import { unblockSelection } from "@/services/deviceActivity";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
 import { getScheduleStatuses } from "@/utils/scheduleEngine";
+import { useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import { useShallow } from "zustand/react/shallow";
@@ -16,6 +17,7 @@ export const useVerseFocusSessionTicker = () => {
     startLiveProgress,
     pauseLiveProgress,
     resetAfterUnblock,
+    setSessionNowMs,
     completedScheduleIds,
     markScheduleCompleted,
     setActiveSchedule,
@@ -26,6 +28,7 @@ export const useVerseFocusSessionTicker = () => {
       startLiveProgress: s.startLiveProgress,
       pauseLiveProgress: s.pauseLiveProgress,
       resetAfterUnblock: s.resetAfterUnblock,
+      setSessionNowMs: s.setSessionNowMs,
       completedScheduleIds: s.completedScheduleIds,
       markScheduleCompleted: s.markScheduleCompleted,
       setActiveSchedule: s.setActiveSchedule,
@@ -40,7 +43,9 @@ export const useVerseFocusSessionTicker = () => {
     })),
   );
 
-  const { dateKey, activeSchedule, pendingSchedules } = useFocusScheduleStatus();
+  const { dateKey, activeSchedule, pendingSchedules, refresh } =
+    useVerseScheduleController();
+  const isFocused = useIsFocused();
   const [appState, setAppState] = useState<AppStateStatus>(
     AppState.currentState,
   );
@@ -52,12 +57,14 @@ export const useVerseFocusSessionTicker = () => {
   }, [activeSchedule?.schedule.id, dateKey]);
 
   const tick = useCallback(() => {
+    const nowMs = Date.now();
+    setSessionNowMs(nowMs);
     const requiredMinutes = getRequiredMinutes();
     if (requiredMinutes <= 0) return;
-    const accumulatedMinutes = getAccumulatedMinutesSnapshot(Date.now());
+    const accumulatedMinutes = getAccumulatedMinutesSnapshot(nowMs);
     const shouldUnblock = accumulatedMinutes >= requiredMinutes;
     if (!shouldUnblock) return;
-    pauseLiveProgress(Date.now());
+    pauseLiveProgress(nowMs);
     if (!unlockSessionCountedRef.current) {
       incrementCompletedUnlockSessions();
       unlockSessionCountedRef.current = true;
@@ -116,6 +123,7 @@ export const useVerseFocusSessionTicker = () => {
     markScheduleCompleted,
     pauseLiveProgress,
     resetAfterUnblock,
+    setSessionNowMs,
     setActiveSchedule,
   ]);
 
@@ -127,7 +135,7 @@ export const useVerseFocusSessionTicker = () => {
   }, []);
 
   useEffect(() => {
-    if (!activeSchedule || appState !== "active") {
+    if (!isFocused || !activeSchedule || appState !== "active") {
       pauseLiveProgress(Date.now());
       useBlockingStore.getState().flushLifetimeProgress();
       if (intervalRef.current) {
@@ -137,7 +145,9 @@ export const useVerseFocusSessionTicker = () => {
       return;
     }
 
-    startLiveProgress(Date.now());
+    const nowMs = Date.now();
+    setSessionNowMs(nowMs);
+    startLiveProgress(nowMs);
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
@@ -151,9 +161,18 @@ export const useVerseFocusSessionTicker = () => {
         intervalRef.current = null;
       }
     };
-  }, [activeSchedule, appState, pauseLiveProgress, startLiveProgress, tick]);
+  }, [
+    activeSchedule,
+    appState,
+    isFocused,
+    pauseLiveProgress,
+    setSessionNowMs,
+    startLiveProgress,
+    tick,
+  ]);
 
   return {
     pendingSchedulesCount: pendingSchedules.length,
+    refreshSchedule: refresh,
   };
 };

@@ -1,10 +1,7 @@
 import { PAYWALL_SOURCES } from "@/constants/entitlements";
 import { useFunnelText } from "@/hooks/app";
-import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
-import {
-  getStableAuthStatus,
-  requestAuthorization,
-} from "@/services/deviceActivity";
+import { useHomePermissionStatus } from "@/hooks/home/useHomePermissionStatus";
+import { useHomeScheduleStatus } from "@/hooks/home/useHomeScheduleStatus";
 import {
   canOpenQuran,
   ensureCanEditFocusTimes,
@@ -13,17 +10,12 @@ import {
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
 import { getDateKey, type ScheduleStatus } from "@/utils/scheduleEngine";
-import * as Notifications from "expo-notifications";
+import { useIsFocused } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AppState, Platform } from "react-native";
+import { AppState } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
-const AuthorizationStatus = {
-  notDetermined: 0,
-  denied: 1,
-  approved: 2,
-} as const;
 const QURAN_TOTAL_PAGES = 604;
 
 export interface HomeTimelineItem {
@@ -46,14 +38,73 @@ const formatTime = (hour: number, minute: number) => {
   return `${displayHour}:${minute.toString().padStart(2, "0")} ${suffix}`;
 };
 
+const toTimelineItem = (
+  id: string,
+  label: string,
+  hour: number,
+  minute: number,
+  durationMinutes: number,
+  status: HomeTimelineItem["status"],
+): HomeTimelineItem => ({
+  id,
+  label,
+  timeLabel: formatTime(hour, minute),
+  durationMinutes,
+  status,
+});
+
+const getTodayDateKey = () => getDateKey(new Date());
+
+const buildStreakDays = (
+  streakCompletedDates: string[],
+  hasCompletedAllGoalsToday: boolean,
+): HomeStreakDay[] => {
+  const completedSet = new Set(streakCompletedDates);
+  if (hasCompletedAllGoalsToday) {
+    completedSet.add(getTodayDateKey());
+  }
+
+  const now = new Date();
+  const startOfWeek = new Date(now);
+  startOfWeek.setDate(now.getDate() - now.getDay());
+
+  return Array.from({ length: 7 }, (_, index) => {
+    const d = new Date(startOfWeek);
+    d.setDate(startOfWeek.getDate() + index);
+    const dateKey = getDateKey(d);
+    return {
+      date: dateKey,
+      dayLabel: d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2),
+      completed: completedSet.has(dateKey),
+    };
+  });
+};
+
+const calculateCurrentStreakCount = (
+  streakCompletedDates: string[],
+  hasCompletedAllGoalsToday: boolean,
+) => {
+  const completedSet = new Set(streakCompletedDates);
+  if (hasCompletedAllGoalsToday) {
+    completedSet.add(getTodayDateKey());
+  }
+
+  let count = 0;
+  const cursor = new Date();
+  while (true) {
+    const key = getDateKey(cursor);
+    if (!completedSet.has(key)) break;
+    count += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return count;
+};
+
 export const useHomeScreen = () => {
   const funnelText = useFunnelText();
   const router = useRouter();
-  const [screenTimeStatus, setScreenTimeStatus] = useState<number | null>(null);
-  const [notificationGranted, setNotificationGranted] = useState<boolean | null>(
-    null,
-  );
-  const [requestingScreenTime, setRequestingScreenTime] = useState(false);
+  const isFocused = useIsFocused();
+  const [refreshing, setRefreshing] = useState(false);
 
   const {
     name,
@@ -76,77 +127,66 @@ export const useHomeScreen = () => {
       markStreakDayCompleted: s.markStreakDayCompleted,
     })),
   );
-  const { statuses, activeSchedule } = useFocusScheduleStatus();
+
+  const {
+    statuses,
+    activeSchedule,
+    refresh: refreshScheduleStatus,
+  } = useHomeScheduleStatus({
+    autoRefreshOnAppActive: false,
+    autoTickMinutes: false,
+  });
 
   const {
     getAccumulatedMinutesSnapshot,
     totalQuranMinutesLifetime,
     getRequiredMinutes,
-  } =
-    useBlockingStore(
-      useShallow((s) => ({
-        getAccumulatedMinutesSnapshot: s.getAccumulatedMinutesSnapshot,
-        totalQuranMinutesLifetime: s.totalQuranMinutesLifetime,
-        getRequiredMinutes: s.getRequiredMinutes,
-      })),
-    );
+  } = useBlockingStore(
+    useShallow((s) => ({
+      getAccumulatedMinutesSnapshot: s.getAccumulatedMinutesSnapshot,
+      totalQuranMinutesLifetime: s.totalQuranMinutesLifetime,
+      getRequiredMinutes: s.getRequiredMinutes,
+    })),
+  );
+
+  const {
+    needsScreenTime,
+    needsNotifications,
+    requestingScreenTime,
+    refreshPermissionStatus,
+    requestScreenTimePermission,
+    requestNotificationPermission,
+  } = useHomePermissionStatus();
+
   const accumulatedMinutes = getAccumulatedMinutesSnapshot(Date.now());
 
-  const refreshScreenTimeStatus = useCallback(async () => {
-    if (Platform.OS !== "ios") return;
-    try {
-      const status = await getStableAuthStatus();
-      setScreenTimeStatus(status);
-    } catch {
-      setScreenTimeStatus(AuthorizationStatus.notDetermined);
-    }
-  }, []);
+  const refreshHome = useCallback(async () => {
+    refreshScheduleStatus();
+    await refreshPermissionStatus();
+  }, [refreshPermissionStatus, refreshScheduleStatus]);
 
   useEffect(() => {
-    if (Platform.OS !== "ios") return;
-    let cancelled = false;
+    if (!isFocused) return;
+    void refreshHome();
+  }, [isFocused, refreshHome]);
 
-    const syncStatus = async () => {
-      try {
-        const status = await getStableAuthStatus();
-        if (!cancelled) setScreenTimeStatus(status);
-      } catch {
-        if (!cancelled) {
-          setScreenTimeStatus(AuthorizationStatus.notDetermined);
-        }
-      }
-    };
-
-    void syncStatus();
+  useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") {
-        void syncStatus();
+      if (nextState === "active" && isFocused) {
+        void refreshHome();
       }
     });
+    return () => subscription.remove();
+  }, [isFocused, refreshHome]);
 
-    return () => {
-      cancelled = true;
-      subscription.remove();
-    };
-  }, []);
-
-  useEffect(() => {
-    Notifications.getPermissionsAsync().then(({ status }) => {
-      setNotificationGranted(status === "granted");
-    });
-  }, []);
-
-  const handleRequestScreenTime = useCallback(() => {
-    setRequestingScreenTime(true);
-    requestAuthorization()
-      .then(() => refreshScreenTimeStatus())
-      .finally(() => setRequestingScreenTime(false));
-  }, [refreshScreenTimeStatus]);
-
-  const handleRequestNotifications = useCallback(async () => {
-    const { status } = await Notifications.requestPermissionsAsync();
-    setNotificationGranted(status === "granted");
-  }, []);
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshHome();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshHome]);
 
   const requiredMinutes = getRequiredMinutes();
   const progressRatio =
@@ -174,10 +214,10 @@ export const useHomeScreen = () => {
     totalSchedules > 0
       ? Math.round((completedSchedulesCount / totalSchedules) * 100)
       : 0;
+
   const journeyProgressPercent =
     requiredMinutes > 0 ? progressPercent : scheduleCompletionPercent;
-  const journeyCompletionPercent =
-    journeyProgressPercent;
+
   const pagesRead = Math.min(
     QURAN_TOTAL_PAGES,
     Math.max(1, Math.trunc(lastReadPage || 1)),
@@ -185,13 +225,16 @@ export const useHomeScreen = () => {
 
   const activeTimelineItems = useMemo(
     () =>
-      statuses.map((entry) => ({
-        id: entry.schedule.id,
-        label: entry.schedule.label,
-        timeLabel: formatTime(entry.schedule.hour, entry.schedule.minute),
-        durationMinutes: entry.schedule.durationMinutes,
-        status: entry.status,
-      })) satisfies HomeTimelineItem[],
+      statuses.map((entry) =>
+        toTimelineItem(
+          entry.schedule.id,
+          entry.schedule.label,
+          entry.schedule.hour,
+          entry.schedule.minute,
+          entry.schedule.durationMinutes,
+          entry.status,
+        ),
+      ) satisfies HomeTimelineItem[],
     [statuses],
   );
 
@@ -200,13 +243,16 @@ export const useHomeScreen = () => {
       return activeTimelineItems;
     }
 
-    const deferredItems = deferredFocusSchedules.map((schedule) => ({
-      id: `deferred-${schedule.id}`,
-      label: schedule.label,
-      timeLabel: formatTime(schedule.hour, schedule.minute),
-      durationMinutes: schedule.durationMinutes,
-      status: "premium_locked" as const,
-    })) satisfies HomeTimelineItem[];
+    const deferredItems = deferredFocusSchedules.map((schedule) =>
+      toTimelineItem(
+        `deferred-${schedule.id}`,
+        schedule.label,
+        schedule.hour,
+        schedule.minute,
+        schedule.durationMinutes,
+        "premium_locked",
+      ),
+    ) satisfies HomeTimelineItem[];
 
     return [...activeTimelineItems, ...deferredItems];
   }, [activeTimelineItems, deferredFocusSchedules, isPremium]);
@@ -217,12 +263,6 @@ export const useHomeScreen = () => {
   const nextFocusLabel = nextUpcoming
     ? `${nextUpcoming.label} • ${nextUpcoming.timeLabel}`
     : "All focus windows for today are done";
-
-  const needsScreenTime =
-    Platform.OS === "ios" &&
-    screenTimeStatus != null &&
-    screenTimeStatus !== AuthorizationStatus.approved;
-  const needsNotifications = notificationGranted === false;
 
   const showSetupApps = !hasSelectedApps;
   const showSetupTimes = hasSelectedApps && timelineItems.length === 0;
@@ -237,53 +277,28 @@ export const useHomeScreen = () => {
         1,
         totalSchedules,
       )} focus windows completed`;
+
   const hasCompletedAllGoalsToday =
     totalSchedules > 0 && completedSchedulesCount === totalSchedules;
 
-  const streakDays = useMemo(() => {
-    const todayKey = getDateKey(new Date());
-    const completedSet = new Set(streakCompletedDates);
-    if (hasCompletedAllGoalsToday) {
-      completedSet.add(todayKey);
-    }
-
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
-    const days: HomeStreakDay[] = Array.from({ length: 7 }, (_, index) => {
-      const d = new Date(startOfWeek);
-      d.setDate(startOfWeek.getDate() + index);
-      const dateKey = getDateKey(d);
-      return {
-        date: dateKey,
-        dayLabel: d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2),
-        completed: completedSet.has(dateKey),
-      };
-    });
-    return days;
-  }, [hasCompletedAllGoalsToday, streakCompletedDates]);
+  const streakDays = useMemo(
+    () => buildStreakDays(streakCompletedDates, hasCompletedAllGoalsToday),
+    [hasCompletedAllGoalsToday, streakCompletedDates],
+  );
 
   useEffect(() => {
     if (!hasCompletedAllGoalsToday) return;
-    markStreakDayCompleted(getDateKey(new Date()));
+    markStreakDayCompleted(getTodayDateKey());
   }, [hasCompletedAllGoalsToday, markStreakDayCompleted]);
 
-  const currentStreakCount = useMemo(() => {
-    const completedSet = new Set(streakCompletedDates);
-    if (hasCompletedAllGoalsToday) {
-      completedSet.add(getDateKey(new Date()));
-    }
-
-    let count = 0;
-    const cursor = new Date();
-    while (true) {
-      const key = getDateKey(cursor);
-      if (!completedSet.has(key)) break;
-      count += 1;
-      cursor.setDate(cursor.getDate() - 1);
-    }
-    return count;
-  }, [hasCompletedAllGoalsToday, streakCompletedDates]);
+  const currentStreakCount = useMemo(
+    () =>
+      calculateCurrentStreakCount(
+        streakCompletedDates,
+        hasCompletedAllGoalsToday,
+      ),
+    [hasCompletedAllGoalsToday, streakCompletedDates],
+  );
 
   const handleOpenSettings = useCallback(() => {
     router.push("/settings");
@@ -349,6 +364,7 @@ export const useHomeScreen = () => {
       needsScreenTime,
       needsNotifications,
       requestingScreenTime,
+      refreshing,
       showSetupApps,
       showSetupTimes,
       showTimeline,
@@ -358,8 +374,9 @@ export const useHomeScreen = () => {
       openQuran: handleOpenQuran,
       openFocusTimes: handleOpenFocusTimes,
       openSettingsForApps: handleOpenSettings,
-      requestScreenTime: handleRequestScreenTime,
-      requestNotifications: handleRequestNotifications,
+      requestScreenTime: requestScreenTimePermission,
+      requestNotifications: requestNotificationPermission,
+      refreshHome: handleRefresh,
     },
   };
 };

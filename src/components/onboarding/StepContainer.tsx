@@ -36,6 +36,7 @@ interface StepContainerProps {
   headerAlign?: "left" | "center";
   animateTitleWords?: boolean;
   titleHighlightWords?: string[];
+  hideNextButton?: boolean;
   children: React.ReactNode;
 }
 
@@ -59,6 +60,7 @@ export function StepContainer({
   headerAlign = "left",
   animateTitleWords = false,
   titleHighlightWords = [],
+  hideNextButton = false,
   children,
 }: StepContainerProps) {
   const progress = totalSteps > 0 ? (step + 1) / totalSteps : 0;
@@ -242,15 +244,17 @@ export function StepContainer({
         {children}
       </View>
 
-      <View className="px-6 pb-6 pt-4">
-        <Animated.View style={ctaAnimatedStyle}>
-          <PrimaryButton
-            title={nextLabel}
-            onPress={onNext}
-            disabled={nextDisabled}
-          />
-        </Animated.View>
-      </View>
+      {!hideNextButton && (
+        <View className="px-6 pb-6 pt-4">
+          <Animated.View style={ctaAnimatedStyle}>
+            <PrimaryButton
+              title={nextLabel}
+              onPress={onNext}
+              disabled={nextDisabled}
+            />
+          </Animated.View>
+        </View>
+      )}
     </View>
   );
 }

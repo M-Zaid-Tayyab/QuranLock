@@ -59,6 +59,7 @@ export function OnboardingStepContent({
   if (onboarding.activeStep === 3) {
     return (
       <TextInputQuestion
+        key="name-input"
         question="What's your name?"
         subtitle="We'd love to know how to address you"
         icon="person-outline"
@@ -67,6 +68,7 @@ export function OnboardingStepContent({
         value={name}
         onChangeText={setName}
         error={onboarding.stepError ?? undefined}
+        autoFocus
       />
     );
   }
@@ -74,6 +76,7 @@ export function OnboardingStepContent({
   if (onboarding.activeStep === 4) {
     return (
       <TextInputQuestion
+        key="age-input"
         question="How old are you?"
         subtitle="This helps us create age-appropriate content"
         icon="person-outline"
@@ -85,6 +88,7 @@ export function OnboardingStepContent({
         maxLength={3}
         unitLabel="Years"
         error={onboarding.stepError ?? undefined}
+        autoFocus
       />
     );
   }
@@ -154,7 +158,7 @@ export function OnboardingStepContent({
   }
 
   if (onboarding.activeStep === 10) {
-    return <ReviewsStep />;
+    return <ReviewsStep onContinue={onboarding.onNext} />;
   }
 
   return null;

@@ -19,7 +19,6 @@ import { useUserStore, type FocusSchedule } from "@/store/user";
 import { resolveFocusSchedulesByEntitlement } from "@/utils/focusScheduleEntitlement";
 import { applyFocusSchedulesToDevice } from "@/utils/focusScheduleRuntime";
 import * as Notifications from "expo-notifications";
-import * as StoreReview from "expo-store-review";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Linking, Platform } from "react-native";
@@ -116,7 +115,6 @@ export function useOnboarding(): UseOnboardingResult {
   const [notificationResolving, setNotificationResolving] = useState(false);
   const [hasAttemptedScheduleSubmit, setHasAttemptedScheduleSubmit] =
     useState(false);
-  const [hasRequestedReview, setHasRequestedReview] = useState(false);
 
   const { setQuranMinutesToUnblock } = useBlockingStore(
     useShallow((s) => ({
@@ -311,17 +309,6 @@ export function useOnboarding(): UseOnboardingResult {
     }
 
     if (!isEditTimes && activeStep === REVIEW_STEP) {
-      if (!hasRequestedReview) {
-        setHasRequestedReview(true);
-        try {
-          const isReviewAvailable = await StoreReview.isAvailableAsync();
-          if (isReviewAvailable) {
-            await StoreReview.requestReview();
-          }
-        } catch {}
-        return;
-      }
-
       setOnboardingComplete(true);
       router.replace({
         pathname: "/paywall",
@@ -337,7 +324,6 @@ export function useOnboarding(): UseOnboardingResult {
     applySchedules,
     familyActivitySelection,
     focusSchedules.length,
-    hasRequestedReview,
     isEditTimes,
     isPremium,
     mapNotificationStatus,

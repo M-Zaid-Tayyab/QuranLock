@@ -1,8 +1,8 @@
+import { getArabicTextStyle } from "@/utils/arabicTypography";
 import clsx from "clsx";
 import { useCallback } from "react";
 import { Pressable, Text } from "react-native";
 import type { DisplayVerse } from "./types";
-import { getArabicTextStyle } from "@/utils/arabicTypography";
 
 interface VerseCardProps {
   verse: DisplayVerse;
@@ -37,7 +37,9 @@ export function VerseCard({
           : "border-outline bg-backgroundElevated",
       )}
     >
-      <Text className="text-xs font-sfPro-semibold text-accent">{verse.key}</Text>
+      <Text className="text-xs font-sfPro-semibold text-accent">
+        {verse.key}
+      </Text>
       <Text
         allowFontScaling={false}
         className="mt-3 text-right text-foreground"

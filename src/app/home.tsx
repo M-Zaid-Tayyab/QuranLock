@@ -9,7 +9,7 @@ import {
 import { colors } from "@/constants/colors";
 import { useFunnelText } from "@/hooks/app";
 import { useHomeScreen } from "@/hooks/home";
-import { ScrollView, View } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
 
 export default function HomeScreen() {
   const funnelText = useFunnelText();
@@ -21,6 +21,14 @@ export default function HomeScreen() {
         className="flex-1 px-6 pt-4"
         contentContainerStyle={{ paddingBottom: 24 }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={vm.flags.refreshing}
+            onRefresh={vm.actions.refreshHome}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         <HomeHeader
           greeting={vm.header.greeting}
@@ -31,7 +39,6 @@ export default function HomeScreen() {
         <JourneyHeroCard
           title={vm.journey.title}
           subtitle={vm.journey.subtitle}
-          isBlockingActive={vm.journey.isBlockingActive}
           progressPercent={vm.journey.progressPercent}
           pagesRead={vm.journey.pagesRead}
           pagesTotal={vm.journey.pagesTotal}

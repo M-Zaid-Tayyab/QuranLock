@@ -6,70 +6,97 @@ import {
   getPendingSchedules,
   getScheduleStatuses,
 } from "@/utils/scheduleEngine";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
-export const useFocusScheduleStatus = () => {
+interface UseFocusScheduleStatusOptions {
+  autoRefreshOnAppActive?: boolean;
+  autoTickMinutes?: boolean;
+}
+
+const TIMER_GRACE_MS = 24;
+const MIN_TIMER_DELAY_MS = 250;
+
+const getNextBoundaryDelayMs = (params: {
+  now: Date;
+  focusSchedules: { hour: number; minute: number; id: string }[];
+  completedScheduleIds: string[];
+}) => {
+  const { now, focusSchedules, completedScheduleIds } = params;
+  const nowMs = now.getTime();
+  const completedSet = new Set(completedScheduleIds);
+
+  let nextScheduleStartMs = Number.POSITIVE_INFINITY;
+  for (const schedule of focusSchedules) {
+    if (completedSet.has(schedule.id)) continue;
+    const scheduleTime = new Date(now);
+    scheduleTime.setHours(schedule.hour, schedule.minute, 0, 0);
+    const scheduleMs = scheduleTime.getTime();
+    if (scheduleMs > nowMs && scheduleMs < nextScheduleStartMs) {
+      nextScheduleStartMs = scheduleMs;
+    }
+  }
+
+  const nextMidnight = new Date(now);
+  nextMidnight.setHours(24, 0, 0, 0);
+  const nextMidnightMs = nextMidnight.getTime();
+  const nextBoundaryMs = Math.min(nextScheduleStartMs, nextMidnightMs);
+  const rawDelay = nextBoundaryMs - nowMs + TIMER_GRACE_MS;
+  return Math.max(MIN_TIMER_DELAY_MS, rawDelay);
+};
+
+export const useFocusScheduleStatus = ({
+  autoRefreshOnAppActive = true,
+  autoTickMinutes = true,
+}: UseFocusScheduleStatusOptions = {}) => {
   const { focusSchedules } = useUserStore(
     useShallow((s) => ({
       focusSchedules: s.focusSchedules,
     })),
   );
-  const {
-    completedScheduleDate,
-    completedScheduleIds,
-    activeScheduleId,
-    ensureCompletionDate,
-    setActiveSchedule,
-  } = useBlockingStore(
+  const { completedScheduleIds } = useBlockingStore(
     useShallow((s) => ({
-      completedScheduleDate: s.completedScheduleDate,
       completedScheduleIds: s.completedScheduleIds,
-      activeScheduleId: s.activeScheduleId,
-      ensureCompletionDate: s.ensureCompletionDate,
-      setActiveSchedule: s.setActiveSchedule,
     })),
   );
 
   const [now, setNow] = useState(() => new Date());
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  const refresh = useCallback(() => {
+    setNow(new Date());
+  }, []);
 
   useEffect(() => {
+    if (!autoRefreshOnAppActive && !autoTickMinutes) return;
     const sub = AppState.addEventListener("change", (nextState) => {
-      setAppState(nextState);
-      if (nextState === "active") {
+      if (autoTickMinutes) {
+        setAppState(nextState);
+      }
+      if (autoRefreshOnAppActive && nextState === "active") {
         setNow(new Date());
       }
     });
     return () => sub.remove();
-  }, []);
+  }, [autoRefreshOnAppActive, autoTickMinutes]);
 
   useEffect(() => {
+    if (!autoTickMinutes) return;
     if (appState !== "active") return;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    const timeoutId = setTimeout(() => {
+      setNow(new Date());
+    }, getNextBoundaryDelayMs({
+      now,
+      focusSchedules,
+      completedScheduleIds,
+    }));
 
-    const scheduleNextTick = () => {
-      const msUntilNextMinute = 60_000 - (Date.now() % 60_000) + 24;
-      timeoutId = setTimeout(() => {
-        setNow(new Date());
-        scheduleNextTick();
-      }, msUntilNextMinute);
-    };
-
-    scheduleNextTick();
     return () => {
-      if (timeoutId) clearTimeout(timeoutId);
+      clearTimeout(timeoutId);
     };
-  }, [appState]);
+  }, [appState, autoTickMinutes, completedScheduleIds, focusSchedules, now]);
 
   const dateKey = useMemo(() => getDateKey(now), [now]);
-
-  useEffect(() => {
-    if (completedScheduleDate !== dateKey) {
-      ensureCompletionDate(dateKey);
-    }
-  }, [completedScheduleDate, dateKey]);
 
   const statuses = useMemo(
     () => getScheduleStatuses(focusSchedules, completedScheduleIds, now),
@@ -82,20 +109,11 @@ export const useFocusScheduleStatus = () => {
     [statuses],
   );
 
-  useEffect(() => {
-    if (activeSchedule?.schedule.id !== activeScheduleId) {
-      setActiveSchedule(
-        activeSchedule?.schedule.id ?? null,
-        activeSchedule?.schedule.durationMinutes ?? 0,
-        dateKey,
-      );
-    }
-  }, [activeSchedule, activeScheduleId, dateKey]);
-
   return {
     dateKey,
     statuses,
     pendingSchedules,
     activeSchedule,
+    refresh,
   };
 };

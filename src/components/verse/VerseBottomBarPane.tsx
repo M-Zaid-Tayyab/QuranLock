@@ -1,5 +1,5 @@
 import { useBlockingStore } from "@/store/blocking";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { VerseNavigationBar } from "./VerseNavigationBar";
 
@@ -31,6 +31,7 @@ export function VerseBottomBarPane({
     requiredQuranMinutes,
     quranMinutesToUnblock,
     lastBlockedAt,
+    sessionNowMs,
     getAccumulatedMinutesSnapshot,
   } = useBlockingStore(
     useShallow((s) => ({
@@ -38,17 +39,11 @@ export function VerseBottomBarPane({
       requiredQuranMinutes: s.requiredQuranMinutes,
       quranMinutesToUnblock: s.quranMinutesToUnblock,
       lastBlockedAt: s.lastBlockedAt,
+      sessionNowMs: s.sessionNowMs,
       getAccumulatedMinutesSnapshot: s.getAccumulatedMinutesSnapshot,
     })),
   );
-  const [nowMs, setNowMs] = useState(() => Date.now());
   const isBlockSessionActive = visible && activeScheduleId != null;
-
-  useEffect(() => {
-    if (!visible || !isBlockSessionActive) return;
-    const id = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [isBlockSessionActive, visible]);
 
   const requiredMinutes = useMemo(
     () =>
@@ -59,7 +54,9 @@ export function VerseBottomBarPane({
           : 0,
     [lastBlockedAt, quranMinutesToUnblock, requiredQuranMinutes],
   );
-  const accumulatedMinutes = getAccumulatedMinutesSnapshot(nowMs);
+  const accumulatedMinutes = getAccumulatedMinutesSnapshot(
+    isBlockSessionActive ? sessionNowMs : Date.now(),
+  );
   const remaining = Math.max(
     0,
     Math.ceil((requiredMinutes - accumulatedMinutes) * 60),

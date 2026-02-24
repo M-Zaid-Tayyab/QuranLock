@@ -1,4 +1,6 @@
 import type { QuranWord } from "@/services/quranPack";
+import { colors } from "@/constants/colors";
+import { useBlockingStore } from "@/store/blocking";
 import { useVerseStore } from "@/store/verse";
 import {
   FlashList,
@@ -9,12 +11,15 @@ import { useCallback, useMemo, useRef, type RefObject } from "react";
 import {
   ActivityIndicator,
   Animated,
-  type LayoutChangeEvent,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   View,
+  type LayoutChangeEvent,
 } from "react-native";
+import { heightPercentageToDP } from "react-native-responsive-screen";
+import { useShallow } from "zustand/react/shallow";
 import { MushafTranslationPanel } from "./MushafTranslationPanel";
 import { MushafVerseFlow } from "./MushafVerseFlow";
 import { MushafWordLines } from "./MushafWordLines";
@@ -25,6 +30,7 @@ import { VersePackCard } from "./VersePackCard";
 export interface VerseScrollableRef {
   scrollTo?: (options: { y: number; animated?: boolean }) => void;
   scrollToOffset?: (options: { offset: number; animated?: boolean }) => void;
+  scrollToEnd?: (options?: { animated?: boolean }) => void;
   scrollToIndex?: (options: {
     index: number;
     animated?: boolean;
@@ -35,7 +41,6 @@ export interface VerseScrollableRef {
 
 interface VerseContentPaneProps {
   scrollViewRef: RefObject<VerseScrollableRef | null>;
-  pendingSchedulesCount: number;
   packState: PackState;
   packError: string | null;
   downloadProgress: number;
@@ -54,6 +59,8 @@ interface VerseContentPaneProps {
   translationFontSize: number;
   onSelectVerse: (verseKey: string) => void;
   onRedownloadPack: () => void;
+  refreshing: boolean;
+  onRefresh: () => void;
   onViewportHeightChange: (height: number) => void;
   onScrollYChange: (y: number) => void;
   onRegisterVerseLayout: (verseKey: string, y: number, height: number) => void;
@@ -99,12 +106,11 @@ function StudyVerseListItem({
 }
 
 function StudyItemSeparator() {
-  return <View style={{ height: 16 }} />;
+  return <View className="py-3" />;
 }
 
 export function VerseContentPane({
   scrollViewRef,
-  pendingSchedulesCount,
   packState,
   packError,
   downloadProgress,
@@ -123,6 +129,8 @@ export function VerseContentPane({
   translationFontSize,
   onSelectVerse,
   onRedownloadPack,
+  refreshing,
+  onRefresh,
   onViewportHeightChange,
   onScrollYChange,
   onRegisterVerseLayout,
@@ -138,7 +146,30 @@ export function VerseContentPane({
   const mushafWordSectionYRef = useRef(0);
   const mushafFlowSectionYRef = useRef(0);
   const translationSectionYRef = useRef(0);
-  const bottomPadding = pendingSchedulesCount > 0 ? 200 : 40;
+  const {
+    activeScheduleId,
+    requiredQuranMinutes,
+    quranMinutesToUnblock,
+    lastBlockedAt,
+  } = useBlockingStore(
+    useShallow((s) => ({
+      activeScheduleId: s.activeScheduleId,
+      requiredQuranMinutes: s.requiredQuranMinutes,
+      quranMinutesToUnblock: s.quranMinutesToUnblock,
+      lastBlockedAt: s.lastBlockedAt,
+    })),
+  );
+  const requiredMinutes =
+    requiredQuranMinutes > 0
+      ? requiredQuranMinutes
+      : lastBlockedAt != null
+        ? quranMinutesToUnblock
+        : 0;
+  const hasBottomTimer =
+    packState === "ready" && activeScheduleId != null && requiredMinutes > 0;
+  const bottomPadding = hasBottomTimer
+    ? heightPercentageToDP(18)
+    : heightPercentageToDP(9);
   const shouldUseStudyFlashList =
     packState === "ready" &&
     !loadingPage &&
@@ -152,12 +183,7 @@ export function VerseContentPane({
       arabicLineHeight,
       translationFontSize,
     }),
-    [
-      translationEnabled,
-      arabicFontSize,
-      arabicLineHeight,
-      translationFontSize,
-    ],
+    [translationEnabled, arabicFontSize, arabicLineHeight, translationFontSize],
   );
   const listContentContainerStyle = useMemo(
     () => ({
@@ -204,7 +230,9 @@ export function VerseContentPane({
         <View className="mt-6 flex-1 overflow-hidden rounded-3xl border border-outline bg-surface">
           <Animated.View className="flex-1" style={animatedContentStyle}>
             <FlashList
-              ref={scrollViewRef as RefObject<FlashListRef<DisplayVerse> | null>}
+              ref={
+                scrollViewRef as RefObject<FlashListRef<DisplayVerse> | null>
+              }
               data={displayVerses}
               extraData={studyExtraData}
               keyExtractor={(item) => item.key}
@@ -217,6 +245,8 @@ export function VerseContentPane({
               onLayout={handleListLayout}
               onScroll={handleListScroll}
               scrollEventThrottle={16}
+              refreshing={refreshing}
+              onRefresh={onRefresh}
             />
           </Animated.View>
         </View>
@@ -230,6 +260,14 @@ export function VerseContentPane({
       className="flex-1 px-6"
       contentContainerStyle={{ paddingBottom: bottomPadding }}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
+        />
+      }
       onLayout={(event) => {
         onViewportHeightChange(event.nativeEvent.layout.height);
       }}
@@ -292,7 +330,8 @@ export function VerseContentPane({
                   {hasWordData ? (
                     <View
                       onLayout={(event) => {
-                        mushafWordSectionYRef.current = event.nativeEvent.layout.y;
+                        mushafWordSectionYRef.current =
+                          event.nativeEvent.layout.y;
                       }}
                     >
                       <MushafWordLines
@@ -315,7 +354,8 @@ export function VerseContentPane({
                   ) : (
                     <View
                       onLayout={(event) => {
-                        mushafFlowSectionYRef.current = event.nativeEvent.layout.y;
+                        mushafFlowSectionYRef.current =
+                          event.nativeEvent.layout.y;
                       }}
                     >
                       <MushafVerseFlow
@@ -339,7 +379,8 @@ export function VerseContentPane({
                   {translationEnabled && (
                     <View
                       onLayout={(event) => {
-                        translationSectionYRef.current = event.nativeEvent.layout.y;
+                        translationSectionYRef.current =
+                          event.nativeEvent.layout.y;
                       }}
                     >
                       <MushafTranslationPanel

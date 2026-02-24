@@ -188,9 +188,10 @@ const SHIELD_THEME = {
 export const DEFAULT_SHIELD_CONFIG: ShieldConfiguration = {
   title: "You started this journey for Allah",
   subtitle:
-    "You'll get a notification on clicking Open Quran. Open the notification to unblock your apps.",
-  iconSystemName: "book.closed.fill",
-  primaryButtonLabel: "Open Quran",
+    "Tap Read Quran, then open the notification to read Quran.",
+  iconSystemName: "timer",
+  iconTint: { red: 255, green: 255, blue: 255, alpha: 1 },
+  primaryButtonLabel: "Read Quran",
   primaryButtonLabelColor: SHIELD_THEME.primaryButtonLabelColor,
   primaryButtonBackgroundColor: SHIELD_THEME.primaryButtonBackgroundColor,
   backgroundColor: SHIELD_THEME.backgroundColor,
@@ -204,7 +205,7 @@ export const DEFAULT_SHIELD_ACTIONS: ShieldActions = {
     type: "sendNotification",
     payload: {
       title: "Quran Lock",
-      subtitle: "Tap to open your Quran page now",
+      subtitle: "Tap to read Quran now",
       userInfo: { url: "quranlock://verse" },
       body: "Qur'an 13:28: Hearts find peace in Allah's remembrance.",
     },

@@ -11,6 +11,7 @@ export interface BlockingState {
   requiredQuranMinutes: number;
   accumulatedQuranMinutesForCurrentBlock: number;
   liveProgressStartedAt: number | null;
+  sessionNowMs: number;
   totalQuranMinutesLifetime: number;
   lastBlockedAt: number | null;
   quranMinutesToUnblock: number;
@@ -25,6 +26,7 @@ interface BlockingActions {
   addQuranMinutes: (minutes: number) => boolean;
   startLiveProgress: (nowMs?: number) => void;
   pauseLiveProgress: (nowMs?: number) => void;
+  setSessionNowMs: (nowMs: number) => void;
   getAccumulatedMinutesSnapshot: (nowMs?: number) => number;
   getRequiredMinutes: () => number;
   flushLifetimeProgress: () => void;
@@ -43,6 +45,7 @@ const initialState: BlockingState = {
   requiredQuranMinutes: 0,
   accumulatedQuranMinutesForCurrentBlock: 0,
   liveProgressStartedAt: null,
+  sessionNowMs: Date.now(),
   totalQuranMinutesLifetime: 0,
   lastBlockedAt: null,
   quranMinutesToUnblock: 30,
@@ -201,6 +204,12 @@ export const useBlockingStore = create<BlockingState & BlockingActions>()(
             totalQuranMinutesLifetime: nextLifetime + deltaMinutes,
           };
         });
+      },
+
+      setSessionNowMs: (nowMs) => {
+        set((state) =>
+          state.sessionNowMs === nowMs ? {} : { sessionNowMs: nowMs },
+        );
       },
 
       getAccumulatedMinutesSnapshot: (nowMs = Date.now()) => {

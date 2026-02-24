@@ -1,4 +1,5 @@
 import { OnboardingStepContent, StepContainer } from "@/components/onboarding";
+import { REVIEW_STEP } from "@/configs/onboarding";
 import { useOnboarding } from "@/hooks/onboarding/useOnboarding";
 
 export default function Onboarding() {
@@ -24,6 +25,7 @@ export default function Onboarding() {
       ctaKey={onboarding.ctaKey}
       animateTitleWords={onboarding.animateTitleWords}
       titleHighlightWords={onboarding.titleHighlightWords}
+      hideNextButton={!onboarding.isEditTimes && onboarding.activeStep === REVIEW_STEP}
     >
       <OnboardingStepContent onboarding={onboarding} />
     </StepContainer>

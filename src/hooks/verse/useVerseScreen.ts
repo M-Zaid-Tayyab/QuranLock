@@ -78,6 +78,7 @@ export const useVerseScreen = () => {
   );
   const [pageDirection, setPageDirection] = useState<1 | -1>(1);
   const [searchVisible, setSearchVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (gateCheckedRef.current) return;
@@ -223,6 +224,15 @@ export const useVerseScreen = () => {
     handlePageChange(currentPage - 1);
   }, [currentPage, handlePageChange]);
 
+  const handleRefreshVerse = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      focusSessionVm.refreshSchedule();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [focusSessionVm.refreshSchedule]);
+
   const actions = useMemo(
     () => ({
       goBack: handleGoBack,
@@ -239,6 +249,7 @@ export const useVerseScreen = () => {
       redownloadPack: packVm.actions.redownloadPack,
       goNextPage: handleGoNextPage,
       goPreviousPage: handleGoPreviousPage,
+      refreshVerse: handleRefreshVerse,
       selectVerse: setSelectedVerseKey,
       toggleRecitationVisible,
     }),
@@ -257,6 +268,7 @@ export const useVerseScreen = () => {
       packVm.actions.redownloadPack,
       handleGoNextPage,
       handleGoPreviousPage,
+      handleRefreshVerse,
       setSelectedVerseKey,
       toggleRecitationVisible,
     ],
@@ -307,6 +319,9 @@ export const useVerseScreen = () => {
     },
     search: {
       visible: searchVisible,
+    },
+    refresh: {
+      refreshing,
     },
     pack: {
       error: packVm.packError,

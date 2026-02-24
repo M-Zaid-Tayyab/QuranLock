@@ -27,7 +27,6 @@ export default function VerseScreen() {
   const suppressAutoScrollOnceRef = useRef(false);
   const scrollMetricsRef = useRef({ y: 0, viewportHeight: 0 });
   const bottomOverlayHeightRef = useRef(0);
-  const isRecitationPlayingRef = useRef(false);
   const selectedVerseKeyRef = useRef<string | null>(
     useVerseStore.getState().selectedVerseKey,
   );
@@ -61,10 +60,17 @@ export default function VerseScreen() {
       if (targetIndex < 0) {
         return false;
       }
+      const totalVerses = vm.content.displayVerses.length;
+      if (targetIndex >= totalVerses - 1 && scrollView.scrollToEnd) {
+        scrollView.scrollToEnd({ animated: true });
+        return true;
+      }
+      const isTailVerse = targetIndex >= totalVerses - 2;
       scrollView.scrollToIndex({
         index: targetIndex,
         animated: true,
-        viewPosition: 0.5,
+        viewPosition: isTailVerse ? 0.82 : 0.5,
+        viewOffset: 12,
       });
       return true;
     }
@@ -110,7 +116,7 @@ export default function VerseScreen() {
       });
     }
     return true;
-  }, [studyVerseIndexByKey, vm.readingMode]);
+  }, [studyVerseIndexByKey, vm.content.displayVerses.length, vm.readingMode]);
 
   const registerVerseLayout = useCallback(
     (verseKey: string, y: number, height: number) => {
@@ -186,7 +192,6 @@ export default function VerseScreen() {
   }, [attemptEntryAutoScrollToSelectedVerse, isFocused]);
 
   const handleRecitationPlayingChange = useCallback((isPlaying: boolean) => {
-    isRecitationPlayingRef.current = isPlaying;
     if (!isPlaying) {
       return;
     }
@@ -234,16 +239,21 @@ export default function VerseScreen() {
       if (!selectedVerseKey) {
         return;
       }
+      if (!isFocused) {
+        return;
+      }
       if (pendingEntryAutoScrollRef.current) {
         attemptEntryAutoScrollToSelectedVerse();
         return;
       }
-      if (isRecitationPlayingRef.current) {
-        attemptAutoScrollToSelectedVerse();
-      }
+      attemptAutoScrollToSelectedVerse();
     });
     return unsubscribe;
-  }, [attemptAutoScrollToSelectedVerse, attemptEntryAutoScrollToSelectedVerse]);
+  }, [
+    attemptAutoScrollToSelectedVerse,
+    attemptEntryAutoScrollToSelectedVerse,
+    isFocused,
+  ]);
 
   return (
     <View className="flex-1 bg-background py-safe">
@@ -266,7 +276,6 @@ export default function VerseScreen() {
 
       <VerseContentPane
         scrollViewRef={scrollViewRef}
-        pendingSchedulesCount={vm.progress.pendingSchedulesCount}
         packState={vm.content.packState}
         packError={vm.pack.error}
         downloadProgress={vm.pack.downloadProgress}
@@ -285,6 +294,8 @@ export default function VerseScreen() {
         translationFontSize={vm.content.translationFontSize}
         onSelectVerse={vm.actions.selectVerse}
         onRedownloadPack={vm.actions.redownloadPack}
+        refreshing={vm.refresh.refreshing}
+        onRefresh={vm.actions.refreshVerse}
         onViewportHeightChange={handleViewportHeightChange}
         onScrollYChange={handleScrollYChange}
         onRegisterVerseLayout={registerVerseLayout}

@@ -24,6 +24,7 @@ interface TextInputQuestionProps {
   maxLength?: number;
   unitLabel?: string;
   error?: string;
+  autoFocus?: boolean;
 }
 
 const largeInputStyle = StyleSheet.create({
@@ -49,6 +50,7 @@ export function TextInputQuestion({
   maxLength,
   unitLabel,
   error,
+  autoFocus = false,
 }: TextInputQuestionProps) {
   const questionWords = question.split(" ");
 
@@ -108,7 +110,7 @@ export function TextInputQuestion({
           keyboardType={keyboardType}
           maxLength={maxLength}
           cursorColor={colors.primary}
-          autoFocus
+          autoFocus={autoFocus}
           style={largeInputStyle.input}
         />
         {unitLabel ? (

@@ -1,6 +1,8 @@
+import { PrimaryButton } from "@/components/common";
 import { colors, rgba } from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
-import { useEffect, useState } from "react";
+import * as StoreReview from "expo-store-review";
+import { useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import Animated, {
   Easing,
@@ -179,10 +181,46 @@ function ReviewsTicker({ reviews }: { reviews: Review[] }) {
   );
 }
 
-export function ReviewsStep() {
+interface ReviewsStepProps {
+  onContinue: () => void | Promise<void>;
+}
+
+export function ReviewsStep({ onContinue }: ReviewsStepProps) {
+  const hasRequestedReviewRef = useRef(false);
+  const [showContinueButton, setShowContinueButton] = useState(false);
+
+  useEffect(() => {
+    if (hasRequestedReviewRef.current) return;
+    hasRequestedReviewRef.current = true;
+
+    const timeoutId = setTimeout(() => {
+      setShowContinueButton(true);
+    }, 2000);
+
+    (async () => {
+      try {
+        const isReviewAvailable = await StoreReview.isAvailableAsync();
+        if (isReviewAvailable) {
+          await StoreReview.requestReview();
+        }
+      } catch {}
+    })();
+
+    return () => {
+      clearTimeout(timeoutId);
+    };
+  }, []);
+
   return (
     <View className="flex-1">
       <ReviewsTicker reviews={REVIEWS} />
+      <View className="mt-4">
+        {showContinueButton ? (
+          <PrimaryButton title="Continue" onPress={() => void onContinue()} />
+        ) : (
+          <View className="h-[58px]" />
+        )}
+      </View>
     </View>
   );
 }
