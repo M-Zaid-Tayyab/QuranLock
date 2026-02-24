@@ -54,6 +54,48 @@ const OptionCard = ({
   </Pressable>
 );
 
+const ToggleOptionCard = ({
+  label,
+  icon,
+  enabled,
+  onToggle,
+}: {
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  enabled: boolean;
+  onToggle: () => void;
+}) => (
+  <Pressable
+    onPress={onToggle}
+    accessibilityRole="switch"
+    accessibilityState={{ checked: enabled }}
+    className="rounded-2xl border border-outline bg-backgroundElevated px-4 py-4"
+  >
+    <View className="flex-row items-center justify-between">
+      <View className="flex-row items-center gap-3">
+        <View className="h-9 w-9 items-center justify-center rounded-full bg-surface">
+          <Ionicons name={icon} size={16} color={colors.accent} />
+        </View>
+        <Text className="text-sm font-sfPro-semibold text-foreground">
+          {label}
+        </Text>
+      </View>
+
+      <View
+        className={`h-7 w-12 flex-row items-center rounded-full border px-0.5 ${
+          enabled ? "border-accent bg-accent" : "border-outline bg-surface"
+        }`}
+      >
+        <View
+          className={`h-6 w-6 rounded-full bg-white ${
+            enabled ? "ml-auto" : "ml-0"
+          }`}
+        />
+      </View>
+    </View>
+  </Pressable>
+);
+
 export function VerseSettingsSheet({
   sheetRef,
   readingMode,
@@ -88,7 +130,6 @@ export function VerseSettingsSheet({
   const recitationDownloadTotalChapters = recitationDownloadStatus.totalChapters;
   const recitationDownloadCurrentChapter =
     recitationDownloadStatus.currentChapter;
-  const recitationDownloadError = recitationDownloadStatus.lastError;
   const recitationDownloadInProgress = recitationDownloadStatus.isDownloading;
   const isRecitationDownloadComplete = recitationDownloadProgressPercent >= 100;
   const isRecitationDownloadActionDisabled =
@@ -102,9 +143,7 @@ export function VerseSettingsSheet({
     ? `Downloading chapter ${recitationDownloadCurrentChapter ?? "..."}.`
     : isRecitationDownloadComplete
       ? "Offline recitation pack ready."
-      : recitationDownloadError
-        ? "Download paused due to an error."
-        : "Download is paused.";
+      : "Download is paused.";
 
   return (
     <BottomSheetModal
@@ -183,18 +222,18 @@ export function VerseSettingsSheet({
             </View>
           </View>
 
-          <OptionCard
+          <ToggleOptionCard
             label="English Translation"
-            value={translationEnabled ? "Shown" : "Hidden"}
             icon="language-outline"
-            onPress={onToggleTranslation}
+            enabled={translationEnabled}
+            onToggle={onToggleTranslation}
           />
 
-          <OptionCard
-            label="Recitation Player"
-            value={recitationVisible ? "Visible" : "Hidden"}
+          <ToggleOptionCard
+            label="Recitation Controls"
             icon="play-circle-outline"
-            onPress={onToggleRecitationVisible}
+            enabled={recitationVisible}
+            onToggle={onToggleRecitationVisible}
           />
 
           <View className="rounded-2xl border border-outline bg-backgroundElevated px-4 py-4">
@@ -215,12 +254,6 @@ export function VerseSettingsSheet({
             <Text className="mt-2 text-xs font-sfPro text-muted">
               {downloadStatusText}
             </Text>
-
-            {recitationDownloadError ? (
-              <Text className="mt-2 text-xs font-sfPro text-error">
-                {recitationDownloadError}
-              </Text>
-            ) : null}
 
             <Pressable
               onPress={handleResumeRecitationDownload}
