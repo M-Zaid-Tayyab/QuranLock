@@ -1,5 +1,5 @@
-import type { QuranWord } from "@/services/quranPack";
 import { colors } from "@/constants/colors";
+import type { QuranWord } from "@/services/quranPack";
 import { useBlockingStore } from "@/store/blocking";
 import { useVerseStore } from "@/store/verse";
 import {
@@ -257,7 +257,7 @@ export function VerseContentPane({
   return (
     <ScrollView
       ref={scrollViewRef as RefObject<ScrollView | null>}
-      className="flex-1 px-6"
+      className="flex-1 px-6 mt-4"
       contentContainerStyle={{ paddingBottom: bottomPadding }}
       showsVerticalScrollIndicator={false}
       refreshControl={

@@ -70,7 +70,6 @@ function VisibleRecitationPane({
   return (
     <VerseRecitationControls
       selectedVerseKey={selectedVerseKey}
-      playbackRate={recitation.playbackRate}
       isLoadingAudio={recitation.isLoadingAudio}
       isPlaying={recitation.isPlaying}
       error={recitation.error}
@@ -81,7 +80,6 @@ function VisibleRecitationPane({
       onTogglePlayback={recitation.actions.togglePlayback}
       onPlayNext={recitation.actions.playNext}
       onPlayPrevious={recitation.actions.playPrevious}
-      onCycleRate={recitation.actions.cycleRate}
     />
   );
 }

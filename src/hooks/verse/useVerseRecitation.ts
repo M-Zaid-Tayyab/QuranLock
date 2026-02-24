@@ -9,7 +9,6 @@ import {
 } from "expo-audio";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-const PLAYBACK_RATES = [0.8, 1, 1.2] as const;
 const DEFAULT_RECITER_ID = DEFAULT_QURAN_RECITERS[0]?.id ?? 7;
 const PLAYER_END_SEEK_TOLERANCE_SECONDS = 0.06;
 const STATUS_END_TOLERANCE_SECONDS = 0.08;
@@ -106,7 +105,6 @@ export const useVerseRecitation = ({
     (verseKey: string, shouldPlay: boolean, options?: LoadVerseOptions) => void
   >(() => {});
 
-  const [playbackRate, setPlaybackRate] = useState(1);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [positionMillis, setPositionMillis] = useState(0);
@@ -365,7 +363,6 @@ export const useVerseRecitation = ({
           loadedSourceRef.current.reciterId === reciterId;
 
         if (isSameSource) {
-          player.setPlaybackRate(playbackRate, "high");
           if (shouldPlay) {
             if (isPlayerAtTrackEnd(player)) {
               await player.seekTo(0).catch(() => undefined);
@@ -387,7 +384,6 @@ export const useVerseRecitation = ({
 
         player.replace({ uri: source.uri });
         player.shouldCorrectPitch = true;
-        player.setPlaybackRate(playbackRate, "high");
         setLoadedSource(trimmedVerseKey, reciterId);
         setPositionForDisplay(0, true);
         setDurationForDisplay(
@@ -424,7 +420,6 @@ export const useVerseRecitation = ({
     },
     [
       ensureAudioMode,
-      playbackRate,
       player,
       reciterId,
       setLoadedSource,
@@ -488,17 +483,6 @@ export const useVerseRecitation = ({
     ],
   );
 
-  const cycleRate = useCallback(() => {
-    const currentRateIndex = PLAYBACK_RATES.findIndex((value) => value === playbackRate);
-    const nextRate =
-      PLAYBACK_RATES[(currentRateIndex + 1 + PLAYBACK_RATES.length) % PLAYBACK_RATES.length];
-    setPlaybackRate(nextRate);
-
-    if (player.isLoaded) {
-      player.setPlaybackRate(nextRate, "high");
-    }
-  }, [playbackRate, player]);
-
   const handlePlayNext = useCallback(() => {
     playRelative(1);
   }, [playRelative]);
@@ -512,9 +496,8 @@ export const useVerseRecitation = ({
       togglePlayback,
       playNext: handlePlayNext,
       playPrevious: handlePlayPrevious,
-      cycleRate,
     }),
-    [cycleRate, handlePlayNext, handlePlayPrevious, togglePlayback],
+    [handlePlayNext, handlePlayPrevious, togglePlayback],
   );
 
   useEffect(() => {
@@ -573,7 +556,6 @@ export const useVerseRecitation = ({
   }, [isPlaying, player, reciterId, selectedVerseKey]);
 
   return {
-    playbackRate,
     isLoadingAudio,
     isPlaying,
     error,
