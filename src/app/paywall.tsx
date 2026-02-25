@@ -19,11 +19,68 @@ import {
   Text,
   View,
 } from "react-native";
-import { PACKAGE_TYPE, PurchasesPackage } from "react-native-purchases";
+import Purchases, {
+  INTRO_ELIGIBILITY_STATUS,
+  PACKAGE_TYPE,
+  type PurchasesPackage,
+} from "react-native-purchases";
 
 type PlanOption = "weekly" | "annual";
 type PlanProduct = PurchasesPackage["product"] & {
   pricePerWeekString?: string;
+};
+
+const periodToDays = (unit: string, value: number) => {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+
+  switch (unit.toUpperCase()) {
+    case "DAY":
+      return Math.round(value);
+    case "WEEK":
+      return Math.round(value * 7);
+    case "MONTH":
+      return Math.round(value * 30);
+    case "YEAR":
+      return Math.round(value * 365);
+    default:
+      return 0;
+  }
+};
+
+const getFreeTrialDays = (pkg: PurchasesPackage | null) => {
+  if (!pkg) return 0;
+
+  const introPrice = pkg.product.introPrice;
+  if (!introPrice || introPrice.price !== 0) return 0;
+
+  const cycles = introPrice.cycles > 0 ? introPrice.cycles : 1;
+  return periodToDays(
+    introPrice.periodUnit,
+    introPrice.periodNumberOfUnits * cycles,
+  );
+};
+
+const getOfferDebugSnapshot = (pkg: PurchasesPackage | null) => {
+  if (!pkg) return null;
+  const intro = pkg.product.introPrice;
+
+  return {
+    packageIdentifier: pkg.identifier,
+    packageType: pkg.packageType,
+    productIdentifier: pkg.product.identifier,
+    price: pkg.product.priceString,
+    subscriptionPeriod: pkg.product.subscriptionPeriod,
+    introPrice: intro
+      ? {
+          price: intro.price,
+          priceString: intro.priceString,
+          periodUnit: intro.periodUnit,
+          periodNumberOfUnits: intro.periodNumberOfUnits,
+          cycles: intro.cycles,
+        }
+      : null,
+    computedFreeTrialDays: getFreeTrialDays(pkg),
+  };
 };
 
 export default function PaywallScreen() {
@@ -68,11 +125,29 @@ export default function PaywallScreen() {
   const [selectedPlan, setSelectedPlan] = useState<PlanOption>("annual");
   const [purchasing, setPurchasing] = useState(false);
   const [showClose, setShowClose] = useState(false);
+  const [introEligibilityByProduct, setIntroEligibilityByProduct] = useState<
+    Record<string, INTRO_ELIGIBILITY_STATUS>
+  >({});
 
   const selectedPackage = useMemo(
     () => (selectedPlan === "annual" ? annualPackage : weeklyPackage),
     [annualPackage, weeklyPackage, selectedPlan],
   );
+  const selectedTrialDays = useMemo(
+    () => getFreeTrialDays(selectedPackage),
+    [selectedPackage],
+  );
+
+  const hasEligibleFreeTrial = useMemo(() => {
+    if (!selectedPackage || selectedTrialDays < 1) return false;
+    const status = introEligibilityByProduct[selectedPackage.product.identifier];
+    return status === INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE;
+  }, [introEligibilityByProduct, selectedPackage, selectedTrialDays]);
+
+  const purchaseCtaTitle = useMemo(() => {
+    if (!hasEligibleFreeTrial) return funnelText.paywall.ctaTitle;
+    return `Start ${selectedTrialDays} day${selectedTrialDays === 1 ? "" : "s"} free trial`;
+  }, [funnelText.paywall.ctaTitle, hasEligibleFreeTrial, selectedTrialDays]);
 
   useEffect(() => {
     setLoading(true);
@@ -84,6 +159,18 @@ export default function PaywallScreen() {
         }
         const weekly = pickPackage(offering, PACKAGE_TYPE.WEEKLY);
         const annual = pickPackage(offering, PACKAGE_TYPE.ANNUAL);
+        console.log("[Paywall] Loaded current offering", {
+          offeringIdentifier: offering.identifier,
+          availablePackageCount: offering.availablePackages.length,
+          availablePackages: offering.availablePackages.map((pkg) => ({
+            packageIdentifier: pkg.identifier,
+            packageType: pkg.packageType,
+            productIdentifier: pkg.product.identifier,
+            price: pkg.product.priceString,
+          })),
+          weekly: getOfferDebugSnapshot(weekly),
+          annual: getOfferDebugSnapshot(annual),
+        });
         setWeeklyPackage(weekly);
         setAnnualPackage(annual);
         setOfferingError(null);
@@ -111,6 +198,43 @@ export default function PaywallScreen() {
       setSelectedPlan("annual");
     }
   }, [annualPackage, selectedPlan, weeklyPackage]);
+
+  useEffect(() => {
+    const productIds = [
+      weeklyPackage?.product.identifier,
+      annualPackage?.product.identifier,
+    ].filter((id): id is string => Boolean(id));
+
+    if (productIds.length === 0) {
+      setIntroEligibilityByProduct({});
+      return;
+    }
+
+    let isCancelled = false;
+
+    Purchases.checkTrialOrIntroductoryPriceEligibility([...new Set(productIds)])
+      .then((result) => {
+        if (isCancelled) return;
+
+        const next: Record<string, INTRO_ELIGIBILITY_STATUS> = {};
+        for (const [productId, eligibility] of Object.entries(result)) {
+          if (typeof eligibility?.status === "number") {
+            next[productId] = eligibility.status;
+          }
+        }
+        console.log("[Paywall] Intro eligibility by product", next);
+        setIntroEligibilityByProduct(next);
+      })
+      .catch(() => {
+        if (!isCancelled) {
+          setIntroEligibilityByProduct({});
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [annualPackage?.product.identifier, weeklyPackage?.product.identifier]);
 
   const handlePurchase = useCallback(async () => {
     if (!selectedPackage) return;
@@ -325,7 +449,7 @@ export default function PaywallScreen() {
             )}
 
             <PrimaryButton
-              title={funnelText.paywall.ctaTitle}
+              title={purchaseCtaTitle}
               isLoading={loading || purchasing}
               disabled={!selectedPackage}
               onPress={handlePurchase}

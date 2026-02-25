@@ -2,7 +2,7 @@
   "expo": {
     "name": "Quran Lock",
     "slug": "QuranLock",
-    "version": "1.0.1",
+    "version": "1.0.3",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -63,9 +63,9 @@
         "expo-splash-screen",
         {
           "image": "./src/assets/images/icon.png",
-          "imageWidth": 200,
+          "imageWidth": 300,
           "resizeMode": "contain",
-          "backgroundColor": "#14b8a6"
+          "backgroundColor": "#0d9488"
         }
       ],
       [
