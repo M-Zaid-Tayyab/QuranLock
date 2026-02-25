@@ -78,9 +78,9 @@ export const UpdateBanner = () => {
     }
   }, [updateKey]);
 
-  // if (!isUpdatePending || !updateKey || dismissedUpdateKey === updateKey) {
-  //   return null;
-  // }
+  if (!isUpdatePending || !updateKey || dismissedUpdateKey === updateKey) {
+    return null;
+  }
 
   const title = isApplyingUpdate
     ? "Applying update..."
