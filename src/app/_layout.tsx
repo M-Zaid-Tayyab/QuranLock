@@ -36,7 +36,7 @@ if (vexoApiKey) {
 }
 
 SplashScreen.setOptions({
-  duration: 1500,
+  duration: 2000,
 });
 
 function useDeepLinkToVerse() {
