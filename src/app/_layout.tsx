@@ -1,3 +1,4 @@
+import { UpdateBanner } from "@/components/common";
 import { colors } from "@/constants/colors";
 import { PAYWALL_SOURCES } from "@/constants/entitlements";
 import { useRemoteAppConfig } from "@/hooks/app";
@@ -5,13 +6,12 @@ import {
   useFocusScheduleEntitlementReconciliation,
   useUserSync,
 } from "@/hooks/user";
-import { UpdateBanner } from "@/components/common";
 import { QueryProvider } from "@/providers/QueryProvider";
+import { convexClient } from "@/services/convexClient";
 import {
   canOpenQuran,
   openPaywallForBlockedDecision,
 } from "@/services/entitlements";
-import { convexClient } from "@/services/convexClient";
 import { ensureQuranPack } from "@/services/quranPack";
 import { startGlobalRecitationOfflineDownload } from "@/services/recitationPack";
 import { configureRevenueCat } from "@/services/revenueCat";
@@ -19,6 +19,7 @@ import { useUserStore } from "@/store/user";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef } from "react";
 import { Linking, Platform } from "react-native";
@@ -33,6 +34,10 @@ const vexoApiKey = process.env.EXPO_PUBLIC_VEXO_API_KEY;
 if (vexoApiKey) {
   vexo(vexoApiKey);
 }
+
+SplashScreen.setOptions({
+  duration: 1500,
+});
 
 function useDeepLinkToVerse() {
   const router = useRouter();
