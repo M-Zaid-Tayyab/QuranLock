@@ -15,6 +15,7 @@ import Animated, { Easing, FadeInDown } from "react-native-reanimated";
 interface SelectAppsStepProps {
   familyActivitySelection: string | null;
   onSelectionChange: (selection: string | null) => void;
+  onSelectionDone?: () => void | Promise<void>;
   autoOpen?: boolean;
 }
 
@@ -33,6 +34,7 @@ interface AppsPickerPanelProps {
 interface AppsPickerSheetProps {
   familyActivitySelection: string | null;
   onSelectionChange: (selection: string | null) => void;
+  onSelectionDone?: () => void | Promise<void>;
   sheetRef: RefObject<GorhomBottomSheetModal | null>;
 }
 
@@ -113,6 +115,7 @@ function AppsPickerPanel({
 function AppsPickerSheet({
   familyActivitySelection,
   onSelectionChange,
+  onSelectionDone,
   sheetRef,
 }: AppsPickerSheetProps) {
   const handleChange = (
@@ -138,8 +141,14 @@ function AppsPickerSheet({
           />
         </View>
         <PrimaryButton
-          title="Done"
-          onPress={() => sheetRef.current?.dismiss()}
+          title={onSelectionDone ? "Continue" : "Done"}
+          onPress={() => {
+            if (onSelectionDone) {
+              void onSelectionDone();
+              return;
+            }
+            sheetRef.current?.dismiss();
+          }}
           className="mt-4"
         />
       </View>
@@ -150,6 +159,7 @@ function AppsPickerSheet({
 export function SelectAppsStep({
   familyActivitySelection,
   onSelectionChange,
+  onSelectionDone,
   autoOpen = true,
 }: SelectAppsStepProps) {
   const funnelText = useFunnelText();
@@ -200,6 +210,7 @@ export function SelectAppsStep({
       <AppsPickerSheet
         familyActivitySelection={familyActivitySelection}
         onSelectionChange={onSelectionChange}
+        onSelectionDone={onSelectionDone}
         sheetRef={sheetRef}
       />
     </View>

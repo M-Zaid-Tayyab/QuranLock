@@ -1,6 +1,6 @@
 import type { SubscriptionTier } from "@/constants/entitlements";
 import { convexClient } from "@/services/convexClient";
-import type { FocusSchedule } from "@/store/user";
+import type { FocusDurationMode, FocusSchedule } from "@/store/user";
 import { api } from "../../convex/_generated/api";
 
 export interface UserSyncPayload {
@@ -11,10 +11,15 @@ export interface UserSyncPayload {
   reasonsDisconnect: string[];
   focusSchedules: FocusSchedule[];
   deferredFocusSchedules: FocusSchedule[];
+  focusDurationMode: FocusDurationMode;
+  focusCompletionDays: number;
+  focusMinutesPerPage: number;
   onboardingComplete: boolean;
   hasSelectedApps: boolean;
+  familyActivitySelection: string | null;
   lastReadPage: number;
   translationEnabled: boolean;
+  quranFontScale: number;
   isPremium: boolean;
   subscriptionTier: SubscriptionTier;
   completedUnlockSessions: number;
@@ -29,6 +34,7 @@ export const syncUserProfile = async (payload: UserSyncPayload) => {
       ...payload,
       age: payload.age ?? undefined,
       quranFrequency: payload.quranFrequency || undefined,
+      familyActivitySelection: payload.familyActivitySelection ?? undefined,
     });
   } catch {
     // Silent background sync; ignore failures.

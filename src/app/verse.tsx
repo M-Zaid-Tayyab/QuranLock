@@ -30,7 +30,7 @@ export default function VerseScreen() {
   const selectedVerseKeyRef = useRef<string | null>(
     useVerseStore.getState().selectedVerseKey,
   );
-  const studyVerseIndexByKey = useMemo(
+  const verseIndexByKey = useMemo(
     () =>
       new Map(vm.content.displayVerses.map((verse, index) => [verse.key, index])),
     [vm.content.displayVerses],
@@ -54,14 +54,18 @@ export default function VerseScreen() {
     if (!scrollView) {
       return false;
     }
+    const totalVerses = vm.content.displayVerses.length;
+    const targetIndex = verseIndexByKey.get(verseKey) ?? -1;
+    const shouldScrollToEnd =
+      targetIndex >= totalVerses - 1 &&
+      (vm.readingMode === "study" ||
+        (vm.readingMode === "mushaf" && !vm.header.translationEnabled));
 
     if (vm.readingMode === "study" && scrollView.scrollToIndex) {
-      const targetIndex = studyVerseIndexByKey.get(verseKey) ?? -1;
       if (targetIndex < 0) {
         return false;
       }
-      const totalVerses = vm.content.displayVerses.length;
-      if (targetIndex >= totalVerses - 1 && scrollView.scrollToEnd) {
+      if (shouldScrollToEnd && scrollView.scrollToEnd) {
         scrollView.scrollToEnd({ animated: true });
         return true;
       }
@@ -72,6 +76,11 @@ export default function VerseScreen() {
         viewPosition: isTailVerse ? 0.82 : 0.5,
         viewOffset: 12,
       });
+      return true;
+    }
+
+    if (shouldScrollToEnd && scrollView.scrollToEnd) {
+      scrollView.scrollToEnd({ animated: true });
       return true;
     }
 
@@ -116,7 +125,12 @@ export default function VerseScreen() {
       });
     }
     return true;
-  }, [studyVerseIndexByKey, vm.content.displayVerses.length, vm.readingMode]);
+  }, [
+    verseIndexByKey,
+    vm.content.displayVerses.length,
+    vm.header.translationEnabled,
+    vm.readingMode,
+  ]);
 
   const registerVerseLayout = useCallback(
     (verseKey: string, y: number, height: number) => {

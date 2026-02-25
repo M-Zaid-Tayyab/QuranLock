@@ -16,6 +16,13 @@ export function VersePackCard({
   downloadProgress,
   onDownload,
 }: VersePackCardProps) {
+  const ctaLabel =
+    packState === "checking"
+      ? "Checking…"
+      : packState === "error"
+        ? "Retry download"
+        : "Download now";
+
   return (
     <View className="mt-6 rounded-3xl border border-outline bg-surface px-6 py-8">
       <View className="items-center">
@@ -54,7 +61,7 @@ export function VersePackCard({
           className="mt-6 rounded-full bg-accent px-6 py-3"
         >
           <Text className="text-center text-base font-sfPro-bold text-black">
-            {packState === "checking" ? "Checking…" : "Download now"}
+            {ctaLabel}
           </Text>
         </Pressable>
       )}

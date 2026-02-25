@@ -4,6 +4,7 @@ import {
   fetchVerseRecitationAudio,
   type QuranVerseRecitation,
 } from "@/services/quranFoundation";
+import { retryAsync } from "@/services/retry";
 import * as FileSystem from "expo-file-system/legacy";
 
 type RecitationSourceType = "offline" | "stream";
@@ -26,6 +27,8 @@ export interface RecitationOfflineDownloadStatus {
 const DEFAULT_RECITER_ID = DEFAULT_QURAN_RECITERS[0]?.id ?? 7;
 const TOTAL_RECITATION_CHAPTERS = 114;
 const OFFLINE_DOWNLOAD_CONCURRENCY = 3;
+const RECITATION_FILE_DOWNLOAD_RETRY_ATTEMPTS = 3;
+const RECITATION_CHAPTER_FETCH_RETRY_ATTEMPTS = 3;
 
 const verseDownloadCache = new Map<string, Promise<string>>();
 let globalDownloadPromise: Promise<void> | null = null;
@@ -91,6 +94,11 @@ const checkFileExists = async (uri: string) => {
 const toProgressPercent = (completedChapters: number) => {
   const bounded = Math.min(TOTAL_RECITATION_CHAPTERS, Math.max(0, completedChapters));
   return Math.round((bounded / TOTAL_RECITATION_CHAPTERS) * 100);
+};
+
+const isCancelledError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.toLowerCase().includes("cancel");
 };
 
 const publishOfflineDownloadStatus = (
@@ -166,32 +174,44 @@ const downloadRecitationToFile = async (
   const request = (async () => {
     const reciterDirectory = await ensureReciterDirectory(recitation.reciterId);
     const tempDirectory = FileSystem.cacheDirectory ?? reciterDirectory;
-    const tempUri = `${tempDirectory}/recitation-${recitation.reciterId}-${getSafeVerseFileName(normalizedVerseKey)}.tmp`;
-
     try {
-      const existing = await FileSystem.getInfoAsync(fileUri);
-      if (existing.exists) {
-        return fileUri;
-      }
+      return await retryAsync(
+        async () => {
+          const existing = await FileSystem.getInfoAsync(fileUri);
+          if (existing.exists) {
+            return fileUri;
+          }
 
-      const downloadResumable = FileSystem.createDownloadResumable(
-        recitation.url,
-        tempUri,
+          const tempUri = `${tempDirectory}/recitation-${recitation.reciterId}-${Date.now()}-${getSafeVerseFileName(normalizedVerseKey)}.tmp`;
+          try {
+            const downloadResumable = FileSystem.createDownloadResumable(
+              recitation.url,
+              tempUri,
+            );
+            const result = await downloadResumable.downloadAsync();
+            if (!result?.uri) {
+              throw new Error("Recitation download was cancelled");
+            }
+
+            const outputExists = await FileSystem.getInfoAsync(fileUri);
+            if (outputExists.exists) {
+              await FileSystem.deleteAsync(fileUri, { idempotent: true });
+            }
+            await FileSystem.moveAsync({ from: result.uri, to: fileUri });
+            return fileUri;
+          } finally {
+            await FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(
+              () => undefined,
+            );
+          }
+        },
+        {
+          attempts: RECITATION_FILE_DOWNLOAD_RETRY_ATTEMPTS,
+          shouldRetry: (error) => !isCancelledError(error),
+        },
       );
-      const result = await downloadResumable.downloadAsync();
-      if (!result?.uri) {
-        throw new Error("Recitation download was cancelled");
-      }
-
-      const outputExists = await FileSystem.getInfoAsync(fileUri);
-      if (outputExists.exists) {
-        await FileSystem.deleteAsync(fileUri, { idempotent: true });
-      }
-      await FileSystem.moveAsync({ from: result.uri, to: fileUri });
-      return fileUri;
     } finally {
       verseDownloadCache.delete(cacheKey);
-      await FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(() => undefined);
     }
   })();
 
@@ -200,7 +220,12 @@ const downloadRecitationToFile = async (
 };
 
 const downloadVerseRecitation = async (verseKey: string, reciterId: number) => {
-  const recitation = await fetchVerseRecitationAudio(verseKey, reciterId);
+  const recitation = await retryAsync(
+    () => fetchVerseRecitationAudio(verseKey, reciterId),
+    {
+      attempts: RECITATION_CHAPTER_FETCH_RETRY_ATTEMPTS,
+    },
+  );
   return downloadRecitationToFile(recitation);
 };
 
@@ -213,7 +238,12 @@ const downloadChapterRecitations = async (
     return true;
   }
 
-  const recitations = await fetchChapterVerseRecitations(chapterNumber, reciterId);
+  const recitations = await retryAsync(
+    () => fetchChapterVerseRecitations(chapterNumber, reciterId),
+    {
+      attempts: RECITATION_CHAPTER_FETCH_RETRY_ATTEMPTS,
+    },
+  );
   const entries = [...recitations.values()];
   if (!entries.length) {
     return false;
@@ -272,7 +302,12 @@ export const resolveVerseRecitationPlaybackSource = async (
     };
   }
 
-  const stream = await fetchVerseRecitationAudio(normalizedVerseKey, reciterId);
+  const stream = await retryAsync(
+    () => fetchVerseRecitationAudio(normalizedVerseKey, reciterId),
+    {
+      attempts: 2,
+    },
+  );
   if (getRecitationRootDirectory()) {
     void downloadRecitationToFile(stream).catch(() => undefined);
   }

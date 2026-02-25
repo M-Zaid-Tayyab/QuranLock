@@ -13,10 +13,15 @@ export const useUserSync = () => {
       reasonsDisconnect: s.reasonsDisconnect,
       focusSchedules: s.focusSchedules,
       deferredFocusSchedules: s.deferredFocusSchedules,
+      focusDurationMode: s.focusDurationMode,
+      focusCompletionDays: s.focusCompletionDays,
+      focusMinutesPerPage: s.focusMinutesPerPage,
       onboardingComplete: s.onboardingComplete,
       hasSelectedApps: s.hasSelectedApps,
+      familyActivitySelection: s.familyActivitySelection,
       lastReadPage: s.lastReadPage,
       translationEnabled: s.translationEnabled,
+      quranFontScale: s.quranFontScale,
       isPremium: s.isPremium,
       subscriptionTier: s.subscriptionTier,
       completedUnlockSessions: s.completedUnlockSessions,
@@ -26,12 +31,31 @@ export const useUserSync = () => {
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPayloadRef = useRef<string>("");
+  const previousOnboardingCompleteRef = useRef<boolean>(
+    payload.onboardingComplete,
+  );
 
   useEffect(() => {
+    if (!payload.appUserId || !payload.onboardingComplete) {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      previousOnboardingCompleteRef.current = payload.onboardingComplete;
+      return;
+    }
+
     const serialized = JSON.stringify(payload);
     if (serialized === lastPayloadRef.current) return;
     lastPayloadRef.current = serialized;
+
+    const becameOnboardingComplete =
+      !previousOnboardingCompleteRef.current && payload.onboardingComplete;
+    previousOnboardingCompleteRef.current = payload.onboardingComplete;
+
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    if (becameOnboardingComplete) {
+      syncUserProfile(payload);
+      return;
+    }
+
     timeoutRef.current = setTimeout(() => {
       syncUserProfile(payload);
     }, 1500);

@@ -24,6 +24,12 @@ interface AppConfigActions {
   applyRemoteConfig: (value: RemoteAppConfigPayload) => void;
 }
 
+const createInitialAppConfigState = (): AppConfigState => ({
+  isRamadan: false,
+  funnelVariant: DEFAULT_FUNNEL_VARIANT,
+  lastSyncedAt: null,
+});
+
 const resolveFunnelVariant = (input: {
   isRamadan: boolean;
   funnelVariant?: string;
@@ -42,9 +48,7 @@ const resolveFunnelVariant = (input: {
 export const useAppConfigStore = create<AppConfigState & AppConfigActions>()(
   persist(
     (set) => ({
-      isRamadan: false,
-      funnelVariant: DEFAULT_FUNNEL_VARIANT,
-      lastSyncedAt: null,
+      ...createInitialAppConfigState(),
       applyRemoteConfig: (value) => {
         set({
           isRamadan: value.isRamadan,
@@ -59,11 +63,7 @@ export const useAppConfigStore = create<AppConfigState & AppConfigActions>()(
       storage: createJSONStorage(() => zustandStorage),
       migrate: (persistedState) => {
         if (persistedState == null || typeof persistedState !== "object") {
-          return {
-            isRamadan: false,
-            funnelVariant: DEFAULT_FUNNEL_VARIANT,
-            lastSyncedAt: null,
-          };
+          return createInitialAppConfigState();
         }
 
         const legacy = persistedState as {
@@ -93,3 +93,8 @@ export const useAppConfigStore = create<AppConfigState & AppConfigActions>()(
     },
   ),
 );
+
+export const resetAppConfigStore = () => {
+  useAppConfigStore.setState(createInitialAppConfigState());
+  void useAppConfigStore.persist.clearStorage();
+};

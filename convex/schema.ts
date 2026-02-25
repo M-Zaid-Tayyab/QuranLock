@@ -6,6 +6,8 @@ const SUBSCRIPTION_TIERS = {
   PRO: "pro",
 } as const;
 
+const focusDurationMode = v.union(v.literal("manual"), v.literal("goal"));
+
 const focusSchedule = v.object({
   id: v.string(),
   label: v.string(),
@@ -24,10 +26,15 @@ export default defineSchema({
     reasonsDisconnect: v.array(v.string()),
     focusSchedules: v.array(focusSchedule),
     deferredFocusSchedules: v.optional(v.array(focusSchedule)),
+    focusDurationMode: v.optional(focusDurationMode),
+    focusCompletionDays: v.optional(v.number()),
+    focusMinutesPerPage: v.optional(v.number()),
     onboardingComplete: v.boolean(),
     hasSelectedApps: v.boolean(),
+    familyActivitySelection: v.optional(v.string()),
     lastReadPage: v.number(),
     translationEnabled: v.boolean(),
+    quranFontScale: v.optional(v.number()),
     isPremium: v.boolean(),
     subscriptionTier: v.union(
       v.literal(SUBSCRIPTION_TIERS.FREE),

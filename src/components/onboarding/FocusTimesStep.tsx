@@ -31,6 +31,7 @@ export function FocusTimesStep({
     focusSchedules,
     focusDurationMode,
     goalDaysInput,
+    scheduleLabelDrafts,
     expandedScheduleId,
     pickerDate,
     isTimePickerOpen,
@@ -323,7 +324,9 @@ export function FocusTimesStep({
                             color={colors.primary}
                           />
                           <TextInput
-                            value={schedule.label}
+                            value={
+                              scheduleLabelDrafts[schedule.id] ?? schedule.label
+                            }
                             maxLength={FOCUS_LABEL_MAX_LENGTH}
                             onChangeText={(text) =>
                               onChangeScheduleLabel(schedule.id, text)

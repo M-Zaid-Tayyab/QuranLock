@@ -9,7 +9,7 @@ import {
 } from "@/services/revenueCat";
 import { useUserStore } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -210,153 +210,156 @@ export default function PaywallScreen() {
   };
 
   return (
-    <View className="flex-1 bg-background pt-safe pb-safe">
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {showClose && (
-          <Pressable
-            onPress={exitPaywall}
-            className="h-10 w-10 self-end items-center justify-center rounded-full border border-outline bg-surface"
-          >
-            <Ionicons name="close" size={20} color={colors.muted} />
-          </Pressable>
-        )}
-        <View className=" items-center">
-          <View className="mt-3 flex-row flex-wrap justify-center px-4">
-            {funnelText.paywall.headlineWords.map((word, index) => (
-              <Text
-                key={`${word}-${index}`}
-                className="text-center text-4xl font-sfPro-bold leading-tight"
-                style={{
-                  color: funnelText.paywall.headlineHighlightedWords.includes(
-                    word.replace(/[^a-z]/gi, "").toLowerCase(),
-                  )
-                    ? colors.accent
-                    : colors.foreground,
-                }}
-              >
-                {word}
-                {index < funnelText.paywall.headlineWords.length - 1 ? " " : ""}
-              </Text>
-            ))}
-          </View>
-        </View>
-
-        <View className="mt-10 gap-3">
-          <View className="flex-row items-center gap-3">
-            <Ionicons
-              name="shield-checkmark-outline"
-              size={23}
-              color={colors.primary}
-            />
-            <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
-              {funnelText.paywall.featureLines[0]}
-            </Text>
-          </View>
-          <View className="flex-row items-center gap-3">
-            <Ionicons name="book-outline" size={23} color={colors.accent} />
-            <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
-              {funnelText.paywall.featureLines[1]}
-            </Text>
-          </View>
-          <View className="flex-row items-center gap-3">
-            <Ionicons
-              name="notifications-outline"
-              size={23}
-              color={colors.secondary}
-            />
-            <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
-              {funnelText.paywall.featureLines[2]}
-            </Text>
-          </View>
-          <View className="flex-row items-center gap-3">
-            <Ionicons name="time-outline" size={23} color={colors.primary} />
-            <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
-              {funnelText.paywall.featureLines[3]}
-            </Text>
-          </View>
-        </View>
-
-        <View className="mt-10">
-          <View className="flex-row items-center justify-between">
-            <Text className="mt-1 text-2xl font-sfPro-bold text-foreground">
-              Choose your plan
-            </Text>
-            <Text className="mt-1 text-sm font-sfPro-semibold text-muted">
-              Cancel anytime
-            </Text>
-          </View>
-
-          <View className="mt-7 gap-3">
-            {!loading && !weeklyPackage && !annualPackage ? (
-              <Text className="text-sm font-sfPro text-muted">
-                Subscription plans are not available right now.
-              </Text>
-            ) : (
-              <View className="flex-row gap-3">
-                {(loading || weeklyPackage) &&
-                  renderPlan(
-                    "weekly",
-                    weeklyPackage,
-                    "Flexible commitment billed weekly.",
-                  )}
-                {(loading || annualPackage) &&
-                  renderPlan(
-                    "annual",
-                    annualPackage,
-                    "Lower weekly cost for long-term consistency.",
-                    "Best value",
-                  )}
-              </View>
-            )}
-          </View>
-        </View>
-
-        <View className="mt-5 gap-3">
-          {offeringError && (
-            <Text className="text-center text-sm font-sfPro text-error">
-              {offeringError}
-            </Text>
-          )}
-
-          <PrimaryButton
-            title={funnelText.paywall.ctaTitle}
-            isLoading={loading || purchasing}
-            disabled={!selectedPackage}
-            onPress={handlePurchase}
-            className="w-full mt-4"
-          />
-
-          <Pressable
-            onPress={handleRestore}
-            className="self-center rounded-full border border-outline bg-surface px-4 py-2 my-2"
-          >
-            <Text className="text-sm font-sfPro-semibold text-foreground">
-              Restore purchases
-            </Text>
-          </Pressable>
-
-          <View className="flex-row items-center justify-center gap-2">
+    <>
+      <Stack.Screen options={{ animation: "fade" }} />
+      <View className="flex-1 bg-background pt-safe pb-safe">
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
+          showsVerticalScrollIndicator={false}
+        >
+          {showClose && (
             <Pressable
-              onPress={() => openLink(privacyUrl, "Privacy Policy")}
-              hitSlop={8}
+              onPress={exitPaywall}
+              className="h-10 w-10 self-end items-center justify-center rounded-full border border-outline bg-surface"
             >
-              <Text className="text-xs font-sfPro-semibold text-foreground">
-                Privacy Policy
-              </Text>
+              <Ionicons name="close" size={20} color={colors.muted} />
             </Pressable>
-            <Text className="text-xs font-sfPro text-muted">•</Text>
-            <Pressable onPress={() => openLink(termsUrl, "Terms")} hitSlop={8}>
-              <Text className="text-xs font-sfPro-semibold text-foreground">
-                Terms
-              </Text>
-            </Pressable>
+          )}
+          <View className=" items-center">
+            <View className="mt-3 flex-row flex-wrap justify-center px-4">
+              {funnelText.paywall.headlineWords.map((word, index) => (
+                <Text
+                  key={`${word}-${index}`}
+                  className="text-center text-4xl font-sfPro-bold leading-tight"
+                  style={{
+                    color: funnelText.paywall.headlineHighlightedWords.includes(
+                      word.replace(/[^a-z]/gi, "").toLowerCase(),
+                    )
+                      ? colors.accent
+                      : colors.foreground,
+                  }}
+                >
+                  {word}
+                  {index < funnelText.paywall.headlineWords.length - 1 ? " " : ""}
+                </Text>
+              ))}
+            </View>
           </View>
-        </View>
-      </ScrollView>
-    </View>
+
+          <View className="mt-10 gap-3">
+            <View className="flex-row items-center gap-3">
+              <Ionicons
+                name="shield-checkmark-outline"
+                size={23}
+                color={colors.primary}
+              />
+              <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
+                {funnelText.paywall.featureLines[0]}
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-3">
+              <Ionicons name="book-outline" size={23} color={colors.accent} />
+              <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
+                {funnelText.paywall.featureLines[1]}
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-3">
+              <Ionicons
+                name="notifications-outline"
+                size={23}
+                color={colors.secondary}
+              />
+              <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
+                {funnelText.paywall.featureLines[2]}
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-3">
+              <Ionicons name="time-outline" size={23} color={colors.primary} />
+              <Text className="flex-1 text-lg font-sfPro-semibold leading-7 text-foreground">
+                {funnelText.paywall.featureLines[3]}
+              </Text>
+            </View>
+          </View>
+
+          <View className="mt-10">
+            <View className="flex-row items-center justify-between">
+              <Text className="mt-1 text-2xl font-sfPro-bold text-foreground">
+                Choose your plan
+              </Text>
+              <Text className="mt-1 text-sm font-sfPro-semibold text-muted">
+                Cancel anytime
+              </Text>
+            </View>
+
+            <View className="mt-7 gap-3">
+              {!loading && !weeklyPackage && !annualPackage ? (
+                <Text className="text-sm font-sfPro text-muted">
+                  Subscription plans are not available right now.
+                </Text>
+              ) : (
+                <View className="flex-row gap-3">
+                  {(loading || weeklyPackage) &&
+                    renderPlan(
+                      "weekly",
+                      weeklyPackage,
+                      "Flexible commitment billed weekly.",
+                    )}
+                  {(loading || annualPackage) &&
+                    renderPlan(
+                      "annual",
+                      annualPackage,
+                      "Lower weekly cost for long-term consistency.",
+                      "Best value",
+                    )}
+                </View>
+              )}
+            </View>
+          </View>
+
+          <View className="mt-5 gap-3">
+            {offeringError && (
+              <Text className="text-center text-sm font-sfPro text-error">
+                {offeringError}
+              </Text>
+            )}
+
+            <PrimaryButton
+              title={funnelText.paywall.ctaTitle}
+              isLoading={loading || purchasing}
+              disabled={!selectedPackage}
+              onPress={handlePurchase}
+              className="w-full mt-4"
+            />
+
+            <Pressable
+              onPress={handleRestore}
+              className="self-center rounded-full border border-outline bg-surface px-4 py-2 my-2"
+            >
+              <Text className="text-sm font-sfPro-semibold text-foreground">
+                Restore purchases
+              </Text>
+            </Pressable>
+
+            <View className="flex-row items-center justify-center gap-2">
+              <Pressable
+                onPress={() => openLink(privacyUrl, "Privacy Policy")}
+                hitSlop={8}
+              >
+                <Text className="text-xs font-sfPro-semibold text-foreground">
+                  Privacy Policy
+                </Text>
+              </Pressable>
+              <Text className="text-xs font-sfPro text-muted">•</Text>
+              <Pressable onPress={() => openLink(termsUrl, "Terms")} hitSlop={8}>
+                <Text className="text-xs font-sfPro-semibold text-foreground">
+                  Terms
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    </>
   );
 }

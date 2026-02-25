@@ -32,10 +32,14 @@ const initialState: VerseState = {
   hasMigratedFromUserStore: false,
 };
 
+const createInitialVerseState = (): VerseState => ({
+  ...initialState,
+});
+
 export const useVerseStore = create<VerseState & VerseActions>()(
   persist(
     (set) => ({
-      ...initialState,
+      ...createInitialVerseState(),
 
       hydrateFromUserTranslation: (translationEnabled) =>
         set((state) => {
@@ -62,3 +66,8 @@ export const useVerseStore = create<VerseState & VerseActions>()(
     },
   ),
 );
+
+export const resetVerseStore = () => {
+  useVerseStore.setState(createInitialVerseState());
+  void useVerseStore.persist.clearStorage();
+};

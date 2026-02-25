@@ -10,6 +10,7 @@ import {
   canOpenQuran,
   openPaywallForBlockedDecision,
 } from "@/services/entitlements";
+import { convexClient } from "@/services/convexClient";
 import { ensureQuranPack } from "@/services/quranPack";
 import { startGlobalRecitationOfflineDownload } from "@/services/recitationPack";
 import { configureRevenueCat } from "@/services/revenueCat";
@@ -18,7 +19,7 @@ import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as Notifications from "expo-notifications";
 import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Linking, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -42,8 +43,6 @@ function useDeepLinkToVerse() {
   );
 
   useEffect(() => {
-    ensureQuranPack().catch(() => undefined);
-    startGlobalRecitationOfflineDownload().catch(() => undefined);
     const handleUrl = (url: string | null) => {
       if (
         url &&
@@ -98,43 +97,67 @@ function RootLayoutContent() {
       setIsPremium: s.setIsPremium,
     })),
   );
+  const hasStartedBackgroundDownloadsRef = useRef(false);
+  const initialAppUserIdRef = useRef(appUserId);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
     let isMounted = true;
     let listener: ((info: CustomerInfo) => void) | null = null;
-    configureRevenueCat(appUserId || undefined).then(async (configured) => {
-      if (!configured) return;
-      if (!appUserId) {
+    configureRevenueCat(initialAppUserIdRef.current || undefined).then(
+      async (configured) => {
+        if (!configured || !isMounted) return;
         const rcId = await Purchases.getAppUserID();
-        if (rcId && isMounted) {
+        if (rcId && isMounted && rcId !== useUserStore.getState().appUserId) {
           setAppUserId(rcId);
         }
-      }
-      const entitlementId =
-        process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID ?? "pro";
-      Purchases.getCustomerInfo()
-        .then((info) => {
-          if (!isMounted) return;
+        const entitlementId =
+          process.env.EXPO_PUBLIC_REVENUECAT_ENTITLEMENT_ID ?? "pro";
+        Purchases.getCustomerInfo()
+          .then((info) => {
+            if (!isMounted) return;
+            setIsPremium(Boolean(info.entitlements.active[entitlementId]));
+          })
+          .catch(() => {});
+        listener = (info) => {
           setIsPremium(Boolean(info.entitlements.active[entitlementId]));
-        })
-        .catch(() => {});
-      listener = (info) => {
-        setIsPremium(Boolean(info.entitlements.active[entitlementId]));
-      };
-      Purchases.addCustomerInfoUpdateListener(listener);
-    });
+        };
+        Purchases.addCustomerInfoUpdateListener(listener);
+      },
+    );
     return () => {
       isMounted = false;
       if (listener) {
         Purchases.removeCustomerInfoUpdateListener(listener);
       }
     };
-  }, [appUserId]);
+  }, [setAppUserId, setIsPremium]);
 
   useEffect(() => {
     if (!appUserId) return;
     identifyDevice(appUserId).catch(() => undefined);
+  }, [appUserId]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (appUserId) return;
+    Purchases.getAppUserID()
+      .then((rcId) => {
+        if (!rcId) return;
+        if (rcId === useUserStore.getState().appUserId) return;
+        setAppUserId(rcId);
+      })
+      .catch(() => undefined);
+  }, [appUserId, setAppUserId]);
+
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (hasStartedBackgroundDownloadsRef.current) return;
+    if (!appUserId || !convexClient) return;
+
+    hasStartedBackgroundDownloadsRef.current = true;
+    ensureQuranPack().catch(() => undefined);
+    startGlobalRecitationOfflineDownload().catch(() => undefined);
   }, [appUserId]);
 
   return (

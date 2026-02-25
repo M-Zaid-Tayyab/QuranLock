@@ -72,7 +72,7 @@ const getLocalDateKey = (date: Date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
-const initialState: UserState = {
+const createInitialUserState = (): UserState => ({
   appUserId: "",
   name: "",
   age: null,
@@ -93,12 +93,12 @@ const initialState: UserState = {
   subscriptionTier: SUBSCRIPTION_TIERS.FREE,
   completedUnlockSessions: 0,
   streakCompletedDates: [],
-};
+});
 
 export const useUserStore = create<UserState & UserActions>()(
   persist(
     (set) => ({
-      ...initialState,
+      ...createInitialUserState(),
 
       setAppUserId: (appUserId) => set({ appUserId }),
       setName: (name) => set({ name }),
@@ -155,3 +155,8 @@ export const useUserStore = create<UserState & UserActions>()(
     },
   ),
 );
+
+export const resetUserStore = () => {
+  useUserStore.setState(createInitialUserState());
+  void useUserStore.persist.clearStorage();
+};

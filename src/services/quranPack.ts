@@ -1,5 +1,6 @@
 import * as FileSystem from "expo-file-system/legacy";
 import * as SQLite from "expo-sqlite";
+import { retryAsync } from "./retry";
 
 export const QURAN_DB_NAME = "quran-pack.db";
 export const QURAN_TOTAL_PAGES = 604;
@@ -10,6 +11,8 @@ type ProgressListener = (
 ) => void;
 const progressListeners = new Set<ProgressListener>();
 let downloadPromise: Promise<void> | null = null;
+const QURAN_PACK_URL_RETRY_ATTEMPTS = 3;
+const QURAN_PACK_DOWNLOAD_RETRY_ATTEMPTS = 3;
 
 export interface QuranWord {
   id: number;
@@ -94,20 +97,29 @@ const notifyProgress = (
   progressListeners.forEach((listener) => listener(progress, written, total));
 };
 
+const isCancelledError = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.toLowerCase().includes("cancel");
+};
+
 const performDownload = async () => {
   const downloadUrl = process.env.EXPO_PUBLIC_QURAN_PACK_URL;
   const downloadEndpoint = process.env.EXPO_PUBLIC_QURAN_PACK_URL_ENDPOINT;
   let resolvedUrl = downloadUrl ?? null;
   if (downloadEndpoint) {
-    const response = await fetch(downloadEndpoint);
-    if (!response.ok) {
-      throw new Error("Unable to resolve Quran pack URL");
-    }
-    const data = (await response.json()) as { url?: string };
-    if (!data.url) {
-      throw new Error("Invalid Quran pack URL response");
-    }
-    resolvedUrl = data.url;
+    resolvedUrl = await retryAsync(async () => {
+      const response = await fetch(downloadEndpoint);
+      if (!response.ok) {
+        throw new Error("Unable to resolve Quran pack URL");
+      }
+      const data = (await response.json()) as { url?: string };
+      if (!data.url) {
+        throw new Error("Invalid Quran pack URL response");
+      }
+      return data.url;
+    }, {
+      attempts: QURAN_PACK_URL_RETRY_ATTEMPTS,
+    });
   }
   if (!resolvedUrl) {
     throw new Error("Missing EXPO_PUBLIC_QURAN_PACK_URL");
@@ -121,33 +133,47 @@ const performDownload = async () => {
 
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
 
-  const tempUri = `${FileSystem.cacheDirectory ?? directory}/quran-pack.tmp`;
-  const downloadResumable = FileSystem.createDownloadResumable(
-    resolvedUrl,
-    tempUri,
-    {},
-    ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
-      if (totalBytesExpectedToWrite) {
-        notifyProgress(
-          totalBytesWritten / totalBytesExpectedToWrite,
-          totalBytesWritten,
-          totalBytesExpectedToWrite,
+  await retryAsync(
+    async () => {
+      const tempUri = `${FileSystem.cacheDirectory ?? directory}/quran-pack-${Date.now()}-${Math.random().toString(36).slice(2)}.tmp`;
+      try {
+        const downloadResumable = FileSystem.createDownloadResumable(
+          resolvedUrl,
+          tempUri,
+          {},
+          ({ totalBytesWritten, totalBytesExpectedToWrite }) => {
+            if (totalBytesExpectedToWrite) {
+              notifyProgress(
+                totalBytesWritten / totalBytesExpectedToWrite,
+                totalBytesWritten,
+                totalBytesExpectedToWrite,
+              );
+            }
+          },
+        );
+
+        const result = await downloadResumable.downloadAsync();
+        if (!result?.uri) {
+          throw new Error("Download cancelled");
+        }
+
+        const existing = await FileSystem.getInfoAsync(fileUri);
+        if (existing.exists) {
+          await FileSystem.deleteAsync(fileUri, { idempotent: true });
+        }
+
+        await FileSystem.moveAsync({ from: result.uri, to: fileUri });
+      } finally {
+        await FileSystem.deleteAsync(tempUri, { idempotent: true }).catch(
+          () => undefined,
         );
       }
     },
+    {
+      attempts: QURAN_PACK_DOWNLOAD_RETRY_ATTEMPTS,
+      shouldRetry: (error) => !isCancelledError(error),
+    },
   );
-
-  const result = await downloadResumable.downloadAsync();
-  if (!result?.uri) {
-    throw new Error("Download cancelled");
-  }
-
-  const existing = await FileSystem.getInfoAsync(fileUri);
-  if (existing.exists) {
-    await FileSystem.deleteAsync(fileUri, { idempotent: true });
-  }
-
-  await FileSystem.moveAsync({ from: result.uri, to: fileUri });
 };
 
 export const ensureQuranPack = async (

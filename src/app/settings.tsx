@@ -1,8 +1,7 @@
 import { SettingsSelectAppsStep } from "@/components/onboarding";
 import { setSelection } from "@/services/deviceActivity";
-import {
-  ensureCanEditFocusTimes,
-} from "@/services/entitlements";
+import { ensureCanEditFocusTimes } from "@/services/entitlements";
+import { resetAllStores } from "@/store";
 import { useUserStore } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
 import * as Application from "expo-application";
@@ -45,8 +44,12 @@ export default function SettingsScreen() {
 
   const privacyUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_PRIVACY_URL);
   const termsUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_TERMS_URL);
-  const linkedInUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_LINKEDIN_URL);
-  const instagramUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_INSTAGRAM_URL);
+  const linkedInUrl = normalizeExternalUrl(
+    process.env.EXPO_PUBLIC_LINKEDIN_URL,
+  );
+  const instagramUrl = normalizeExternalUrl(
+    process.env.EXPO_PUBLIC_INSTAGRAM_URL,
+  );
   const xUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_X_URL);
 
   const appVersion = Application.nativeApplicationVersion ?? "";
@@ -91,6 +94,11 @@ export default function SettingsScreen() {
       params: { mode: "edit-times", from: "settings" },
     });
   }, [isPremium, router]);
+
+  const handleLogout = useCallback(() => {
+    resetAllStores();
+    router.replace("/welcome");
+  }, [router]);
 
   const formatTime = (hour: number, minute: number) => {
     const suffix = hour >= 12 ? "PM" : "AM";
@@ -172,7 +180,9 @@ export default function SettingsScreen() {
                   className="rounded-full border border-outline bg-backgroundElevated px-3 py-2"
                 >
                   <Text className="text-xs font-sfPro text-foreground">
-                    {schedule.label} · {formatTime(schedule.hour, schedule.minute)} · {schedule.durationMinutes}m
+                    {schedule.label} ·{" "}
+                    {formatTime(schedule.hour, schedule.minute)} ·{" "}
+                    {schedule.durationMinutes}m
                   </Text>
                 </View>
               ))}
@@ -186,7 +196,7 @@ export default function SettingsScreen() {
           )}
           <Pressable
             onPress={handleEditFocusTimes}
-            className="mt-4 rounded-full bg-primary px-4 py-2"
+            className="mt-4 rounded-full bg-primary px-4 py-3"
           >
             <Text className="text-center text-sm font-sfPro-semibold text-primaryForeground">
               Edit focus times
@@ -271,7 +281,11 @@ export default function SettingsScreen() {
               style={!termsUrl ? { opacity: 0.5 } : undefined}
             >
               <View className="flex-row items-center gap-3">
-                <Ionicons name="document-text-outline" size={18} color="#94a3b8" />
+                <Ionicons
+                  name="document-text-outline"
+                  size={18}
+                  color="#94a3b8"
+                />
                 <Text className="font-sfPro text-sm text-foreground">
                   Terms of service
                 </Text>
@@ -280,15 +294,30 @@ export default function SettingsScreen() {
             </Pressable>
             <View className="flex-row items-center justify-between rounded-xl border border-outline bg-backgroundElevated px-4 py-3">
               <View className="flex-row items-center gap-3">
-                <Ionicons name="information-circle-outline" size={18} color="#94a3b8" />
+                <Ionicons
+                  name="information-circle-outline"
+                  size={18}
+                  color="#94a3b8"
+                />
                 <Text className="font-sfPro text-sm text-foreground">
                   App version
                 </Text>
               </View>
-              <Text className="text-xs font-sfPro text-muted">{versionLabel}</Text>
+              <Text className="text-xs font-sfPro text-muted">
+                {versionLabel}
+              </Text>
             </View>
           </View>
         </View>
+
+        <Pressable
+          onPress={handleLogout}
+          className="mt-6 mb-4 rounded-full border border-error bg-backgroundElevated px-4 py-3"
+        >
+          <Text className="text-center text-sm font-sfPro-semibold text-error">
+            Logout
+          </Text>
+        </Pressable>
       </ScrollView>
     </View>
   );

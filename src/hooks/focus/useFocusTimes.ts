@@ -43,6 +43,7 @@ export interface UseFocusTimesResult {
   focusDurationMode: FocusDurationMode;
   focusCompletionDays: number;
   goalDaysInput: string;
+  scheduleLabelDrafts: Record<string, string>;
   expandedScheduleId: string | null;
   timePickerTarget: string | null;
   pickerDate: Date;
@@ -119,6 +120,14 @@ export function useFocusTimes({
   const [goalDaysInput, setGoalDaysInput] = useState(() =>
     String(sanitizeGoalDays(focusCompletionDays)),
   );
+  const [scheduleLabelDrafts, setScheduleLabelDrafts] = useState<
+    Record<string, string>
+  >(() =>
+    focusSchedules.reduce<Record<string, string>>((acc, schedule) => {
+      acc[schedule.id] = schedule.label;
+      return acc;
+    }, {}),
+  );
 
   const hasRequestedNotificationsRef = useRef(false);
   const customIndexRef = useRef(
@@ -135,6 +144,32 @@ export function useFocusTimes({
       setTimePickerTarget(null);
     }
   }, [focusSchedules.length]);
+
+  useEffect(() => {
+    setScheduleLabelDrafts((previous) => {
+      let changed = false;
+      const next: Record<string, string> = {};
+
+      for (const schedule of focusSchedules) {
+        if (Object.prototype.hasOwnProperty.call(previous, schedule.id)) {
+          next[schedule.id] = previous[schedule.id];
+          continue;
+        }
+        next[schedule.id] = schedule.label;
+        changed = true;
+      }
+
+      if (Object.keys(previous).length !== focusSchedules.length) {
+        changed = true;
+      }
+
+      if (!changed) {
+        return previous;
+      }
+
+      return next;
+    });
+  }, [focusSchedules]);
 
   const mapNotificationStatus = useCallback(
     (status: Notifications.PermissionStatus): Exclude<
@@ -506,9 +541,12 @@ export function useFocusTimes({
   const onChangeScheduleLabel = useCallback(
     (scheduleId: string, rawValue: string) => {
       const nextLabel = rawValue.slice(0, FOCUS_LABEL_MAX_LENGTH);
-      onUpdateSchedule(scheduleId, { label: nextLabel });
+      setScheduleLabelDrafts((current) => {
+        if (current[scheduleId] === nextLabel) return current;
+        return { ...current, [scheduleId]: nextLabel };
+      });
     },
-    [onUpdateSchedule],
+    [],
   );
 
   const onCommitScheduleLabel = useCallback(
@@ -520,6 +558,10 @@ export function useFocusTimes({
       const fallback =
         schedule.kind === "prayer" ? defaultPrayerLabel : "Custom time";
       const nextLabel = (collapsed || fallback).slice(0, FOCUS_LABEL_MAX_LENGTH);
+      setScheduleLabelDrafts((current) => {
+        if (current[schedule.id] === nextLabel) return current;
+        return { ...current, [schedule.id]: nextLabel };
+      });
       if (nextLabel === schedule.label) return;
       onUpdateSchedule(schedule.id, { label: nextLabel });
     },
@@ -535,6 +577,7 @@ export function useFocusTimes({
     focusDurationMode,
     focusCompletionDays,
     goalDaysInput,
+    scheduleLabelDrafts,
     expandedScheduleId,
     timePickerTarget,
     pickerDate,

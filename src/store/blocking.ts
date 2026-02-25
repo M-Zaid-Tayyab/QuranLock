@@ -41,7 +41,7 @@ interface BlockingActions {
   markScheduleCompleted: (scheduleId: string, dateKey: string) => void;
 }
 
-const initialState: BlockingState = {
+const createInitialBlockingState = (): BlockingState => ({
   requiredQuranMinutes: 0,
   accumulatedQuranMinutesForCurrentBlock: 0,
   liveProgressStartedAt: null,
@@ -53,7 +53,7 @@ const initialState: BlockingState = {
   activeScheduleDate: null,
   completedScheduleDate: null,
   completedScheduleIds: [],
-};
+});
 
 const LIFETIME_FLUSH_THRESHOLD_MINUTES = 10 / 60;
 let bufferedLifetimeMinutes = 0;
@@ -138,7 +138,7 @@ const blockingPersistStorage: StateStorage = {
 export const useBlockingStore = create<BlockingState & BlockingActions>()(
   persist(
     (set, get) => ({
-      ...initialState,
+      ...createInitialBlockingState(),
 
       startBlockSession: (requiredMinutes: number) => {
         set((state) => ({
@@ -355,3 +355,20 @@ export const useBlockingStore = create<BlockingState & BlockingActions>()(
     },
   ),
 );
+
+const clearBlockingPersistBuffers = () => {
+  bufferedLifetimeMinutes = 0;
+  for (const timer of pendingTimerByKey.values()) {
+    clearTimeout(timer);
+  }
+  pendingTimerByKey.clear();
+  pendingValueByKey.clear();
+  lastPersistedByKey.clear();
+  lastPersistedAtByKey.clear();
+};
+
+export const resetBlockingStore = () => {
+  clearBlockingPersistBuffers();
+  useBlockingStore.setState(createInitialBlockingState());
+  void useBlockingStore.persist.clearStorage();
+};

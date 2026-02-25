@@ -17,12 +17,14 @@ interface UseVersePackLifecycleArgs {
   currentPage: number;
   setLastReadPage: (page: number) => void;
   translationEnabledRef: RefObject<boolean>;
+  enableAutoDownload: boolean;
 }
 
 export const useVersePackLifecycle = ({
   currentPage,
   setLastReadPage,
   translationEnabledRef,
+  enableAutoDownload,
 }: UseVersePackLifecycleArgs) => {
   const [packState, setPackState] = useState<PackState>("checking");
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -67,11 +69,11 @@ export const useVersePackLifecycle = ({
   }, [checkPack]);
 
   useEffect(() => {
-    if (packState === "missing" && !autoDownloadAttempted) {
+    if (enableAutoDownload && packState === "missing" && !autoDownloadAttempted) {
       setAutoDownloadAttempted(true);
       void downloadPack();
     }
-  }, [autoDownloadAttempted, downloadPack, packState]);
+  }, [autoDownloadAttempted, downloadPack, enableAutoDownload, packState]);
 
   const loadPage = useCallback(
     async (page: number) => {

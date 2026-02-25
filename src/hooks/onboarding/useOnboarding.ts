@@ -34,6 +34,7 @@ export interface UseOnboardingResult {
   ctaDelayMs: number;
   ctaKey: string | number;
   animateTitleWords: boolean;
+  nameInput: string;
   familyActivitySelection: string | null;
   hideProgress: boolean;
   headerAlign: "left" | "center";
@@ -56,6 +57,7 @@ export interface UseOnboardingResult {
   onScreenTimeAuthorizationStatusChange: (status: number) => void;
   onNotificationPermissionChange: (approved: boolean) => void;
   onNotificationPermissionStatusChange: (status: NotificationPermissionStatus) => void;
+  onSetNameInput: (value: string) => void;
   onSetAgeInput: (value: string) => void;
   onSetFamilyActivitySelection: (selection: string | null) => void;
 }
@@ -67,6 +69,7 @@ export function useOnboarding(): UseOnboardingResult {
 
   const {
     name,
+    setName,
     age,
     setAge,
     quranFrequency,
@@ -75,12 +78,12 @@ export function useOnboarding(): UseOnboardingResult {
     setFocusSchedules,
     setDeferredFocusSchedules,
     familyActivitySelection,
-    setFamilyActivitySelection,
     isPremium,
     setOnboardingComplete,
   } = useUserStore(
     useShallow((s) => ({
       name: s.name,
+      setName: s.setName,
       age: s.age,
       setAge: s.setAge,
       quranFrequency: s.quranFrequency,
@@ -89,7 +92,6 @@ export function useOnboarding(): UseOnboardingResult {
       setFocusSchedules: s.setFocusSchedules,
       setDeferredFocusSchedules: s.setDeferredFocusSchedules,
       familyActivitySelection: s.familyActivitySelection,
-      setFamilyActivitySelection: s.setFamilyActivitySelection,
       isPremium: s.isPremium,
       setOnboardingComplete: s.setOnboardingComplete,
     })),
@@ -97,13 +99,16 @@ export function useOnboarding(): UseOnboardingResult {
 
   const [stepIndex, setStepIndex] = useState(0);
   const [stepError, setStepError] = useState<string | null>(null);
+  const [nameInput, setNameInput] = useState(() => name);
   const [ageInput, setAgeInput] = useState(() =>
     age != null ? String(age) : "",
   );
+  const [familyActivitySelectionDraft, setFamilyActivitySelectionDraft] =
+    useState<string | null>(() => familyActivitySelection);
   const [screenTimeApproved, setScreenTimeApproved] = useState(() =>
     canProceedScreenTime(),
   );
-  const [, setScreenTimeStatus] = useState<number>(() =>
+  const [screenTimeStatus, setScreenTimeStatus] = useState<number>(() =>
     Platform.OS === "ios" ? getAuthStatus() : AuthorizationStatus.approved,
   );
   const [screenTimeResolving, setScreenTimeResolving] = useState(false);
@@ -128,6 +133,14 @@ export function useOnboarding(): UseOnboardingResult {
   const modeParam = Array.isArray(params.mode) ? params.mode[0] : params.mode;
   const isEditTimes = modeParam === "edit-times";
   const activeStep = isEditTimes ? 9 : stepIndex;
+
+  useEffect(() => {
+    setNameInput(name);
+  }, [name]);
+
+  useEffect(() => {
+    setFamilyActivitySelectionDraft(familyActivitySelection);
+  }, [familyActivitySelection]);
 
   const onBack = useCallback(() => {
     setStepError(null);
@@ -185,6 +198,12 @@ export function useOnboarding(): UseOnboardingResult {
     );
   }, [isEditTimes, isPremium, router]);
 
+  useEffect(() => {
+    if (isEditTimes || activeStep !== 7 || !screenTimeApproved) return;
+    setStepError(null);
+    setStepIndex((current) => (current === 7 ? 8 : current));
+  }, [activeStep, isEditTimes, screenTimeApproved]);
+
   const applySchedules = useCallback(async (schedules: FocusSchedule[]) => {
     if (!schedules.length) return;
     await applyFocusSchedulesToDevice({
@@ -199,9 +218,15 @@ export function useOnboarding(): UseOnboardingResult {
     setStepError(null);
     if (activeStep !== 9) setHasAttemptedScheduleSubmit(false);
 
-    if (!isEditTimes && activeStep === 3 && !name.trim()) {
-      setStepError("Please enter your name");
-      return;
+    if (!isEditTimes && activeStep === 3) {
+      const trimmedInput = nameInput.trim();
+      if (!trimmedInput) {
+        setStepError("Please enter your name");
+        return;
+      }
+      if (trimmedInput !== name) {
+        setName(trimmedInput);
+      }
     }
 
     if (!isEditTimes && activeStep === 4) {
@@ -241,7 +266,7 @@ export function useOnboarding(): UseOnboardingResult {
       !isEditTimes &&
       activeStep === 8 &&
       Platform.OS === "ios" &&
-      !commitSelectApps(familyActivitySelection)
+      !commitSelectApps(familyActivitySelectionDraft)
     ) {
       return;
     }
@@ -317,27 +342,31 @@ export function useOnboarding(): UseOnboardingResult {
       return;
     }
 
-    setStepIndex((i) => Math.min(TOTAL_STEPS - 1, i + 1));
+    setStepIndex((i) =>
+      i === activeStep ? Math.min(TOTAL_STEPS - 1, i + 1) : i,
+    );
   }, [
     activeStep,
     ageInput,
     applySchedules,
-    familyActivitySelection,
+    familyActivitySelectionDraft,
     focusSchedules.length,
     isEditTimes,
     isPremium,
     mapNotificationStatus,
     name,
+    nameInput,
     notificationApproved,
     router,
     screenTimeApproved,
+    setName,
     setAge,
     setDeferredFocusSchedules,
     setFocusSchedules,
     setOnboardingComplete,
   ]);
 
-  const trimmedName = name.trim();
+  const trimmedName = nameInput.trim();
   const parsedAge = parseInt(ageInput.trim(), 10);
   const isAgeValid =
     ageInput.trim() !== "" &&
@@ -345,7 +374,7 @@ export function useOnboarding(): UseOnboardingResult {
     parsedAge >= 1 &&
     parsedAge <= 120;
   const hasSelectedApps =
-    Platform.OS !== "ios" || familyActivitySelection != null;
+    Platform.OS !== "ios" || familyActivitySelectionDraft != null;
 
   const nextDisabled = (() => {
     if (activeStep === 3) return trimmedName.length === 0;
@@ -355,13 +384,20 @@ export function useOnboarding(): UseOnboardingResult {
     if (activeStep === 7) return screenTimeResolving;
     if (activeStep === 8) return !hasSelectedApps;
     if (activeStep === 9) {
-      return focusSchedules.length === 0 || notificationResolving;
+      return notificationResolving;
     }
     return false;
   })();
 
   const nextLabel = (() => {
     if (isEditTimes) return "Save";
+    if (
+      activeStep === 7 &&
+      Platform.OS === "ios" &&
+      screenTimeStatus === AuthorizationStatus.notDetermined
+    ) {
+      return "Checking...";
+    }
     if (activeStep === 7 && Platform.OS === "ios" && !screenTimeApproved) {
       return screenTimeResolving ? "Checking..." : "Give Access";
     }
@@ -393,11 +429,12 @@ export function useOnboarding(): UseOnboardingResult {
     animateTitleWords: isReviewStep,
     ctaDelayMs: 360,
     ctaKey: isEditTimes ? "edit-times" : stepIndex,
-    familyActivitySelection,
+    familyActivitySelection: familyActivitySelectionDraft,
     hideProgress: isEditTimes,
     headerAlign: isReviewStep ? "center" : "left",
     icon,
     isEditTimes,
+    nameInput,
     nextDisabled,
     nextLabel,
     onBack,
@@ -406,8 +443,9 @@ export function useOnboarding(): UseOnboardingResult {
     onNotificationPermissionStatusChange,
     onScreenTimeAuthorizationChange,
     onScreenTimeAuthorizationStatusChange,
+    onSetNameInput: setNameInput,
     onSetAgeInput: setAgeInput,
-    onSetFamilyActivitySelection: setFamilyActivitySelection,
+    onSetFamilyActivitySelection: setFamilyActivitySelectionDraft,
     progressVariant: isEditTimes ? "full" : "bar",
     scheduleError,
     showBack: isEditTimes,

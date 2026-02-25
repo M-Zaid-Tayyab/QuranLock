@@ -1,7 +1,7 @@
 import { PrimaryButton } from "@/components/common";
 import { colors } from "@/constants/colors";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   Text,
   TouchableOpacity,
@@ -10,6 +10,7 @@ import {
 import Animated, {
   Easing,
   FadeInDown,
+  LinearTransition,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -101,10 +102,14 @@ export function StepContainer({
   }));
   const titleWords = title ? title.split(" ") : [];
 
-  const normalizedHighlightWords = new Set(
-    titleHighlightWords
-      .map((word) => word.replace(/[^a-z]/gi, "").toLowerCase())
-      .filter(Boolean),
+  const normalizedHighlightWords = useMemo(
+    () =>
+      new Set(
+        titleHighlightWords
+          .map((word) => word.replace(/[^a-z]/gi, "").toLowerCase())
+          .filter(Boolean),
+      ),
+    [titleHighlightWords],
   );
 
   return (
@@ -127,7 +132,10 @@ export function StepContainer({
                   backgroundColor: colors.outline,
                 }}
               >
-                <View
+                <Animated.View
+                  layout={LinearTransition.duration(220).easing(
+                    Easing.out(Easing.cubic),
+                  )}
                   className="h-full rounded-full"
                   style={{
                     width: `${progress * 100}%`,

@@ -6,6 +6,7 @@ import {
   canOpenQuran,
   openPaywallForBlockedDecision,
 } from "@/services/entitlements";
+import { convexClient } from "@/services/convexClient";
 import {
   type QuranSearchResult,
 } from "@/services/quranFoundation";
@@ -24,6 +25,7 @@ const FONT_SCALES = [0.9, 1, 1.15, 1.3];
 export const useVerseScreen = () => {
   const router = useRouter();
   const {
+    appUserId,
     lastReadPage,
     setLastReadPage,
     syncedTranslationEnabled,
@@ -34,6 +36,7 @@ export const useVerseScreen = () => {
     completedUnlockSessions,
   } = useUserStore(
     useShallow((s) => ({
+      appUserId: s.appUserId,
       lastReadPage: s.lastReadPage,
       setLastReadPage: s.setLastReadPage,
       syncedTranslationEnabled: s.translationEnabled,
@@ -113,6 +116,7 @@ export const useVerseScreen = () => {
     currentPage,
     setLastReadPage,
     translationEnabledRef,
+    enableAutoDownload: Boolean(appUserId && convexClient),
   });
 
   const handlePageChange = useCallback(

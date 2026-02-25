@@ -11,32 +11,41 @@ import { useShallow } from "zustand/react/shallow";
 import { FocusTimesStep } from "./FocusTimesStep";
 import { IntroStep } from "./IntroStep";
 import { QuestionCard } from "./QuestionCard";
+import { ReviewsStep } from "./ReviewsStep";
 import { ScreenTimeStep } from "./ScreenTimeStep";
 import { SelectAppsStep } from "./SelectAppsStep";
 import { TextInputQuestion } from "./TextInputQuestion";
-import { ReviewsStep } from "./ReviewsStep";
 
 interface OnboardingStepContentProps {
   onboarding: UseOnboardingResult;
 }
 
-export function OnboardingStepContent({
-  onboarding,
-}: OnboardingStepContentProps) {
+function QuranFrequencyQuestion() {
   const funnelText = useFunnelText();
-  const {
-    name,
-    setName,
-    quranFrequency,
-    setQuranFrequency,
-    reasonsDisconnect,
-    setReasonsDisconnect,
-  } = useUserStore(
+  const { quranFrequency, setQuranFrequency } = useUserStore(
     useShallow((s) => ({
-      name: s.name,
-      setName: s.setName,
       quranFrequency: s.quranFrequency,
       setQuranFrequency: s.setQuranFrequency,
+    })),
+  );
+
+  return (
+    <QuestionCard
+      question={funnelText.onboarding.quranFrequencyQuestion}
+      subtitle={funnelText.onboarding.quranFrequencySubtitle}
+      icon="book-outline"
+      iconColor={colors.primary}
+      options={QURAN_FREQUENCY_OPTIONS}
+      selectedValue={quranFrequency || null}
+      onSelect={setQuranFrequency}
+    />
+  );
+}
+
+function ReasonsQuestion() {
+  const funnelText = useFunnelText();
+  const { reasonsDisconnect, setReasonsDisconnect } = useUserStore(
+    useShallow((s) => ({
       reasonsDisconnect: s.reasonsDisconnect,
       setReasonsDisconnect: s.setReasonsDisconnect,
     })),
@@ -44,14 +53,31 @@ export function OnboardingStepContent({
 
   const onToggleReason = useCallback(
     (value: string) => {
-      const set = new Set(reasonsDisconnect);
-      if (set.has(value)) set.delete(value);
-      else set.add(value);
-      setReasonsDisconnect(Array.from(set));
+      const next = new Set(reasonsDisconnect);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      setReasonsDisconnect(Array.from(next));
     },
     [reasonsDisconnect, setReasonsDisconnect],
   );
 
+  return (
+    <QuestionCard
+      question={funnelText.onboarding.reasonsQuestion}
+      subtitle="Select all that apply"
+      icon="heart-dislike-outline"
+      iconColor={colors.primary}
+      options={REASONS_OPTIONS}
+      selectedValues={reasonsDisconnect}
+      onToggle={onToggleReason}
+      multiSelect
+    />
+  );
+}
+
+export function OnboardingStepContent({
+  onboarding,
+}: OnboardingStepContentProps) {
   if (onboarding.activeStep <= 2) {
     return <IntroStep step={onboarding.activeStep} />;
   }
@@ -65,8 +91,8 @@ export function OnboardingStepContent({
         icon="person-outline"
         iconColor={colors.primary}
         placeholder="Your name"
-        value={name}
-        onChangeText={setName}
+        value={onboarding.nameInput}
+        onChangeText={onboarding.onSetNameInput}
         error={onboarding.stepError ?? undefined}
         autoFocus
       />
@@ -94,32 +120,11 @@ export function OnboardingStepContent({
   }
 
   if (onboarding.activeStep === 5) {
-    return (
-      <QuestionCard
-        question={funnelText.onboarding.quranFrequencyQuestion}
-        subtitle={funnelText.onboarding.quranFrequencySubtitle}
-        icon="book-outline"
-        iconColor={colors.primary}
-        options={QURAN_FREQUENCY_OPTIONS}
-        selectedValue={quranFrequency || null}
-        onSelect={setQuranFrequency}
-      />
-    );
+    return <QuranFrequencyQuestion />;
   }
 
   if (onboarding.activeStep === 6) {
-    return (
-      <QuestionCard
-        question={funnelText.onboarding.reasonsQuestion}
-        subtitle="Select all that apply"
-        icon="heart-dislike-outline"
-        iconColor={colors.primary}
-        options={REASONS_OPTIONS}
-        selectedValues={reasonsDisconnect}
-        onToggle={onToggleReason}
-        multiSelect
-      />
-    );
+    return <ReasonsQuestion />;
   }
 
   if (onboarding.activeStep === 7) {
@@ -138,6 +143,9 @@ export function OnboardingStepContent({
       <SelectAppsStep
         familyActivitySelection={onboarding.familyActivitySelection}
         onSelectionChange={onboarding.onSetFamilyActivitySelection}
+        onSelectionDone={() => {
+          void onboarding.onNext();
+        }}
       />
     );
   }

@@ -1,7 +1,7 @@
 import { PrimaryButton } from "@/components/common";
 import { colors } from "@/constants/colors";
 import { useFunnelText } from "@/hooks/app";
-import { useRouter, type Href } from "expo-router";
+import { Stack, useRouter, type Href } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import Animated, {
@@ -16,6 +16,7 @@ import Animated, {
 export default function Welcome() {
   const router = useRouter();
   const funnelText = useFunnelText();
+  const onboardingHref: Href = "/onboarding";
 
   const heroText = funnelText.welcome.heroText;
   const heroWords = heroText.split(" ");
@@ -66,6 +67,8 @@ export default function Welcome() {
 
   return (
     <View className="flex-1 bg-background pt-safe pb-safe">
+      <Stack.Screen options={{ animation: "fade" }} />
+
       <View className="flex-1 px-8 pt-8 pb-8">
         <View pointerEvents="none" className="absolute inset-0">
           <View
@@ -78,7 +81,6 @@ export default function Welcome() {
           />
         </View>
 
-        {/* Hero copy */}
         <View className="flex-1 justify-center">
           <Animated.View
             entering={FadeInDown.delay(40)
@@ -121,12 +123,11 @@ export default function Welcome() {
           </View>
         </View>
 
-        {/* CTA */}
         <Animated.View style={buttonAnimatedStyle}>
           <View className="pt-4">
             <PrimaryButton
               title="Begin"
-              onPress={() => router.replace("/onboarding" as Href)}
+              onPress={() => router.replace(onboardingHref)}
               disabled={!heroFinished}
             />
           </View>
