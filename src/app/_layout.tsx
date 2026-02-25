@@ -5,6 +5,7 @@ import {
   useFocusScheduleEntitlementReconciliation,
   useUserSync,
 } from "@/hooks/user";
+import { UpdateBanner } from "@/components/common";
 import { QueryProvider } from "@/providers/QueryProvider";
 import {
   canOpenQuran,
@@ -172,6 +173,7 @@ function RootLayoutContent() {
               animation: "slide_from_right",
             }}
           />
+          <UpdateBanner />
         </BottomSheetModalProvider>
       </KeyboardProvider>
     </GestureHandlerRootView>
