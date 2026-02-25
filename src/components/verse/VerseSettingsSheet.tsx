@@ -131,7 +131,15 @@ export function VerseSettingsSheet({
   const recitationDownloadCurrentChapter =
     recitationDownloadStatus.currentChapter;
   const recitationDownloadInProgress = recitationDownloadStatus.isDownloading;
-  const isRecitationDownloadComplete = recitationDownloadProgressPercent >= 100;
+  const hasDownloadedAllRecitationChapters =
+    recitationDownloadTotalChapters > 0 &&
+    recitationDownloadCompletedChapters >= recitationDownloadTotalChapters;
+  const hasReachedRecitationProgressCompletion =
+    recitationDownloadProgressPercent >= 100;
+  const isRecitationDownloadComplete =
+    !recitationDownloadInProgress &&
+    (hasDownloadedAllRecitationChapters ||
+      hasReachedRecitationProgressCompletion);
   const isRecitationDownloadActionDisabled =
     isRecitationDownloadComplete || recitationDownloadInProgress;
   const downloadCtaLabel = isRecitationDownloadComplete
@@ -144,6 +152,49 @@ export function VerseSettingsSheet({
     : isRecitationDownloadComplete
       ? "Offline recitation pack ready."
       : "Download is paused.";
+  const renderRecitationDownloadCard = () => {
+    if (isRecitationDownloadComplete) return null;
+
+    return (
+      <View className="rounded-2xl border border-outline bg-backgroundElevated px-4 py-4">
+        <View className="flex-row items-center justify-between">
+          <Text className="text-sm font-sfPro-semibold text-foreground">
+            Recitation Download
+          </Text>
+          <Text className="text-xs font-sfPro text-muted">
+            {recitationDownloadProgressPercent}%
+          </Text>
+        </View>
+
+        <Text className="mt-1 text-xs font-sfPro text-muted">
+          {recitationDownloadCompletedChapters}/{recitationDownloadTotalChapters} chapters
+          downloaded
+        </Text>
+
+        <Text className="mt-2 text-xs font-sfPro text-muted">
+          {downloadStatusText}
+        </Text>
+
+        <Pressable
+          onPress={handleResumeRecitationDownload}
+          disabled={isRecitationDownloadActionDisabled}
+          className={`mt-3 rounded-xl border px-4 py-3 ${
+            isRecitationDownloadActionDisabled
+              ? "border-outline bg-surface"
+              : "border-accent bg-accent/20"
+          }`}
+        >
+          <Text
+            className={`text-center text-sm font-sfPro-semibold ${
+              isRecitationDownloadActionDisabled ? "text-muted" : "text-accent"
+            }`}
+          >
+            {downloadCtaLabel}
+          </Text>
+        </Pressable>
+      </View>
+    );
+  };
 
   return (
     <BottomSheetModal
@@ -236,45 +287,7 @@ export function VerseSettingsSheet({
             onToggle={onToggleRecitationVisible}
           />
 
-          <View className="rounded-2xl border border-outline bg-backgroundElevated px-4 py-4">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-sm font-sfPro-semibold text-foreground">
-                Recitation Download
-              </Text>
-              <Text className="text-xs font-sfPro text-muted">
-                {recitationDownloadProgressPercent}%
-              </Text>
-            </View>
-
-            <Text className="mt-1 text-xs font-sfPro text-muted">
-              {recitationDownloadCompletedChapters}/{recitationDownloadTotalChapters} chapters
-              downloaded
-            </Text>
-
-            <Text className="mt-2 text-xs font-sfPro text-muted">
-              {downloadStatusText}
-            </Text>
-
-            <Pressable
-              onPress={handleResumeRecitationDownload}
-              disabled={isRecitationDownloadActionDisabled}
-              className={`mt-3 rounded-xl border px-4 py-3 ${
-                isRecitationDownloadActionDisabled
-                  ? "border-outline bg-surface"
-                  : "border-accent bg-accent/20"
-              }`}
-            >
-              <Text
-                className={`text-center text-sm font-sfPro-semibold ${
-                  isRecitationDownloadActionDisabled
-                    ? "text-muted"
-                    : "text-accent"
-                }`}
-              >
-                {downloadCtaLabel}
-              </Text>
-            </Pressable>
-          </View>
+          {renderRecitationDownloadCard()}
 
           <View className="rounded-2xl border border-outline bg-backgroundElevated px-4 py-4">
             <Text className="text-sm font-sfPro-semibold text-foreground">
