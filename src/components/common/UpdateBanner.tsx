@@ -78,32 +78,27 @@ export const UpdateBanner = () => {
     }
   }, [updateKey]);
 
-  if (!isUpdatePending || !updateKey || dismissedUpdateKey === updateKey) {
-    return null;
-  }
+  // if (!isUpdatePending || !updateKey || dismissedUpdateKey === updateKey) {
+  //   return null;
+  // }
 
-  const title = isApplyingUpdate ? "Applying update..." : "Update is ready";
+  const title = isApplyingUpdate
+    ? "Applying update..."
+    : "A new update is available!";
 
   return (
     <View
       pointerEvents="box-none"
       className="absolute left-4 right-4 z-50 pt-safe"
     >
-      <View
-        className="flex-row items-center justify-between rounded-xl border px-3 py-2"
-        style={{
-          backgroundColor: colors.surface,
-          borderColor: colors.outline,
-        }}
-      >
-        <Text className="mr-3 flex-1 text-sm font-sfPro-medium text-foreground">
+      <View className="flex-row items-center justify-between rounded-xl border p-4 bg-surface border-outline">
+        <Text className="mr-3 flex-1 text-md font-sfPro-medium text-foreground">
           {title}
         </Text>
 
         <View className="flex-row items-center">
           <TouchableOpacity
             activeOpacity={0.8}
-            className="rounded-md px-2 py-1"
             onPress={onLater}
             disabled={isApplyingUpdate}
           >
@@ -114,7 +109,7 @@ export const UpdateBanner = () => {
 
           <TouchableOpacity
             activeOpacity={0.8}
-            className="ml-4 flex-row items-center rounded-md bg-primary px-3 py-1.5"
+            className="ml-6 flex-row items-center rounded-md bg-primary px-5 py-1.5"
             onPress={onReload}
             disabled={isApplyingUpdate}
           >
