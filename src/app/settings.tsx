@@ -1,5 +1,10 @@
 import { SettingsSelectAppsStep } from "@/components/onboarding";
-import { setSelection } from "@/services/deviceActivity";
+import {
+  SCREEN_TIME,
+  setSelection,
+  stopMonitoring,
+  unblockSelection,
+} from "@/services/deviceActivity";
 import { ensureCanEditFocusTimes } from "@/services/entitlements";
 import { resetAllStores } from "@/store";
 import { useUserStore } from "@/store/user";
@@ -7,7 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Application from "expo-application";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo } from "react";
-import { Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
 export default function SettingsScreen() {
@@ -96,9 +101,20 @@ export default function SettingsScreen() {
   }, [isPremium, router]);
 
   const handleLogout = useCallback(() => {
+    if (Platform.OS === "ios") {
+      const activityNames = [
+        SCREEN_TIME.ACTIVITY_NAME,
+        ...focusSchedules.map(
+          (schedule) => `${SCREEN_TIME.ACTIVITY_NAME}-${schedule.id}`,
+        ),
+      ];
+      stopMonitoring(Array.from(new Set(activityNames)));
+      unblockSelection();
+    }
+
     resetAllStores();
     router.replace("/welcome");
-  }, [router]);
+  }, [focusSchedules, router]);
 
   const formatTime = (hour: number, minute: number) => {
     const suffix = hour >= 12 ? "PM" : "AM";
