@@ -12,6 +12,7 @@ import { useUserStore } from "@/store/user";
 import { getDateKey, type ScheduleStatus } from "@/utils/scheduleEngine";
 import { useIsFocused } from "@react-navigation/native";
 import { useRouter } from "expo-router";
+import * as StoreReview from "expo-store-review";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
 import { useShallow } from "zustand/react/shallow";
@@ -114,7 +115,9 @@ export const useHomeScreen = () => {
     lastReadPage,
     hasSelectedApps,
     streakCompletedDates,
+    hasRequestedFirstStreakReview,
     markStreakDayCompleted,
+    setHasRequestedFirstStreakReview,
   } = useUserStore(
     useShallow((s) => ({
       name: s.name,
@@ -124,7 +127,9 @@ export const useHomeScreen = () => {
       lastReadPage: s.lastReadPage,
       hasSelectedApps: s.hasSelectedApps,
       streakCompletedDates: s.streakCompletedDates,
+      hasRequestedFirstStreakReview: s.hasRequestedFirstStreakReview,
       markStreakDayCompleted: s.markStreakDayCompleted,
+      setHasRequestedFirstStreakReview: s.setHasRequestedFirstStreakReview,
     })),
   );
 
@@ -299,6 +304,34 @@ export const useHomeScreen = () => {
       ),
     [hasCompletedAllGoalsToday, streakCompletedDates],
   );
+
+  useEffect(() => {
+    if (
+      !isFocused ||
+      hasRequestedFirstStreakReview ||
+      streakCompletedDates.length !== 1
+    ) {
+      return;
+    }
+
+    setHasRequestedFirstStreakReview(true);
+
+    const requestFirstStreakReview = async () => {
+      try {
+        const isReviewAvailable = await StoreReview.isAvailableAsync();
+        if (isReviewAvailable) {
+          await StoreReview.requestReview();
+        }
+      } catch {}
+    };
+
+    requestFirstStreakReview();
+  }, [
+    hasRequestedFirstStreakReview,
+    isFocused,
+    setHasRequestedFirstStreakReview,
+    streakCompletedDates.length,
+  ]);
 
   const handleOpenSettings = useCallback(() => {
     router.push("/settings");

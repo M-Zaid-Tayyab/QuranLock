@@ -405,8 +405,8 @@ export function useOnboarding(): UseOnboardingResult {
       if (notificationResolving) return "Checking...";
       return notificationStatus === "denied" ? "Open Settings" : "Give Access";
     }
-    if (stepIndex === 0) return "Get Started";
-    if (stepIndex < 3) return "Next";
+    if (stepIndex === 0) return "Continue";
+    if (stepIndex < 3) return "Continue";
     return "Continue";
   })();
 

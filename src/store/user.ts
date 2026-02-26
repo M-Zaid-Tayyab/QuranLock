@@ -28,6 +28,7 @@ export interface UserState {
   subscriptionTier: SubscriptionTier;
   completedUnlockSessions: number;
   streakCompletedDates: string[];
+  hasRequestedFirstStreakReview: boolean;
 }
 
 export interface FocusSchedule {
@@ -63,6 +64,7 @@ interface UserActions {
   incrementCompletedUnlockSessions: () => void;
   setStreakCompletedDates: (value: string[]) => void;
   markStreakDayCompleted: (dateKey?: string) => void;
+  setHasRequestedFirstStreakReview: (value: boolean) => void;
 }
 
 const getLocalDateKey = (date: Date = new Date()) => {
@@ -93,6 +95,7 @@ const createInitialUserState = (): UserState => ({
   subscriptionTier: SUBSCRIPTION_TIERS.FREE,
   completedUnlockSessions: 0,
   streakCompletedDates: [],
+  hasRequestedFirstStreakReview: false,
 });
 
 export const useUserStore = create<UserState & UserActions>()(
@@ -148,6 +151,8 @@ export const useUserStore = create<UserState & UserActions>()(
             streakCompletedDates: [...state.streakCompletedDates, key].sort(),
           };
         }),
+      setHasRequestedFirstStreakReview: (hasRequestedFirstStreakReview) =>
+        set({ hasRequestedFirstStreakReview }),
     }),
     {
       name: STORE_KEYS.USER_STORE,

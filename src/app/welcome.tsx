@@ -1,9 +1,10 @@
 import { PrimaryButton } from "@/components/common";
-import { colors } from "@/constants/colors";
+import { IMAGES } from "@/constants";
+import { colors, rgba } from "@/constants/colors";
 import { useFunnelText } from "@/hooks/app";
 import { Stack, useRouter, type Href } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { Text, View } from "react-native";
+import React, { useEffect } from "react";
+import { Image, Text, View } from "react-native";
 import Animated, {
   Easing,
   FadeInDown,
@@ -22,10 +23,8 @@ export default function Welcome() {
   const heroWords = heroText.split(" ");
   const highlightedWords = funnelText.welcome.highlightedWords;
 
-  const [heroFinished, setHeroFinished] = useState(false);
-
   const buttonOpacity = useSharedValue(0);
-  const buttonScale = useSharedValue(0.9);
+  const buttonScale = useSharedValue(0.92);
 
   const buttonAnimatedStyle = useAnimatedStyle(() => ({
     opacity: buttonOpacity.value,
@@ -33,13 +32,7 @@ export default function Welcome() {
   }));
 
   useEffect(() => {
-    const heroWordDelay = 160;
-    const heroWordDuration = 260;
-
-    const totalHeroDuration =
-      heroWords.length * heroWordDelay + heroWordDuration;
-
-    const buttonStart = totalHeroDuration + 80;
+    const buttonStart = 360;
 
     buttonOpacity.value = withDelay(
       buttonStart,
@@ -55,15 +48,7 @@ export default function Welcome() {
         easing: Easing.out(Easing.cubic),
       }),
     );
-
-    const heroFinishedTimeout = setTimeout(() => {
-      setHeroFinished(true);
-    }, buttonStart + 260);
-
-    return () => {
-      clearTimeout(heroFinishedTimeout);
-    };
-  }, [buttonOpacity, buttonScale, heroWords.length]);
+  }, [buttonOpacity, buttonScale]);
 
   return (
     <View className="flex-1 bg-background pt-safe pb-safe">
@@ -72,12 +57,12 @@ export default function Welcome() {
       <View className="flex-1 px-8 pt-8 pb-8">
         <View pointerEvents="none" className="absolute inset-0">
           <View
-            className="absolute -top-24 -left-16 h-64 w-64 rounded-full"
-            style={{ backgroundColor: colors.primary, opacity: 0.18 }}
+            className="absolute -top-16 -left-12 h-48 w-48 rounded-full"
+            style={{ backgroundColor: colors.primary, opacity: 0.09 }}
           />
           <View
-            className="absolute -bottom-20 -right-10 h-72 w-72 rounded-full"
-            style={{ backgroundColor: colors.accent, opacity: 0.12 }}
+            className="absolute -bottom-28 -right-16 h-56 w-56 rounded-full"
+            style={{ backgroundColor: colors.accent, opacity: 0.06 }}
           />
         </View>
 
@@ -86,28 +71,47 @@ export default function Welcome() {
             entering={FadeInDown.delay(40)
               .duration(240)
               .easing(Easing.out(Easing.cubic))}
-            className="self-start rounded-full border px-3 py-1"
-            style={{
-              borderColor: colors.primary,
-              backgroundColor: "rgba(13, 148, 136, 0.15)",
-            }}
+            className="items-center"
           >
-            <Text className="text-xs font-sfPro-semibold tracking-widest text-primary">
-              QURANLOCK
+            <View
+              className="h-32 w-32 items-center justify-center rounded-[2rem]"
+              style={{
+                backgroundColor: rgba(colors.primary, 0.14),
+                borderColor: rgba(colors.primary, 0.42),
+                borderWidth: 1,
+                shadowColor: colors.black,
+                shadowOpacity: 0.24,
+                shadowRadius: 18,
+                shadowOffset: { width: 0, height: 12 },
+              }}
+            >
+              <Image
+                source={IMAGES.ICON}
+                resizeMode="contain"
+                className="h-28 w-28 rounded-[1.5rem]"
+              />
+            </View>
+            <Text
+              className="mt-3 text-[11px] font-sfPro-semibold tracking-widest"
+              style={{ color: colors.primaryVariant }}
+            >
+              QURAN LOCK
             </Text>
           </Animated.View>
 
-          <View className="mt-5">
-            <View className="flex-row flex-wrap max-w-[320px]">
+          <View className="mt-8 self-center">
+            <View className="flex-row flex-wrap max-w-[344px] items-center justify-center">
               {heroWords.map((word, index) => (
                 <Animated.Text
                   key={`${word}-${index}`}
-                  entering={FadeInDown.delay(index * 160)
+                  entering={FadeInDown.delay(120 + index * 140)
                     .duration(260)
                     .easing(Easing.out(Easing.cubic))}
-                  className="text-4xl font-sfPro-bold leading-tight"
+                  className="text-center font-sfPro-bold"
                   style={{
-                    letterSpacing: 0.8,
+                    fontSize: 32,
+                    lineHeight: 49,
+                    letterSpacing: 0.35,
                     color: highlightedWords.includes(
                       word.replace(/[^a-z]/gi, "").toLowerCase(),
                     )
@@ -126,9 +130,8 @@ export default function Welcome() {
         <Animated.View style={buttonAnimatedStyle}>
           <View className="pt-4">
             <PrimaryButton
-              title="Begin"
+              title="Bismillah, Let's Start"
               onPress={() => router.replace(onboardingHref)}
-              disabled={!heroFinished}
             />
           </View>
         </Animated.View>

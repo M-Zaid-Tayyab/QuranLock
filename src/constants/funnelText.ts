@@ -47,8 +47,8 @@ export const FUNNEL_TEXT_BY_VARIANT: Record<FunnelVariant, FunnelText> = {
   REGULAR: {
     welcome: {
       heroText:
-        "Reconnect with Allah, step away from endless scrolling, and sit with his talk to you again.",
-      highlightedWords: ["allah", "talk"],
+        "Allah brought you here for a reason. You already began your return to Quran.",
+      highlightedWords: ["allah", "quran"],
     },
     onboarding: {
       introTitles: [
@@ -101,8 +101,8 @@ export const FUNNEL_TEXT_BY_VARIANT: Record<FunnelVariant, FunnelText> = {
   RAMADAN: {
     welcome: {
       heroText:
-        "Reconnect this Ramadan, step away from endless scrolling, and sit with His words to you again.",
-      highlightedWords: ["ramadan", "words"],
+        "Allah brought you to this Ramadan for a reason. You already began your return to Quran.",
+      highlightedWords: ["allah", "ramadan", "quran"],
     },
     onboarding: {
       introTitles: [
