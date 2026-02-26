@@ -4,6 +4,7 @@ import { PAYWALL_SOURCES } from "@/constants/entitlements";
 import { useRemoteAppConfig } from "@/hooks/app";
 import {
   useFocusScheduleEntitlementReconciliation,
+  usePushNotificationSync,
   useUserSync,
 } from "@/hooks/user";
 import { QueryProvider } from "@/providers/QueryProvider";
@@ -94,6 +95,7 @@ function RootLayoutContent() {
   useDeepLinkToVerse();
   useRemoteAppConfig();
   useUserSync();
+  usePushNotificationSync();
   useFocusScheduleEntitlementReconciliation();
 
   const { appUserId, setAppUserId, setIsPremium } = useUserStore(

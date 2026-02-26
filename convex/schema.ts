@@ -17,6 +17,12 @@ const focusSchedule = v.object({
   durationMinutes: v.number(),
 });
 
+const notificationPermissionStatus = v.union(
+  v.literal("granted"),
+  v.literal("denied"),
+  v.literal("undetermined"),
+);
+
 export default defineSchema({
   users: defineTable({
     appUserId: v.string(),
@@ -42,6 +48,9 @@ export default defineSchema({
     ),
     completedUnlockSessions: v.number(),
     streakCompletedDates: v.array(v.string()),
+    expoPushToken: v.optional(v.string()),
+    notificationPermissionStatus: v.optional(notificationPermissionStatus),
+    pushTokenUpdatedAt: v.optional(v.number()),
     updatedAt: v.number(),
   }).index("by_appUserId", ["appUserId"]),
 });

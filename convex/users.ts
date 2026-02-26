@@ -17,6 +17,17 @@ const focusSchedule = v.object({
   durationMinutes: v.number(),
 });
 
+const notificationPermissionStatus = v.union(
+  v.literal("granted"),
+  v.literal("denied"),
+  v.literal("undetermined"),
+);
+
+const normalizeToken = (token: string | undefined) => {
+  const trimmed = token?.trim();
+  return trimmed?.length ? trimmed : undefined;
+};
+
 export const upsertUser = mutation({
   args: {
     appUserId: v.string(),
@@ -106,5 +117,67 @@ export const upsertUser = mutation({
     }
 
     return primary._id;
+  },
+});
+
+export const upsertPushToken = mutation({
+  args: {
+    appUserId: v.string(),
+    expoPushToken: v.optional(v.string()),
+    clearExpoPushToken: v.optional(v.boolean()),
+    notificationPermissionStatus,
+  },
+  handler: async (ctx, args) => {
+    const existingUsers = await ctx.db
+      .query("users")
+      .withIndex("by_appUserId", (q) => q.eq("appUserId", args.appUserId))
+      .collect();
+
+    if (!existingUsers.length) {
+      return {
+        updated: false,
+        reason: "user_not_found",
+      };
+    }
+
+    const [primary, ...duplicates] = existingUsers.sort(
+      (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
+    );
+
+    const hasExpoPushTokenInArgs = Object.prototype.hasOwnProperty.call(
+      args,
+      "expoPushToken",
+    );
+    const shouldClearExpoPushToken = args.clearExpoPushToken === true;
+    const nextExpoPushToken = shouldClearExpoPushToken
+      ? undefined
+      : hasExpoPushTokenInArgs
+        ? normalizeToken(args.expoPushToken)
+        : (primary.expoPushToken ?? undefined);
+    const changedToken =
+      (primary.expoPushToken ?? undefined) !== nextExpoPushToken;
+    const changedStatus =
+      (primary.notificationPermissionStatus ?? "undetermined") !==
+      args.notificationPermissionStatus;
+
+    if (changedToken || changedStatus || duplicates.length) {
+      await ctx.db.patch(primary._id, {
+        ...(changedToken ? { expoPushToken: nextExpoPushToken } : {}),
+        notificationPermissionStatus: args.notificationPermissionStatus,
+        pushTokenUpdatedAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+    }
+
+    if (duplicates.length) {
+      await Promise.all(duplicates.map((doc) => ctx.db.delete(doc._id)));
+    }
+
+    return {
+      updated: changedToken || changedStatus || duplicates.length > 0,
+      appUserId: primary.appUserId,
+      expoPushToken: nextExpoPushToken,
+      notificationPermissionStatus: args.notificationPermissionStatus,
+    };
   },
 });

@@ -26,6 +26,7 @@ export interface RecitationOfflineDownloadStatus {
 
 const DEFAULT_RECITER_ID = DEFAULT_QURAN_RECITERS[0]?.id ?? 7;
 const TOTAL_RECITATION_CHAPTERS = 114;
+const RECITATION_DOWNLOAD_CHAPTERS = __DEV__ ? 1 : TOTAL_RECITATION_CHAPTERS;
 const OFFLINE_DOWNLOAD_CONCURRENCY = 3;
 const RECITATION_FILE_DOWNLOAD_RETRY_ATTEMPTS = 3;
 const RECITATION_CHAPTER_FETCH_RETRY_ATTEMPTS = 3;
@@ -38,7 +39,7 @@ const downloadStatusListeners = new Set<
 let offlineDownloadStatus: RecitationOfflineDownloadStatus = {
   isDownloading: false,
   completedChapters: 0,
-  totalChapters: TOTAL_RECITATION_CHAPTERS,
+  totalChapters: RECITATION_DOWNLOAD_CHAPTERS,
   progressPercent: 0,
   currentChapter: null,
   lastError: null,
@@ -92,8 +93,11 @@ const checkFileExists = async (uri: string) => {
 };
 
 const toProgressPercent = (completedChapters: number) => {
-  const bounded = Math.min(TOTAL_RECITATION_CHAPTERS, Math.max(0, completedChapters));
-  return Math.round((bounded / TOTAL_RECITATION_CHAPTERS) * 100);
+  const bounded = Math.min(
+    RECITATION_DOWNLOAD_CHAPTERS,
+    Math.max(0, completedChapters),
+  );
+  return Math.round((bounded / RECITATION_DOWNLOAD_CHAPTERS) * 100);
 };
 
 const isCancelledError = (error: unknown) => {
@@ -117,7 +121,7 @@ const updateOfflineDownloadStatus = (
   };
   publishOfflineDownloadStatus({
     ...merged,
-    totalChapters: TOTAL_RECITATION_CHAPTERS,
+    totalChapters: RECITATION_DOWNLOAD_CHAPTERS,
     progressPercent: toProgressPercent(merged.completedChapters),
   });
 };
@@ -130,7 +134,7 @@ const getChapterMarkerExists = async (reciterId: number, chapterNumber: number) 
 
 const loadCompletedChapterSet = async (reciterId: number) => {
   const completed = new Set<number>();
-  for (let chapter = 1; chapter <= TOTAL_RECITATION_CHAPTERS; chapter += 1) {
+  for (let chapter = 1; chapter <= RECITATION_DOWNLOAD_CHAPTERS; chapter += 1) {
     if (await getChapterMarkerExists(reciterId, chapter)) {
       completed.add(chapter);
     }
@@ -351,7 +355,7 @@ export const startGlobalRecitationOfflineDownload = () => {
         lastError: null,
       });
 
-      for (let chapter = 1; chapter <= TOTAL_RECITATION_CHAPTERS; chapter += 1) {
+      for (let chapter = 1; chapter <= RECITATION_DOWNLOAD_CHAPTERS; chapter += 1) {
         if (completedChapters.has(chapter)) {
           continue;
         }
@@ -396,7 +400,7 @@ export const startGlobalRecitationOfflineDownload = () => {
         completedChapters: completedChapters.size,
         currentChapter: null,
         lastError:
-          completedChapters.size === TOTAL_RECITATION_CHAPTERS
+          completedChapters.size === RECITATION_DOWNLOAD_CHAPTERS
             ? null
             : offlineDownloadStatus.lastError,
       });
