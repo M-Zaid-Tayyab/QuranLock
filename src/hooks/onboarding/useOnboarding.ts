@@ -16,7 +16,6 @@ import {
 import { ensureCanEditFocusTimes } from "@/services/entitlements";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore, type FocusSchedule } from "@/store/user";
-import { resolveFocusSchedulesByEntitlement } from "@/utils/focusScheduleEntitlement";
 import { applyFocusSchedulesToDevice } from "@/utils/focusScheduleRuntime";
 import * as Notifications from "expo-notifications";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -75,8 +74,6 @@ export function useOnboarding(): UseOnboardingResult {
     quranFrequency,
     reasonsDisconnect,
     focusSchedules,
-    setFocusSchedules,
-    setDeferredFocusSchedules,
     familyActivitySelection,
     isPremium,
     setOnboardingComplete,
@@ -89,8 +86,6 @@ export function useOnboarding(): UseOnboardingResult {
       quranFrequency: s.quranFrequency,
       reasonsDisconnect: s.reasonsDisconnect,
       focusSchedules: s.focusSchedules,
-      setFocusSchedules: s.setFocusSchedules,
-      setDeferredFocusSchedules: s.setDeferredFocusSchedules,
       familyActivitySelection: s.familyActivitySelection,
       isPremium: s.isPremium,
       setOnboardingComplete: s.setOnboardingComplete,
@@ -307,27 +302,12 @@ export function useOnboarding(): UseOnboardingResult {
       }
 
       setHasAttemptedScheduleSubmit(false);
-      const selectedSchedules = useUserStore.getState().focusSchedules;
-      let schedulesToActivate = selectedSchedules;
-
-      if (!isEditTimes) {
-        const resolved = resolveFocusSchedulesByEntitlement({
-          isPremium,
-          activeSchedules: selectedSchedules,
-          deferredSchedules: [],
-        });
-        schedulesToActivate = resolved.activeSchedules;
-        setFocusSchedules(resolved.activeSchedules);
-        setDeferredFocusSchedules(resolved.deferredSchedules);
-      }
-
-      try {
-        await applySchedules(schedulesToActivate);
-      } catch {}
-
       if (!isEditTimes) {
         setStepIndex(REVIEW_STEP);
       } else {
+        try {
+          await applySchedules(useUserStore.getState().focusSchedules);
+        } catch {}
         router.back();
       }
       return;
@@ -352,7 +332,6 @@ export function useOnboarding(): UseOnboardingResult {
     familyActivitySelectionDraft,
     focusSchedules.length,
     isEditTimes,
-    isPremium,
     mapNotificationStatus,
     name,
     nameInput,
@@ -361,8 +340,6 @@ export function useOnboarding(): UseOnboardingResult {
     screenTimeApproved,
     setName,
     setAge,
-    setDeferredFocusSchedules,
-    setFocusSchedules,
     setOnboardingComplete,
   ]);
 

@@ -1,11 +1,6 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
 
-const SUBSCRIPTION_TIERS = {
-  FREE: "free",
-  PRO: "pro",
-} as const;
-
 const focusDurationMode = v.union(v.literal("manual"), v.literal("goal"));
 
 const focusSchedule = v.object({
@@ -47,9 +42,8 @@ export const upsertUser = mutation({
     translationEnabled: v.boolean(),
     quranFontScale: v.optional(v.number()),
     isPremium: v.boolean(),
-    subscriptionTier: v.union(
-      v.literal(SUBSCRIPTION_TIERS.FREE),
-      v.literal(SUBSCRIPTION_TIERS.PRO),
+    subscriptionTier: v.optional(
+      v.union(v.literal("free"), v.literal("pro")),
     ),
     completedUnlockSessions: v.number(),
     streakCompletedDates: v.array(v.string()),
@@ -60,56 +54,137 @@ export const upsertUser = mutation({
       .withIndex("by_appUserId", (q) => q.eq("appUserId", args.appUserId))
       .collect();
 
-    const normalizedPayload = {
-      ...args,
-      deferredFocusSchedules: args.deferredFocusSchedules ?? [],
-      focusDurationMode: args.focusDurationMode ?? "goal",
-      focusCompletionDays: args.focusCompletionDays ?? 30,
-      focusMinutesPerPage: args.focusMinutesPerPage ?? 3,
-      quranFontScale: args.quranFontScale ?? 1,
-    };
-
-    const payload = {
-      ...normalizedPayload,
-      updatedAt: Date.now(),
-    };
-
-    if (!existingUsers.length) {
-      return ctx.db.insert("users", payload);
-    }
-
     const [primary, ...duplicates] = existingUsers.sort(
       (a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0),
     );
 
-    const normalizedCurrent = {
+    const normalizeUserFields = (input: {
+      appUserId: string;
+      name: string;
+      age?: number;
+      quranFrequency?: string;
+      reasonsDisconnect: string[];
+      focusSchedules: typeof args.focusSchedules;
+      deferredFocusSchedules?: typeof args.focusSchedules;
+      focusDurationMode?: "manual" | "goal";
+      focusCompletionDays?: number;
+      focusMinutesPerPage?: number;
+      onboardingComplete: boolean;
+      hasSelectedApps: boolean;
+      familyActivitySelection?: string;
+      lastReadPage: number;
+      translationEnabled: boolean;
+      quranFontScale?: number;
+      isPremium: boolean;
+      subscriptionTier?: "free" | "pro";
+      completedUnlockSessions: number;
+      streakCompletedDates: string[];
+    }) => {
+      const normalizedMode = input.focusDurationMode ?? "goal";
+      const normalized = {
+        appUserId: input.appUserId,
+        name: input.name,
+        age: input.age,
+        quranFrequency: input.quranFrequency,
+        reasonsDisconnect: input.reasonsDisconnect,
+        focusSchedules: input.focusSchedules,
+        onboardingComplete: input.onboardingComplete,
+        hasSelectedApps: input.hasSelectedApps,
+        familyActivitySelection: input.familyActivitySelection,
+        lastReadPage: input.lastReadPage,
+        translationEnabled: input.translationEnabled,
+        quranFontScale: input.quranFontScale ?? 1,
+        isPremium: input.isPremium,
+        completedUnlockSessions: input.completedUnlockSessions,
+        streakCompletedDates: input.streakCompletedDates,
+        focusDurationMode: normalizedMode,
+      } as {
+        appUserId: string;
+        name: string;
+        age?: number;
+        quranFrequency?: string;
+        reasonsDisconnect: string[];
+        focusSchedules: typeof args.focusSchedules;
+        deferredFocusSchedules?: typeof args.focusSchedules;
+        focusDurationMode: "manual" | "goal";
+        focusCompletionDays?: number;
+        focusMinutesPerPage?: number;
+        onboardingComplete: boolean;
+        hasSelectedApps: boolean;
+        familyActivitySelection?: string;
+        lastReadPage: number;
+        translationEnabled: boolean;
+        quranFontScale: number;
+        isPremium: boolean;
+        completedUnlockSessions: number;
+        streakCompletedDates: string[];
+      };
+
+      if (input.deferredFocusSchedules?.length) {
+        normalized.deferredFocusSchedules = input.deferredFocusSchedules;
+      }
+
+      if (normalizedMode === "goal") {
+        normalized.focusCompletionDays = input.focusCompletionDays ?? 30;
+        normalized.focusMinutesPerPage = input.focusMinutesPerPage ?? 3;
+      }
+
+      return normalized;
+    };
+
+    const normalizedPayload = normalizeUserFields({
+      ...args,
+      deferredFocusSchedules:
+        args.deferredFocusSchedules ??
+        (primary?.deferredFocusSchedules ?? undefined),
+      focusDurationMode: args.focusDurationMode ?? primary?.focusDurationMode,
+      focusCompletionDays:
+        args.focusCompletionDays ?? primary?.focusCompletionDays,
+      focusMinutesPerPage:
+        args.focusMinutesPerPage ?? primary?.focusMinutesPerPage,
+      quranFontScale: args.quranFontScale ?? primary?.quranFontScale,
+    });
+
+    if (!primary) {
+      return ctx.db.insert("users", {
+        ...normalizedPayload,
+        updatedAt: Date.now(),
+      });
+    }
+
+    const normalizedCurrent = normalizeUserFields({
       appUserId: primary.appUserId,
       name: primary.name,
       age: primary.age,
       quranFrequency: primary.quranFrequency,
       reasonsDisconnect: primary.reasonsDisconnect,
       focusSchedules: primary.focusSchedules,
-      deferredFocusSchedules: primary.deferredFocusSchedules ?? [],
-      focusDurationMode: primary.focusDurationMode ?? "goal",
-      focusCompletionDays: primary.focusCompletionDays ?? 30,
-      focusMinutesPerPage: primary.focusMinutesPerPage ?? 3,
+      deferredFocusSchedules: primary.deferredFocusSchedules,
+      focusDurationMode: primary.focusDurationMode,
+      focusCompletionDays: primary.focusCompletionDays,
+      focusMinutesPerPage: primary.focusMinutesPerPage,
       onboardingComplete: primary.onboardingComplete,
       hasSelectedApps: primary.hasSelectedApps,
       familyActivitySelection: primary.familyActivitySelection,
       lastReadPage: primary.lastReadPage,
       translationEnabled: primary.translationEnabled,
-      quranFontScale: primary.quranFontScale ?? 1,
+      quranFontScale: primary.quranFontScale,
       isPremium: primary.isPremium,
-      subscriptionTier: primary.subscriptionTier,
       completedUnlockSessions: primary.completedUnlockSessions,
       streakCompletedDates: primary.streakCompletedDates,
-    };
+    });
 
     const hasChanges =
       JSON.stringify(normalizedCurrent) !== JSON.stringify(normalizedPayload);
 
     if (hasChanges || duplicates.length) {
-      await ctx.db.patch(primary._id, payload);
+      await ctx.db.replace(primary._id, {
+        ...normalizedPayload,
+        expoPushToken: primary.expoPushToken,
+        notificationPermissionStatus: primary.notificationPermissionStatus,
+        pushTokenUpdatedAt: primary.pushTokenUpdatedAt,
+        updatedAt: Date.now(),
+      });
     }
 
     if (duplicates.length) {

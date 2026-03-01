@@ -1,3 +1,3 @@
 export { useUserSync } from "./useUserSync";
-export { useFocusScheduleEntitlementReconciliation } from "./useFocusScheduleEntitlementReconciliation";
+export { usePremiumAccessSync } from "./usePremiumAccessSync";
 export { usePushNotificationSync } from "./usePushNotificationSync";

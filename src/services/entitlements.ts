@@ -1,7 +1,6 @@
 import {
   ENTITLEMENT_FEATURES,
   ENTITLEMENT_REASONS,
-  FREE_ENTITLEMENT_LIMITS,
   PAYWALL_SOURCES,
   type EntitlementFeature,
   type EntitlementReason,
@@ -21,33 +20,14 @@ interface OpenPaywallOptions {
   replace?: boolean;
 }
 
-export const canAddFocusSchedule = (input: {
-  isPremium: boolean;
-  focusScheduleCount: number;
-}): EntitlementGateDecision => {
-  if (input.isPremium) return { allowed: true };
-  if (input.focusScheduleCount < FREE_ENTITLEMENT_LIMITS.MAX_FOCUS_SCHEDULES) {
-    return { allowed: true };
-  }
-  return {
-    allowed: false,
-    feature: ENTITLEMENT_FEATURES.FOCUS_SCHEDULE,
-    reason: ENTITLEMENT_REASONS.FREE_FOCUS_SCHEDULE_LIMIT_REACHED,
-  };
-};
-
 export const canOpenQuran = (input: {
   isPremium: boolean;
-  completedUnlockSessions: number;
 }): EntitlementGateDecision => {
   if (input.isPremium) return { allowed: true };
-  if (input.completedUnlockSessions < FREE_ENTITLEMENT_LIMITS.MAX_UNLOCK_SESSIONS) {
-    return { allowed: true };
-  }
   return {
     allowed: false,
     feature: ENTITLEMENT_FEATURES.QURAN_READ,
-    reason: ENTITLEMENT_REASONS.FREE_UNLOCK_SESSION_LIMIT_REACHED,
+    reason: ENTITLEMENT_REASONS.PREMIUM_REQUIRED,
   };
 };
 
@@ -58,7 +38,7 @@ export const canEditFocusTimes = (input: {
   return {
     allowed: false,
     feature: ENTITLEMENT_FEATURES.FOCUS_SCHEDULE,
-    reason: ENTITLEMENT_REASONS.FREE_FOCUS_SCHEDULE_LIMIT_REACHED,
+    reason: ENTITLEMENT_REASONS.PREMIUM_REQUIRED,
   };
 };
 

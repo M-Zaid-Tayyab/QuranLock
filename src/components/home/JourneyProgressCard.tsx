@@ -153,11 +153,11 @@ export function JourneyProgressCard({
             <View className="flex-row items-center gap-1.5">
               <Ionicons name="bookmarks-outline" size={13} color={colors.accent} />
               <Text className="text-xs font-sfPro text-foreground">
-                "My Lord, increase me in knowledge."
+                &ldquo;My Lord, increase me in knowledge.&rdquo;
               </Text>
             </View>
             <Text className="mt-1 text-[11px] font-sfPro text-muted">
-              Qur'an 20:114
+              Qur&apos;an 20:114
             </Text>
           </View>
         </View>

@@ -3,7 +3,7 @@ import { colors } from "@/constants/colors";
 import { PAYWALL_SOURCES } from "@/constants/entitlements";
 import { useRemoteAppConfig } from "@/hooks/app";
 import {
-  useFocusScheduleEntitlementReconciliation,
+  usePremiumAccessSync,
   usePushNotificationSync,
   useUserSync,
 } from "@/hooks/user";
@@ -42,12 +42,7 @@ SplashScreen.setOptions({
 
 function useDeepLinkToVerse() {
   const router = useRouter();
-  const { isPremium, completedUnlockSessions } = useUserStore(
-    useShallow((s) => ({
-      isPremium: s.isPremium,
-      completedUnlockSessions: s.completedUnlockSessions,
-    })),
-  );
+  const isPremium = useUserStore((s) => s.isPremium);
 
   useEffect(() => {
     const handleUrl = (url: string | null) => {
@@ -55,7 +50,7 @@ function useDeepLinkToVerse() {
         url &&
         (url === "quranlock://verse" || url.startsWith("quranlock://verse"))
       ) {
-        const gate = canOpenQuran({ isPremium, completedUnlockSessions });
+        const gate = canOpenQuran({ isPremium });
         if (gate.allowed) {
           router.replace("/verse");
           return;
@@ -88,7 +83,7 @@ function useDeepLinkToVerse() {
       linkSub.remove();
       notificationSub.remove();
     };
-  }, [completedUnlockSessions, isPremium, router]);
+  }, [isPremium, router]);
 }
 
 function RootLayoutContent() {
@@ -96,11 +91,19 @@ function RootLayoutContent() {
   useRemoteAppConfig();
   useUserSync();
   usePushNotificationSync();
-  useFocusScheduleEntitlementReconciliation();
+  usePremiumAccessSync();
 
-  const { appUserId, setAppUserId, setIsPremium } = useUserStore(
+  const {
+    appUserId,
+    onboardingComplete,
+    isPremium,
+    setAppUserId,
+    setIsPremium,
+  } = useUserStore(
     useShallow((s) => ({
       appUserId: s.appUserId,
+      onboardingComplete: s.onboardingComplete,
+      isPremium: s.isPremium,
       setAppUserId: s.setAppUserId,
       setIsPremium: s.setIsPremium,
     })),
@@ -179,7 +182,30 @@ function RootLayoutContent() {
               contentStyle: { backgroundColor: colors.background },
               animation: "slide_from_right",
             }}
-          />
+          >
+            <Stack.Screen name="index" />
+
+            <Stack.Protected guard={!onboardingComplete}>
+              <Stack.Screen name="welcome" />
+            </Stack.Protected>
+
+            <Stack.Protected guard={!onboardingComplete || isPremium}>
+              <Stack.Screen name="onboarding" />
+            </Stack.Protected>
+
+            <Stack.Protected guard={onboardingComplete && !isPremium}>
+              <Stack.Screen
+                name="paywall"
+                options={{ animation: "fade", gestureEnabled: false }}
+              />
+            </Stack.Protected>
+
+            <Stack.Protected guard={onboardingComplete && isPremium}>
+              <Stack.Screen name="home" />
+              <Stack.Screen name="verse" />
+              <Stack.Screen name="settings" />
+            </Stack.Protected>
+          </Stack>
           <UpdateBanner />
         </BottomSheetModalProvider>
       </KeyboardProvider>

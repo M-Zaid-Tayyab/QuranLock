@@ -35,10 +35,16 @@ export const useVerseFocusSessionTicker = () => {
     })),
   );
 
-  const { incrementCompletedUnlockSessions, focusSchedules, markStreakDayCompleted } = useUserStore(
+  const {
+    incrementCompletedUnlockSessions,
+    focusSchedules,
+    isBlockingPaused,
+    markStreakDayCompleted,
+  } = useUserStore(
     useShallow((s) => ({
       incrementCompletedUnlockSessions: s.incrementCompletedUnlockSessions,
       focusSchedules: s.focusSchedules,
+      isBlockingPaused: s.isBlockingPaused,
       markStreakDayCompleted: s.markStreakDayCompleted,
     })),
   );
@@ -57,6 +63,7 @@ export const useVerseFocusSessionTicker = () => {
   }, [activeSchedule?.schedule.id, dateKey]);
 
   const tick = useCallback(() => {
+    if (isBlockingPaused) return;
     const nowMs = Date.now();
     setSessionNowMs(nowMs);
     const requiredMinutes = getRequiredMinutes();
@@ -119,6 +126,7 @@ export const useVerseFocusSessionTicker = () => {
     getAccumulatedMinutesSnapshot,
     getRequiredMinutes,
     incrementCompletedUnlockSessions,
+    isBlockingPaused,
     markStreakDayCompleted,
     markScheduleCompleted,
     pauseLiveProgress,
@@ -135,7 +143,7 @@ export const useVerseFocusSessionTicker = () => {
   }, []);
 
   useEffect(() => {
-    if (!isFocused || !activeSchedule || appState !== "active") {
+    if (isBlockingPaused || !isFocused || !activeSchedule || appState !== "active") {
       pauseLiveProgress(Date.now());
       useBlockingStore.getState().flushLifetimeProgress();
       if (intervalRef.current) {
@@ -165,6 +173,7 @@ export const useVerseFocusSessionTicker = () => {
     activeSchedule,
     appState,
     isFocused,
+    isBlockingPaused,
     pauseLiveProgress,
     setSessionNowMs,
     startLiveProgress,

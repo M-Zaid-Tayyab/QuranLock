@@ -81,8 +81,11 @@ export default function HomeScreen() {
         {vm.flags.showTimeline && (
           <JourneyTimelineCard
             items={vm.timeline.items}
+            isBlockingPaused={vm.timeline.isBlockingPaused}
             nextFocusLabel={vm.timeline.nextFocusLabel}
             onManageTimes={vm.actions.openFocusTimes}
+            onToggleBlockingPause={vm.actions.toggleBlockingPause}
+            pauseButtonLabel={vm.timeline.pauseButtonLabel}
           />
         )}
 

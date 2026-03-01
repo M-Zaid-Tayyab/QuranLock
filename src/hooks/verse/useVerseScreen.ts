@@ -33,7 +33,6 @@ export const useVerseScreen = () => {
     quranFontScale,
     setQuranFontScale,
     isPremium,
-    completedUnlockSessions,
   } = useUserStore(
     useShallow((s) => ({
       appUserId: s.appUserId,
@@ -44,7 +43,6 @@ export const useVerseScreen = () => {
       quranFontScale: s.quranFontScale,
       setQuranFontScale: s.setQuranFontScale,
       isPremium: s.isPremium,
-      completedUnlockSessions: s.completedUnlockSessions,
     })),
   );
   const {
@@ -86,12 +84,12 @@ export const useVerseScreen = () => {
   useEffect(() => {
     if (gateCheckedRef.current) return;
     gateCheckedRef.current = true;
-    const gate = canOpenQuran({ isPremium, completedUnlockSessions });
+    const gate = canOpenQuran({ isPremium });
     if (gate.allowed) return;
     openPaywallForBlockedDecision(router, gate, PAYWALL_SOURCES.VERSE_GUARD, {
       replace: true,
     });
-  }, [completedUnlockSessions, isPremium, router]);
+  }, [isPremium, router]);
 
   useEffect(() => {
     translationEnabledRef.current = translationEnabled;

@@ -124,7 +124,6 @@ export default function PaywallScreen() {
   );
   const [selectedPlan, setSelectedPlan] = useState<PlanOption>("annual");
   const [purchasing, setPurchasing] = useState(false);
-  const [showClose, setShowClose] = useState(false);
   const [introEligibilityByProduct, setIntroEligibilityByProduct] = useState<
     Record<string, INTRO_ELIGIBILITY_STATUS>
   >({});
@@ -182,11 +181,6 @@ export default function PaywallScreen() {
       .finally(() => {
         setLoading(false);
       });
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowClose(true), 6000);
-    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -335,21 +329,13 @@ export default function PaywallScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ animation: "fade" }} />
+      <Stack.Screen options={{ animation: "fade", gestureEnabled: false }} />
       <View className="flex-1 bg-background pt-safe pb-safe">
         <ScrollView
           className="flex-1"
           contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
           showsVerticalScrollIndicator={false}
         >
-          {showClose && (
-            <Pressable
-              onPress={exitPaywall}
-              className="h-10 w-10 self-end items-center justify-center rounded-full border border-outline bg-surface"
-            >
-              <Ionicons name="close" size={20} color={colors.muted} />
-            </Pressable>
-          )}
           <View className=" items-center">
             <View className="mt-3 flex-row flex-wrap justify-center px-4">
               {funnelText.paywall.headlineWords.map((word, index) => (

@@ -7,6 +7,7 @@ import type {
   ShieldConfiguration,
 } from "react-native-device-activity";
 import {
+  blockSelection as libBlockSelection,
   configureActions,
   getAuthorizationStatus,
   pollAuthorizationStatus,
@@ -106,6 +107,10 @@ export function unblockSelection(): void {
   libUnblockSelection({ activitySelectionId: SCREEN_TIME.SELECTION_ID });
 }
 
+export function blockSelectionNow(): void {
+  libBlockSelection({ activitySelectionId: SCREEN_TIME.SELECTION_ID });
+}
+
 export function updateShield(
   config: ShieldConfiguration,
   actions: ShieldActions,
@@ -189,7 +194,7 @@ export const DEFAULT_SHIELD_CONFIG: ShieldConfiguration = {
   title: "You started this journey for Allah",
   subtitle:
     "Tap Read Quran, then open the notification to read Quran.",
-  iconSystemName: "timer",
+  iconSystemName: "book.closed.fill",
   iconTint: { red: 255, green: 255, blue: 255, alpha: 1 },
   primaryButtonLabel: "Read Quran",
   primaryButtonLabelColor: SHIELD_THEME.primaryButtonLabelColor,

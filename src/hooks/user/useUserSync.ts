@@ -1,6 +1,6 @@
 import { syncUserProfile } from "@/services/userSync";
 import { useUserStore } from "@/store/user";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 export const useUserSync = () => {
@@ -12,7 +12,6 @@ export const useUserSync = () => {
       quranFrequency: s.quranFrequency,
       reasonsDisconnect: s.reasonsDisconnect,
       focusSchedules: s.focusSchedules,
-      deferredFocusSchedules: s.deferredFocusSchedules,
       focusDurationMode: s.focusDurationMode,
       focusCompletionDays: s.focusCompletionDays,
       focusMinutesPerPage: s.focusMinutesPerPage,
@@ -23,44 +22,61 @@ export const useUserSync = () => {
       translationEnabled: s.translationEnabled,
       quranFontScale: s.quranFontScale,
       isPremium: s.isPremium,
-      subscriptionTier: s.subscriptionTier,
       completedUnlockSessions: s.completedUnlockSessions,
       streakCompletedDates: s.streakCompletedDates,
     })),
+  );
+  const syncPayload = useMemo(
+    () => {
+      const {
+        focusCompletionDays,
+        focusMinutesPerPage,
+        ...basePayload
+      } = payload;
+      if (payload.focusDurationMode !== "goal") {
+        return basePayload;
+      }
+      return {
+        ...basePayload,
+        focusCompletionDays,
+        focusMinutesPerPage,
+      };
+    },
+    [payload],
   );
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPayloadRef = useRef<string>("");
   const previousOnboardingCompleteRef = useRef<boolean>(
-    payload.onboardingComplete,
+    syncPayload.onboardingComplete,
   );
 
   useEffect(() => {
-    if (!payload.appUserId || !payload.onboardingComplete) {
+    if (!syncPayload.appUserId || !syncPayload.onboardingComplete) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      previousOnboardingCompleteRef.current = payload.onboardingComplete;
+      previousOnboardingCompleteRef.current = syncPayload.onboardingComplete;
       return;
     }
 
-    const serialized = JSON.stringify(payload);
+    const serialized = JSON.stringify(syncPayload);
     if (serialized === lastPayloadRef.current) return;
     lastPayloadRef.current = serialized;
 
     const becameOnboardingComplete =
-      !previousOnboardingCompleteRef.current && payload.onboardingComplete;
-    previousOnboardingCompleteRef.current = payload.onboardingComplete;
+      !previousOnboardingCompleteRef.current && syncPayload.onboardingComplete;
+    previousOnboardingCompleteRef.current = syncPayload.onboardingComplete;
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (becameOnboardingComplete) {
-      syncUserProfile(payload);
+      syncUserProfile(syncPayload);
       return;
     }
 
     timeoutRef.current = setTimeout(() => {
-      syncUserProfile(payload);
+      syncUserProfile(syncPayload);
     }, 1500);
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [payload]);
+  }, [syncPayload]);
 };

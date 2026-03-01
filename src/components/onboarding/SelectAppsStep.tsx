@@ -1,7 +1,6 @@
 import { BottomSheetModal, PrimaryButton } from "@/components/common";
 import { colors } from "@/constants/colors";
 import { useFunnelText } from "@/hooks/app";
-import { setSelection } from "@/services/deviceActivity";
 import { useUserStore } from "@/store/user";
 import { Ionicons } from "@expo/vector-icons";
 import { BottomSheetModal as GorhomBottomSheetModal } from "@gorhom/bottom-sheet";
@@ -252,7 +251,6 @@ export function commitSelectApps(selection: string | null): boolean {
     Alert.alert("Select apps", "Please select at least one app to block.");
     return false;
   }
-  setSelection(selection);
   const store = useUserStore.getState();
   store.setHasSelectedApps(true);
   store.setFamilyActivitySelection(selection);

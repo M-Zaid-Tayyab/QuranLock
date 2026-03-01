@@ -1,7 +1,3 @@
-import {
-  SUBSCRIPTION_TIERS,
-  type SubscriptionTier,
-} from "@/constants/entitlements";
 import { STORE_KEYS } from "@/constants/storeKeys";
 import { zustandStorage } from "@/storage";
 import { create } from "zustand";
@@ -14,10 +10,9 @@ export interface UserState {
   quranFrequency: string;
   reasonsDisconnect: string[];
   focusSchedules: FocusSchedule[];
-  deferredFocusSchedules: FocusSchedule[];
   focusDurationMode: FocusDurationMode;
-  focusCompletionDays: number;
-  focusMinutesPerPage: number;
+  focusCompletionDays?: number;
+  focusMinutesPerPage?: number;
   onboardingComplete: boolean;
   hasSelectedApps: boolean;
   familyActivitySelection: string | null;
@@ -25,7 +20,7 @@ export interface UserState {
   translationEnabled: boolean;
   quranFontScale: number;
   isPremium: boolean;
-  subscriptionTier: SubscriptionTier;
+  isBlockingPaused: boolean;
   completedUnlockSessions: number;
   streakCompletedDates: string[];
   hasRequestedFirstStreakReview: boolean;
@@ -49,10 +44,9 @@ interface UserActions {
   setQuranFrequency: (value: string) => void;
   setReasonsDisconnect: (value: string[]) => void;
   setFocusSchedules: (value: FocusSchedule[]) => void;
-  setDeferredFocusSchedules: (value: FocusSchedule[]) => void;
   setFocusDurationMode: (value: FocusDurationMode) => void;
-  setFocusCompletionDays: (value: number) => void;
-  setFocusMinutesPerPage: (value: number) => void;
+  setFocusCompletionDays: (value?: number) => void;
+  setFocusMinutesPerPage: (value?: number) => void;
   setOnboardingComplete: (value: boolean) => void;
   setHasSelectedApps: (value: boolean) => void;
   setFamilyActivitySelection: (value: string | null) => void;
@@ -60,7 +54,7 @@ interface UserActions {
   setTranslationEnabled: (value: boolean) => void;
   setQuranFontScale: (value: number) => void;
   setIsPremium: (value: boolean) => void;
-  setSubscriptionTier: (value: SubscriptionTier) => void;
+  setIsBlockingPaused: (value: boolean) => void;
   incrementCompletedUnlockSessions: () => void;
   setStreakCompletedDates: (value: string[]) => void;
   markStreakDayCompleted: (dateKey?: string) => void;
@@ -81,10 +75,7 @@ const createInitialUserState = (): UserState => ({
   quranFrequency: "",
   reasonsDisconnect: [],
   focusSchedules: [],
-  deferredFocusSchedules: [],
   focusDurationMode: "goal",
-  focusCompletionDays: 30,
-  focusMinutesPerPage: 3.0,
   onboardingComplete: false,
   hasSelectedApps: false,
   familyActivitySelection: null,
@@ -92,7 +83,7 @@ const createInitialUserState = (): UserState => ({
   translationEnabled: false,
   quranFontScale: 1,
   isPremium: false,
-  subscriptionTier: SUBSCRIPTION_TIERS.FREE,
+  isBlockingPaused: false,
   completedUnlockSessions: 0,
   streakCompletedDates: [],
   hasRequestedFirstStreakReview: false,
@@ -109,8 +100,6 @@ export const useUserStore = create<UserState & UserActions>()(
       setQuranFrequency: (quranFrequency) => set({ quranFrequency }),
       setReasonsDisconnect: (reasonsDisconnect) => set({ reasonsDisconnect }),
       setFocusSchedules: (focusSchedules) => set({ focusSchedules }),
-      setDeferredFocusSchedules: (deferredFocusSchedules) =>
-        set({ deferredFocusSchedules }),
       setFocusDurationMode: (focusDurationMode) => set({ focusDurationMode }),
       setFocusCompletionDays: (focusCompletionDays) =>
         set({ focusCompletionDays }),
@@ -125,18 +114,8 @@ export const useUserStore = create<UserState & UserActions>()(
       setTranslationEnabled: (translationEnabled) =>
         set({ translationEnabled }),
       setQuranFontScale: (quranFontScale) => set({ quranFontScale }),
-      setIsPremium: (isPremium) =>
-        set({
-          isPremium,
-          subscriptionTier: isPremium
-            ? SUBSCRIPTION_TIERS.PRO
-            : SUBSCRIPTION_TIERS.FREE,
-        }),
-      setSubscriptionTier: (subscriptionTier) =>
-        set({
-          subscriptionTier,
-          isPremium: subscriptionTier === SUBSCRIPTION_TIERS.PRO,
-        }),
+      setIsPremium: (isPremium) => set({ isPremium }),
+      setIsBlockingPaused: (isBlockingPaused) => set({ isBlockingPaused }),
       incrementCompletedUnlockSessions: () =>
         set((state) => ({
           completedUnlockSessions: state.completedUnlockSessions + 1,

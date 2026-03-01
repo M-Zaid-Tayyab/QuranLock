@@ -24,7 +24,7 @@ export interface HomeTimelineItem {
   label: string;
   timeLabel: string;
   durationMinutes: number;
-  status: ScheduleStatus | "premium_locked";
+  status: ScheduleStatus | "paused";
 }
 
 export interface HomeStreakDay {
@@ -109,26 +109,26 @@ export const useHomeScreen = () => {
 
   const {
     name,
-    isPremium,
     completedUnlockSessions,
-    deferredFocusSchedules,
+    isPremium,
+    isBlockingPaused,
     lastReadPage,
     hasSelectedApps,
     streakCompletedDates,
     hasRequestedFirstStreakReview,
-    markStreakDayCompleted,
+    setIsBlockingPaused,
     setHasRequestedFirstStreakReview,
   } = useUserStore(
     useShallow((s) => ({
       name: s.name,
-      isPremium: s.isPremium,
       completedUnlockSessions: s.completedUnlockSessions,
-      deferredFocusSchedules: s.deferredFocusSchedules,
+      isPremium: s.isPremium,
+      isBlockingPaused: s.isBlockingPaused,
       lastReadPage: s.lastReadPage,
       hasSelectedApps: s.hasSelectedApps,
       streakCompletedDates: s.streakCompletedDates,
       hasRequestedFirstStreakReview: s.hasRequestedFirstStreakReview,
-      markStreakDayCompleted: s.markStreakDayCompleted,
+      setIsBlockingPaused: s.setIsBlockingPaused,
       setHasRequestedFirstStreakReview: s.setHasRequestedFirstStreakReview,
     })),
   );
@@ -200,6 +200,7 @@ export const useHomeScreen = () => {
 
   const hasPendingSchedules = statuses.some((entry) => entry.status === "pending");
   const isBlockingActive =
+    !isBlockingPaused &&
     hasPendingSchedules &&
     requiredMinutes > 0 &&
     accumulatedMinutes < requiredMinutes;
@@ -237,51 +238,44 @@ export const useHomeScreen = () => {
           entry.schedule.hour,
           entry.schedule.minute,
           entry.schedule.durationMinutes,
-          entry.status,
+          isBlockingPaused && entry.status === "pending"
+            ? "paused"
+            : entry.status,
         ),
       ) satisfies HomeTimelineItem[],
-    [statuses],
+    [isBlockingPaused, statuses],
   );
-
-  const timelineItems = useMemo(() => {
-    if (isPremium || deferredFocusSchedules.length === 0) {
-      return activeTimelineItems;
-    }
-
-    const deferredItems = deferredFocusSchedules.map((schedule) =>
-      toTimelineItem(
-        `deferred-${schedule.id}`,
-        schedule.label,
-        schedule.hour,
-        schedule.minute,
-        schedule.durationMinutes,
-        "premium_locked",
-      ),
-    ) satisfies HomeTimelineItem[];
-
-    return [...activeTimelineItems, ...deferredItems];
-  }, [activeTimelineItems, deferredFocusSchedules, isPremium]);
 
   const nextUpcoming = activeTimelineItems.find(
     (item) => item.status === "upcoming",
   );
-  const nextFocusLabel = nextUpcoming
-    ? `${nextUpcoming.label} • ${nextUpcoming.timeLabel}`
-    : "All focus windows for today are done";
+  const nextFocusLabel = isBlockingPaused
+    ? "Blocking is paused until you resume"
+    : nextUpcoming
+      ? `${nextUpcoming.label} • ${nextUpcoming.timeLabel}`
+      : "All focus windows for today are done";
 
   const showSetupApps = !hasSelectedApps;
-  const showSetupTimes = hasSelectedApps && timelineItems.length === 0;
-  const showTimeline = hasSelectedApps && timelineItems.length > 0;
+  const showSetupTimes = hasSelectedApps && activeTimelineItems.length === 0;
+  const showTimeline = hasSelectedApps && activeTimelineItems.length > 0;
 
-  const journeyTitle = isBlockingActive
-    ? funnelText.home.journeyTitleActive
-    : funnelText.home.journeyTitleIdle;
-  const journeySubtitle = isBlockingActive
-    ? `${remainingMinutes}:${remainingSecondsPart.toString().padStart(2, "0")} left to unlock apps`
-    : `${completedSchedulesCount}/${Math.max(
-        1,
-        totalSchedules,
-      )} focus windows completed`;
+  const frozenMinutes = Math.max(0, Math.floor(accumulatedMinutes));
+  const pausedLabel = activeSchedule?.schedule.label ?? "current focus window";
+  const journeyTitle = isBlockingPaused
+    ? "Blocking is paused"
+    : isBlockingActive
+      ? funnelText.home.journeyTitleActive
+      : funnelText.home.journeyTitleIdle;
+  const journeySubtitle = isBlockingPaused
+    ? requiredMinutes > 0
+      ? `${frozenMinutes}/${requiredMinutes} min saved for ${pausedLabel}`
+      : "Resume anytime to re-enable your focus windows"
+    : isBlockingActive
+      ? `${remainingMinutes}:${remainingSecondsPart.toString().padStart(2, "0")} left to unlock apps`
+      : `${completedSchedulesCount}/${Math.max(
+          1,
+          totalSchedules,
+        )} focus windows completed`;
 
   const hasCompletedAllGoalsToday =
     totalSchedules > 0 && completedSchedulesCount === totalSchedules;
@@ -290,11 +284,6 @@ export const useHomeScreen = () => {
     () => buildStreakDays(streakCompletedDates, hasCompletedAllGoalsToday),
     [hasCompletedAllGoalsToday, streakCompletedDates],
   );
-
-  useEffect(() => {
-    if (!hasCompletedAllGoalsToday) return;
-    markStreakDayCompleted(getTodayDateKey());
-  }, [hasCompletedAllGoalsToday, markStreakDayCompleted]);
 
   const currentStreakCount = useMemo(
     () =>
@@ -309,7 +298,9 @@ export const useHomeScreen = () => {
     if (
       !isFocused ||
       hasRequestedFirstStreakReview ||
-      streakCompletedDates.length !== 1
+      (completedUnlockSessions < 1 &&
+        streakCompletedDates.length < 1 &&
+        !hasCompletedAllGoalsToday)
     ) {
       return;
     }
@@ -327,7 +318,9 @@ export const useHomeScreen = () => {
 
     requestFirstStreakReview();
   }, [
+    completedUnlockSessions,
     hasRequestedFirstStreakReview,
+    hasCompletedAllGoalsToday,
     isFocused,
     setHasRequestedFirstStreakReview,
     streakCompletedDates.length,
@@ -338,7 +331,7 @@ export const useHomeScreen = () => {
   }, [router]);
 
   const handleOpenQuran = useCallback(() => {
-    const gate = canOpenQuran({ isPremium, completedUnlockSessions });
+    const gate = canOpenQuran({ isPremium });
     if (gate.allowed) {
       router.push("/verse");
       return;
@@ -348,7 +341,7 @@ export const useHomeScreen = () => {
       gate,
       PAYWALL_SOURCES.HOME_READ_QURAN,
     );
-  }, [completedUnlockSessions, isPremium, router]);
+  }, [isPremium, router]);
 
   const handleOpenFocusTimes = useCallback(() => {
     if (!ensureCanEditFocusTimes(router, { isPremium })) {
@@ -359,6 +352,10 @@ export const useHomeScreen = () => {
       params: { mode: "edit-times", from: "home" },
     });
   }, [isPremium, router]);
+
+  const handleToggleBlockingPause = useCallback(() => {
+    setIsBlockingPaused(!isBlockingPaused);
+  }, [isBlockingPaused, setIsBlockingPaused]);
 
   return {
     header: {
@@ -386,8 +383,12 @@ export const useHomeScreen = () => {
       currentStreakCount,
     },
     timeline: {
-      items: timelineItems,
+      items: activeTimelineItems,
+      isBlockingPaused,
       nextFocusLabel,
+      pauseButtonLabel: isBlockingPaused
+        ? "Resume blocking"
+        : "Pause blocking",
     },
     snapshot: {
       unlockSessions: completedUnlockSessions,
@@ -407,6 +408,7 @@ export const useHomeScreen = () => {
       openQuran: handleOpenQuran,
       openFocusTimes: handleOpenFocusTimes,
       openSettingsForApps: handleOpenSettings,
+      toggleBlockingPause: handleToggleBlockingPause,
       requestScreenTime: requestScreenTimePermission,
       requestNotifications: requestNotificationPermission,
       refreshHome: handleRefresh,

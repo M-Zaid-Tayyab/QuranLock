@@ -8,6 +8,7 @@ import {
 import { ensureCanEditFocusTimes } from "@/services/entitlements";
 import { resetAllStores } from "@/store";
 import { useUserStore } from "@/store/user";
+import { sanitizeGoalDays } from "@/utils/focusPlan";
 import { Ionicons } from "@expo/vector-icons";
 import * as Application from "expo-application";
 import { useRouter } from "expo-router";
@@ -89,6 +90,10 @@ export default function SettingsScreen() {
       ),
     [focusSchedules],
   );
+  const goalCompletionTarget = useMemo(
+    () => sanitizeGoalDays(focusCompletionDays ?? 30),
+    [focusCompletionDays],
+  );
 
   const handleEditFocusTimes = useCallback(() => {
     if (!ensureCanEditFocusTimes(router, { isPremium })) {
@@ -155,14 +160,22 @@ export default function SettingsScreen() {
                   : "Upgrade to Premium and unlock deeper focus tools."}
               </Text>
             </View>
-            <Pressable
-              onPress={() => router.push("/paywall")}
-              className="self-start rounded-full bg-accent px-4 py-2"
-            >
-              <Text className="text-sm font-sfPro-semibold text-black">
-                {isPremium ? "Manage" : "Upgrade"}
-              </Text>
-            </Pressable>
+            {isPremium ? (
+              <View className="self-start rounded-full bg-accent/15 px-4 py-2">
+                <Text className="text-sm font-sfPro-semibold text-accent">
+                  Active
+                </Text>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => router.push("/paywall")}
+                className="self-start rounded-full bg-accent px-4 py-2"
+              >
+                <Text className="text-sm font-sfPro-semibold text-black">
+                  Upgrade
+                </Text>
+              </Pressable>
+            )}
           </View>
         </View>
         <View className="mb-6 rounded-2xl border border-outline bg-surface px-5 py-5">
@@ -183,7 +196,7 @@ export default function SettingsScreen() {
               <Text className="mt-1 text-xs font-sfPro text-muted">
                 Completion target:{" "}
                 <Text className="font-sfPro-semibold text-foreground">
-                  {focusCompletionDays} days
+                  {goalCompletionTarget} days
                 </Text>
               </Text>
             ) : null}

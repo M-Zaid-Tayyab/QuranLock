@@ -1,16 +1,3 @@
-export const FREE_ENTITLEMENT_LIMITS = {
-  MAX_FOCUS_SCHEDULES: 1,
-  MAX_UNLOCK_SESSIONS: 1,
-} as const;
-
-export const SUBSCRIPTION_TIERS = {
-  FREE: "free",
-  PRO: "pro",
-} as const;
-
-export type SubscriptionTier =
-  (typeof SUBSCRIPTION_TIERS)[keyof typeof SUBSCRIPTION_TIERS];
-
 export const ENTITLEMENT_FEATURES = {
   FOCUS_SCHEDULE: "focus_schedule",
   QURAN_READ: "quran_read",
@@ -20,8 +7,7 @@ export type EntitlementFeature =
   (typeof ENTITLEMENT_FEATURES)[keyof typeof ENTITLEMENT_FEATURES];
 
 export const ENTITLEMENT_REASONS = {
-  FREE_FOCUS_SCHEDULE_LIMIT_REACHED: "free_focus_schedule_limit_reached",
-  FREE_UNLOCK_SESSION_LIMIT_REACHED: "free_unlock_session_limit_reached",
+  PREMIUM_REQUIRED: "premium_required",
 } as const;
 
 export type EntitlementReason =

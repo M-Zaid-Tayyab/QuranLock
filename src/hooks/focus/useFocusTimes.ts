@@ -3,11 +3,6 @@ import {
   getNextDuration,
   type PrayerPreset,
 } from "@/configs/onboarding";
-import { PAYWALL_SOURCES, type PaywallSource } from "@/constants/entitlements";
-import {
-  canAddFocusSchedule,
-  openPaywallForBlockedDecision,
-} from "@/services/entitlements";
 import { useBlockingStore } from "@/store/blocking";
 import {
   useUserStore,
@@ -17,11 +12,11 @@ import {
 import {
   applyGoalDurationToSchedules,
   computeGoalRecommendation,
+  DEFAULT_MINUTES_PER_PAGE,
   sanitizeGoalDays,
   sanitizeManualDuration,
 } from "@/utils/focusPlan";
 import * as Notifications from "expo-notifications";
-import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Platform } from "react-native";
 import { useShallow } from "zustand/react/shallow";
@@ -78,7 +73,6 @@ export function useFocusTimes({
   onNotificationPermissionChange,
   onNotificationPermissionStatusChange,
 }: UseFocusTimesArgs): UseFocusTimesResult {
-  const router = useRouter();
   const {
     focusSchedules,
     focusDurationMode,
@@ -87,7 +81,7 @@ export function useFocusTimes({
     setFocusSchedules,
     setFocusDurationMode,
     setFocusCompletionDays,
-    isPremium,
+    setFocusMinutesPerPage,
   } = useUserStore(
     useShallow((s) => ({
       focusSchedules: s.focusSchedules,
@@ -97,7 +91,7 @@ export function useFocusTimes({
       setFocusSchedules: s.setFocusSchedules,
       setFocusDurationMode: s.setFocusDurationMode,
       setFocusCompletionDays: s.setFocusCompletionDays,
-      isPremium: s.isPremium,
+      setFocusMinutesPerPage: s.setFocusMinutesPerPage,
     })),
   );
   const { setQuranMinutesToUnblock } = useBlockingStore(
@@ -105,6 +99,12 @@ export function useFocusTimes({
       setQuranMinutesToUnblock: s.setQuranMinutesToUnblock,
     })),
   );
+
+  const goalCompletionDays = sanitizeGoalDays(focusCompletionDays ?? 30);
+  const goalMinutesPerPage =
+    focusMinutesPerPage && focusMinutesPerPage > 0
+      ? focusMinutesPerPage
+      : DEFAULT_MINUTES_PER_PAGE;
 
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(
     null,
@@ -118,7 +118,7 @@ export function useFocusTimes({
   const [notificationStatus, setNotificationStatus] =
     useState<FocusNotificationStatus>(null);
   const [goalDaysInput, setGoalDaysInput] = useState(() =>
-    String(sanitizeGoalDays(focusCompletionDays)),
+    String(goalCompletionDays),
   );
   const [scheduleLabelDrafts, setScheduleLabelDrafts] = useState<
     Record<string, string>
@@ -135,8 +135,8 @@ export function useFocusTimes({
   );
 
   useEffect(() => {
-    setGoalDaysInput(String(sanitizeGoalDays(focusCompletionDays)));
-  }, [focusCompletionDays]);
+    setGoalDaysInput(String(goalCompletionDays));
+  }, [goalCompletionDays]);
 
   useEffect(() => {
     if (focusSchedules.length === 0) {
@@ -271,11 +271,11 @@ export function useFocusTimes({
   const goalRecommendation = useMemo(
     () =>
       computeGoalRecommendation({
-        completionDays: focusCompletionDays,
+        completionDays: goalCompletionDays,
         scheduleCount: focusSchedules.length,
-        minutesPerPage: focusMinutesPerPage,
+        minutesPerPage: goalMinutesPerPage,
       }),
-    [focusCompletionDays, focusMinutesPerPage, focusSchedules.length],
+    [focusSchedules.length, goalCompletionDays, goalMinutesPerPage],
   );
 
   const setSchedule = useCallback(
@@ -304,20 +304,6 @@ export function useFocusTimes({
     goalRecommendation.computable,
     goalRecommendation.recommendedMinutes,
   ]);
-
-  const ensureCanAddSchedule = useCallback(
-    (source: PaywallSource) => {
-      if (!isEditTimes) return true;
-      const gate = canAddFocusSchedule({
-        isPremium,
-        focusScheduleCount: focusSchedules.length,
-      });
-      if (gate.allowed) return true;
-      openPaywallForBlockedDecision(router, gate, source);
-      return false;
-    },
-    [focusSchedules.length, isEditTimes, isPremium, router],
-  );
 
   const applyManualDuration = useCallback(
     (scheduleId: string, minutes: number) => {
@@ -350,8 +336,6 @@ export function useFocusTimes({
         return;
       }
 
-      if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_PRAYER)) return;
-
       setSchedule([
         ...focusSchedules,
         {
@@ -366,7 +350,6 @@ export function useFocusTimes({
       setExpandedScheduleId(preset.id);
     },
     [
-      ensureCanAddSchedule,
       expandedScheduleId,
       focusSchedules,
       selectedPrayerIds,
@@ -404,9 +387,6 @@ export function useFocusTimes({
       const hour = date.getHours();
       const minute = date.getMinutes();
       if (targetId === "new") {
-        if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_CUSTOM)) {
-          return;
-        }
         const customIndex = customIndexRef.current++;
         const id = `custom-${Date.now()}`;
         setSchedule([
@@ -425,7 +405,7 @@ export function useFocusTimes({
         onUpdateSchedule(targetId, { hour, minute });
       }
     },
-    [ensureCanAddSchedule, focusSchedules, onUpdateSchedule, setSchedule],
+    [focusSchedules, onUpdateSchedule, setSchedule],
   );
 
   const onOpenTimePicker = useCallback(
@@ -441,14 +421,10 @@ export function useFocusTimes({
   );
 
   const onOpenNewCustomTime = useCallback(() => {
-    if (!ensureCanAddSchedule(PAYWALL_SOURCES.FOCUS_TIMES_ADD_CUSTOM)) return;
     const initialDate = toPickerDate(12, 0);
     setPickerDate(initialDate);
     setTimePickerTarget("new");
-  }, [
-    ensureCanAddSchedule,
-    toPickerDate,
-  ]);
+  }, [toPickerDate]);
 
   const onConfirmTimePicker = useCallback(
     (date: Date) => {
@@ -476,13 +452,18 @@ export function useFocusTimes({
   const onChangeMode = useCallback(
     (nextMode: FocusDurationMode) => {
       setFocusDurationMode(nextMode);
-      if (nextMode !== "goal") return;
-      const safeDays = sanitizeGoalDays(focusCompletionDays);
+      if (nextMode !== "goal") {
+        setFocusCompletionDays(undefined);
+        setFocusMinutesPerPage(undefined);
+        return;
+      }
+      const safeDays = goalCompletionDays;
       setFocusCompletionDays(safeDays);
+      setFocusMinutesPerPage(goalMinutesPerPage);
       const recommendation = computeGoalRecommendation({
         completionDays: safeDays,
         scheduleCount: focusSchedules.length,
-        minutesPerPage: focusMinutesPerPage,
+        minutesPerPage: goalMinutesPerPage,
       });
       if (!recommendation.computable) return;
       setSchedule(
@@ -493,31 +474,32 @@ export function useFocusTimes({
       );
     },
     [
-      focusCompletionDays,
-      focusMinutesPerPage,
       focusSchedules,
+      goalCompletionDays,
       setFocusCompletionDays,
       setFocusDurationMode,
+      setFocusMinutesPerPage,
       setSchedule,
+      goalMinutesPerPage,
     ],
   );
 
   const onStepGoalDays = useCallback(
     (delta: number) => {
-      const nextDays = sanitizeGoalDays(focusCompletionDays + delta);
+      const nextDays = sanitizeGoalDays(goalCompletionDays + delta);
       setFocusCompletionDays(nextDays);
       setGoalDaysInput(String(nextDays));
     },
-    [focusCompletionDays, setFocusCompletionDays],
+    [goalCompletionDays, setFocusCompletionDays],
   );
 
   const onCommitGoalDays = useCallback(() => {
     const digits = goalDaysInput.replace(/\D/g, "");
-    const parsed = digits ? parseInt(digits, 10) : focusCompletionDays;
+    const parsed = digits ? parseInt(digits, 10) : goalCompletionDays;
     const nextDays = sanitizeGoalDays(parsed);
     setFocusCompletionDays(nextDays);
     setGoalDaysInput(String(nextDays));
-  }, [focusCompletionDays, goalDaysInput, setFocusCompletionDays]);
+  }, [goalCompletionDays, goalDaysInput, setFocusCompletionDays]);
 
   const onAdjustDuration = useCallback(
     (schedule: FocusSchedule, delta: number) => {
@@ -575,7 +557,7 @@ export function useFocusTimes({
   return {
     focusSchedules,
     focusDurationMode,
-    focusCompletionDays,
+    focusCompletionDays: goalCompletionDays,
     goalDaysInput,
     scheduleLabelDrafts,
     expandedScheduleId,

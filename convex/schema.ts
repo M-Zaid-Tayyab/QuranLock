@@ -1,11 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
-const SUBSCRIPTION_TIERS = {
-  FREE: "free",
-  PRO: "pro",
-} as const;
-
 const focusDurationMode = v.union(v.literal("manual"), v.literal("goal"));
 
 const focusSchedule = v.object({
@@ -42,9 +37,8 @@ export default defineSchema({
     translationEnabled: v.boolean(),
     quranFontScale: v.optional(v.number()),
     isPremium: v.boolean(),
-    subscriptionTier: v.union(
-      v.literal(SUBSCRIPTION_TIERS.FREE),
-      v.literal(SUBSCRIPTION_TIERS.PRO),
+    subscriptionTier: v.optional(
+      v.union(v.literal("free"), v.literal("pro")),
     ),
     completedUnlockSessions: v.number(),
     streakCompletedDates: v.array(v.string()),
