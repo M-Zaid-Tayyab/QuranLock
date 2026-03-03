@@ -23,7 +23,7 @@ import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef } from "react";
-import { Linking, Platform } from "react-native";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import Purchases, { type CustomerInfo } from "react-native-purchases";
@@ -43,6 +43,7 @@ SplashScreen.setOptions({
 function useDeepLinkToVerse() {
   const router = useRouter();
   const isPremium = useUserStore((s) => s.isPremium);
+  const handledNotificationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const handleUrl = (url: string | null) => {
@@ -66,21 +67,38 @@ function useDeepLinkToVerse() {
       }
     };
 
-    Linking.getInitialURL().then(handleUrl);
-    const linkSub = Linking.addEventListener("url", (e) => handleUrl(e.url));
+    const handleNotificationResponse = (
+      response: Notifications.NotificationResponse | null,
+    ) => {
+      if (!response) return;
+      const notificationId = response.notification.request.identifier;
+      if (handledNotificationIdRef.current === notificationId) {
+        return;
+      }
+      handledNotificationIdRef.current = notificationId;
+      const content = response.notification.request.content;
+      const triggerPayload =
+        response.notification.request.trigger &&
+        "payload" in response.notification.request.trigger
+          ? response.notification.request.trigger.payload
+          : undefined;
+      const url =
+        (content.data?.url as string | undefined) ??
+        (content as { userInfo?: { url?: string } }).userInfo?.url ??
+        (triggerPayload as { url?: string } | undefined)?.url ??
+        ((triggerPayload as { userInfo?: { url?: string } } | undefined)
+          ?.userInfo?.url as string | undefined);
+      void handleUrl(url ?? null);
+      Notifications.clearLastNotificationResponse();
+    };
 
+    handleNotificationResponse(Notifications.getLastNotificationResponse());
     const notificationSub =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        const content = response.notification.request.content;
-        const url = (content.data?.url ??
-          (content as { userInfo?: { url?: string } }).userInfo?.url) as
-          | string
-          | undefined;
-        handleUrl(url ?? null);
-      });
+      Notifications.addNotificationResponseReceivedListener(
+        handleNotificationResponse,
+      );
 
     return () => {
-      linkSub.remove();
       notificationSub.remove();
     };
   }, [isPremium, router]);
@@ -128,6 +146,7 @@ function RootLayoutContent() {
           .then((info) => {
             if (!isMounted) return;
             setIsPremium(Boolean(info.entitlements.active[entitlementId]));
+            void Purchases.getOfferings().catch(() => undefined);
           })
           .catch(() => {});
         listener = (info) => {
