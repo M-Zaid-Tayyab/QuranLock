@@ -153,14 +153,9 @@ export function OnboardingStepContent({
   if (onboarding.activeStep === 9) {
     return (
       <FocusTimesStep
+        focusTimes={onboarding.focusTimes}
         isEditTimes={onboarding.isEditTimes}
         scheduleError={onboarding.scheduleError}
-        onNotificationPermissionChange={
-          onboarding.onNotificationPermissionChange
-        }
-        onNotificationPermissionStatusChange={
-          onboarding.onNotificationPermissionStatusChange
-        }
       />
     );
   }

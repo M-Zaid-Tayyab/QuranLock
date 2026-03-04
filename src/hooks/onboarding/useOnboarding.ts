@@ -6,6 +6,7 @@ import {
   TOTAL_STEPS,
 } from "@/configs/onboarding";
 import { useFunnelText } from "@/hooks/app";
+import { useFocusTimes, type UseFocusTimesResult } from "@/hooks/focus";
 import { canProceedScreenTime } from "@/components/onboarding/ScreenTimeStep";
 import { commitSelectApps } from "@/components/onboarding/SelectAppsStep";
 import {
@@ -14,12 +15,10 @@ import {
   requestAuthorization,
 } from "@/services/deviceActivity";
 import { ensureCanEditFocusTimes } from "@/services/entitlements";
-import { useBlockingStore } from "@/store/blocking";
-import { useUserStore, type FocusSchedule } from "@/store/user";
-import { applyFocusSchedulesToDevice } from "@/utils/focusScheduleRuntime";
+import { useUserStore } from "@/store/user";
 import * as Notifications from "expo-notifications";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Linking, Platform } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
@@ -50,6 +49,7 @@ export interface UseOnboardingResult {
   title: string;
   titleHighlightWords: string[];
   totalSteps: number;
+  focusTimes: UseFocusTimesResult;
   onBack: () => void;
   onNext: () => Promise<void>;
   onScreenTimeAuthorizationChange: (approved: boolean) => void;
@@ -73,7 +73,6 @@ export function useOnboarding(): UseOnboardingResult {
     setAge,
     quranFrequency,
     reasonsDisconnect,
-    focusSchedules,
     familyActivitySelection,
     isPremium,
     setOnboardingComplete,
@@ -85,7 +84,6 @@ export function useOnboarding(): UseOnboardingResult {
       setAge: s.setAge,
       quranFrequency: s.quranFrequency,
       reasonsDisconnect: s.reasonsDisconnect,
-      focusSchedules: s.focusSchedules,
       familyActivitySelection: s.familyActivitySelection,
       isPremium: s.isPremium,
       setOnboardingComplete: s.setOnboardingComplete,
@@ -115,15 +113,6 @@ export function useOnboarding(): UseOnboardingResult {
   const [notificationResolving, setNotificationResolving] = useState(false);
   const [hasAttemptedScheduleSubmit, setHasAttemptedScheduleSubmit] =
     useState(false);
-
-  const { setQuranMinutesToUnblock } = useBlockingStore(
-    useShallow((s) => ({
-      setQuranMinutesToUnblock: s.setQuranMinutesToUnblock,
-    })),
-  );
-  const previousSchedulesRef = useRef<FocusSchedule[]>(
-    useUserStore.getState().focusSchedules,
-  );
 
   const modeParam = Array.isArray(params.mode) ? params.mode[0] : params.mode;
   const isEditTimes = modeParam === "edit-times";
@@ -172,6 +161,13 @@ export function useOnboarding(): UseOnboardingResult {
     [],
   );
 
+  const focusTimes = useFocusTimes({
+    isEditTimes,
+    isActive: activeStep === 9,
+    onNotificationPermissionChange,
+    onNotificationPermissionStatusChange,
+  });
+
   const mapNotificationStatus = useCallback(
     (
       status: Notifications.PermissionStatus,
@@ -198,16 +194,6 @@ export function useOnboarding(): UseOnboardingResult {
     setStepError(null);
     setStepIndex((current) => (current === 7 ? 8 : current));
   }, [activeStep, isEditTimes, screenTimeApproved]);
-
-  const applySchedules = useCallback(async (schedules: FocusSchedule[]) => {
-    if (!schedules.length) return;
-    await applyFocusSchedulesToDevice({
-      previousSchedules: previousSchedulesRef.current,
-      nextSchedules: schedules,
-      setQuranMinutesToUnblock,
-    });
-    previousSchedulesRef.current = schedules;
-  }, [setQuranMinutesToUnblock]);
 
   const onNext = useCallback(async () => {
     setStepError(null);
@@ -296,18 +282,16 @@ export function useOnboarding(): UseOnboardingResult {
         }
       }
 
-      if (!focusSchedules.length) {
+      if (!focusTimes.focusSchedules.length) {
         setHasAttemptedScheduleSubmit(true);
         return;
       }
 
       setHasAttemptedScheduleSubmit(false);
+      focusTimes.commitDraftToStore();
       if (!isEditTimes) {
         setStepIndex(REVIEW_STEP);
       } else {
-        try {
-          await applySchedules(useUserStore.getState().focusSchedules);
-        } catch {}
         router.back();
       }
       return;
@@ -328,9 +312,8 @@ export function useOnboarding(): UseOnboardingResult {
   }, [
     activeStep,
     ageInput,
-    applySchedules,
     familyActivitySelectionDraft,
-    focusSchedules.length,
+    focusTimes,
     isEditTimes,
     mapNotificationStatus,
     name,
@@ -394,7 +377,7 @@ export function useOnboarding(): UseOnboardingResult {
     "";
   const icon = STEP_ICONS[activeStep] ?? undefined;
   const scheduleError =
-    hasAttemptedScheduleSubmit && focusSchedules.length === 0
+    hasAttemptedScheduleSubmit && focusTimes.focusSchedules.length === 0
       ? "Please select at least one focus time."
       : null;
   const isReviewStep = !isEditTimes && activeStep === REVIEW_STEP;
@@ -432,5 +415,6 @@ export function useOnboarding(): UseOnboardingResult {
     subtitle,
     title,
     totalSteps: isEditTimes ? 1 : TOTAL_STEPS,
+    focusTimes,
   };
 }

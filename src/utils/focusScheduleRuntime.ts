@@ -3,42 +3,51 @@ import { SCREEN_TIME } from "@/constants/screenTime";
 import {
   DEFAULT_SHIELD_ACTIONS,
   DEFAULT_SHIELD_CONFIG,
-  configureBlockOnly,
+  configureBlockUnblock,
   startDailyBlockScheduleFor,
   stopMonitoring,
   updateShield,
 } from "@/services/deviceActivity";
 import type { FocusSchedule } from "@/store/user";
+import {
+  getFocusScheduleActivityName,
+  getFocusScheduleActivityNames,
+  getFocusScheduleFingerprint,
+} from "@/utils/focusScheduleCoordinator";
 import { Platform } from "react-native";
 
 interface ApplyFocusSchedulesToDeviceArgs {
-  previousSchedules: FocusSchedule[];
-  nextSchedules: FocusSchedule[];
+  schedules: FocusSchedule[];
   setQuranMinutesToUnblock: (minutes: number) => void;
+  stopActivityNames?: string[];
 }
 
+export {
+  getFocusScheduleActivityName,
+  getFocusScheduleActivityNames,
+  getFocusScheduleFingerprint,
+};
+
 export const applyFocusSchedulesToDevice = async ({
-  previousSchedules,
-  nextSchedules,
+  schedules,
   setQuranMinutesToUnblock,
+  stopActivityNames = [],
 }: ApplyFocusSchedulesToDeviceArgs) => {
-  setQuranMinutesToUnblock(getNextDuration(nextSchedules));
+  setQuranMinutesToUnblock(getNextDuration(schedules));
   if (Platform.OS !== "ios") return;
 
-  const previousNames = previousSchedules.map(
-    (schedule) => `${SCREEN_TIME.ACTIVITY_NAME}-${schedule.id}`,
-  );
-  const activityNames = nextSchedules.map(
-    (schedule) => `${SCREEN_TIME.ACTIVITY_NAME}-${schedule.id}`,
-  );
-  stopMonitoring(Array.from(new Set([...previousNames, ...activityNames])));
+  stopMonitoring(Array.from(new Set(stopActivityNames)));
 
-  if (!nextSchedules.length) return;
+  if (!schedules.length) return;
   updateShield(DEFAULT_SHIELD_CONFIG, DEFAULT_SHIELD_ACTIONS, SCREEN_TIME.SHIELD_ID);
 
-  for (const schedule of nextSchedules) {
-    const activityName = `${SCREEN_TIME.ACTIVITY_NAME}-${schedule.id}`;
-    configureBlockOnly(activityName, SCREEN_TIME.SELECTION_ID, SCREEN_TIME.SHIELD_ID);
+  for (const schedule of schedules) {
+    const activityName = getFocusScheduleActivityName(schedule.id);
+    configureBlockUnblock(
+      activityName,
+      SCREEN_TIME.SELECTION_ID,
+      SCREEN_TIME.SHIELD_ID,
+    );
     await startDailyBlockScheduleFor(activityName, schedule.hour, schedule.minute);
   }
 };

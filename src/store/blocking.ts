@@ -19,6 +19,7 @@ export interface BlockingState {
   activeScheduleDate: string | null;
   completedScheduleDate: string | null;
   completedScheduleIds: string[];
+  nativeScheduleFingerprint: string | null;
 }
 
 interface BlockingActions {
@@ -37,6 +38,7 @@ interface BlockingActions {
     requiredMinutes: number,
     dateKey: string,
   ) => void;
+  setNativeScheduleFingerprint: (fingerprint: string | null) => void;
   ensureCompletionDate: (dateKey: string) => void;
   markScheduleCompleted: (scheduleId: string, dateKey: string) => void;
 }
@@ -53,6 +55,7 @@ const createInitialBlockingState = (): BlockingState => ({
   activeScheduleDate: null,
   completedScheduleDate: null,
   completedScheduleIds: [],
+  nativeScheduleFingerprint: null,
 });
 
 const LIFETIME_FLUSH_THRESHOLD_MINUTES = 10 / 60;
@@ -302,6 +305,14 @@ export const useBlockingStore = create<BlockingState & BlockingActions>()(
         });
       },
 
+      setNativeScheduleFingerprint: (nativeScheduleFingerprint) => {
+        set((state) =>
+          state.nativeScheduleFingerprint === nativeScheduleFingerprint
+            ? {}
+            : { nativeScheduleFingerprint },
+        );
+      },
+
       ensureCompletionDate: (dateKey) => {
         set((state) => {
           if (state.completedScheduleDate === dateKey) return {};
@@ -351,6 +362,7 @@ export const useBlockingStore = create<BlockingState & BlockingActions>()(
         activeScheduleDate: state.activeScheduleDate,
         completedScheduleDate: state.completedScheduleDate,
         completedScheduleIds: state.completedScheduleIds,
+        nativeScheduleFingerprint: state.nativeScheduleFingerprint,
       }),
     },
   ),

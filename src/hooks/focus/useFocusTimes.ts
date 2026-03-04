@@ -29,6 +29,7 @@ export type FocusNotificationStatus =
 
 export interface UseFocusTimesArgs {
   isEditTimes: boolean;
+  isActive: boolean;
   onNotificationPermissionChange?: (approved: boolean) => void;
   onNotificationPermissionStatusChange?: (status: FocusNotificationStatus) => void;
 }
@@ -48,6 +49,7 @@ export interface UseFocusTimesResult {
   orderedSchedules: FocusSchedule[];
   summaryMinutesText: string;
   goalRecommendation: ReturnType<typeof computeGoalRecommendation>;
+  commitDraftToStore: () => void;
   setGoalDaysInput: (value: string) => void;
   onTogglePrayer: (preset: PrayerPreset) => void;
   onRemoveSchedule: (id: string) => void;
@@ -68,26 +70,60 @@ export interface UseFocusTimesResult {
 export const FOCUS_DURATION_STEP = 5;
 export const FOCUS_LABEL_MAX_LENGTH = 24;
 
+const getGoalMinutesPerPage = (focusMinutesPerPage?: number) =>
+  focusMinutesPerPage && focusMinutesPerPage > 0
+    ? focusMinutesPerPage
+    : DEFAULT_MINUTES_PER_PAGE;
+
+const buildScheduleLabelDrafts = (focusSchedules: FocusSchedule[]) =>
+  focusSchedules.reduce<Record<string, string>>((acc, schedule) => {
+    acc[schedule.id] = schedule.label;
+    return acc;
+  }, {});
+
+const getFocusTimesDraftFingerprint = (params: {
+  focusSchedules: FocusSchedule[];
+  focusDurationMode: FocusDurationMode;
+  focusCompletionDays: number;
+  focusMinutesPerPage: number;
+}) =>
+  JSON.stringify({
+    focusCompletionDays: params.focusCompletionDays,
+    focusDurationMode: params.focusDurationMode,
+    focusMinutesPerPage: params.focusMinutesPerPage,
+    focusSchedules: [...params.focusSchedules]
+      .map((schedule) => ({
+        durationMinutes: schedule.durationMinutes,
+        hour: schedule.hour,
+        id: schedule.id,
+        kind: schedule.kind,
+        label: schedule.label,
+        minute: schedule.minute,
+      }))
+      .sort((a, b) => a.id.localeCompare(b.id)),
+  });
+
 export function useFocusTimes({
   isEditTimes,
+  isActive,
   onNotificationPermissionChange,
   onNotificationPermissionStatusChange,
 }: UseFocusTimesArgs): UseFocusTimesResult {
   const {
-    focusSchedules,
-    focusDurationMode,
-    focusCompletionDays,
-    focusMinutesPerPage,
+    storedFocusSchedules,
+    storedFocusDurationMode,
+    storedFocusCompletionDays,
+    storedFocusMinutesPerPage,
     setFocusSchedules,
     setFocusDurationMode,
     setFocusCompletionDays,
     setFocusMinutesPerPage,
   } = useUserStore(
     useShallow((s) => ({
-      focusSchedules: s.focusSchedules,
-      focusDurationMode: s.focusDurationMode,
-      focusCompletionDays: s.focusCompletionDays,
-      focusMinutesPerPage: s.focusMinutesPerPage,
+      storedFocusSchedules: s.focusSchedules,
+      storedFocusDurationMode: s.focusDurationMode,
+      storedFocusCompletionDays: s.focusCompletionDays,
+      storedFocusMinutesPerPage: s.focusMinutesPerPage,
       setFocusSchedules: s.setFocusSchedules,
       setFocusDurationMode: s.setFocusDurationMode,
       setFocusCompletionDays: s.setFocusCompletionDays,
@@ -100,11 +136,24 @@ export function useFocusTimes({
     })),
   );
 
-  const goalCompletionDays = sanitizeGoalDays(focusCompletionDays ?? 30);
-  const goalMinutesPerPage =
-    focusMinutesPerPage && focusMinutesPerPage > 0
-      ? focusMinutesPerPage
-      : DEFAULT_MINUTES_PER_PAGE;
+  const storedGoalCompletionDays = sanitizeGoalDays(
+    storedFocusCompletionDays ?? 30,
+  );
+  const storedGoalMinutesPerPage = getGoalMinutesPerPage(
+    storedFocusMinutesPerPage,
+  );
+
+  const [focusSchedules, setFocusSchedulesDraft] = useState<FocusSchedule[]>(
+    () => storedFocusSchedules,
+  );
+  const [focusDurationMode, setFocusDurationModeDraft] =
+    useState<FocusDurationMode>(() => storedFocusDurationMode);
+  const [focusCompletionDays, setFocusCompletionDaysDraft] = useState<number>(
+    () => storedGoalCompletionDays,
+  );
+  const [focusMinutesPerPage, setFocusMinutesPerPageDraft] = useState<number>(
+    () => storedGoalMinutesPerPage,
+  );
 
   const [expandedScheduleId, setExpandedScheduleId] = useState<string | null>(
     null,
@@ -118,25 +167,73 @@ export function useFocusTimes({
   const [notificationStatus, setNotificationStatus] =
     useState<FocusNotificationStatus>(null);
   const [goalDaysInput, setGoalDaysInput] = useState(() =>
-    String(goalCompletionDays),
+    String(storedGoalCompletionDays),
   );
   const [scheduleLabelDrafts, setScheduleLabelDrafts] = useState<
     Record<string, string>
-  >(() =>
-    focusSchedules.reduce<Record<string, string>>((acc, schedule) => {
-      acc[schedule.id] = schedule.label;
-      return acc;
-    }, {}),
-  );
+  >(() => buildScheduleLabelDrafts(storedFocusSchedules));
 
   const hasRequestedNotificationsRef = useRef(false);
   const customIndexRef = useRef(
-    focusSchedules.filter((schedule) => schedule.kind === "custom").length + 1,
+    storedFocusSchedules.filter((schedule) => schedule.kind === "custom").length + 1,
+  );
+  const lastHydratedFingerprintRef = useRef(
+    getFocusTimesDraftFingerprint({
+      focusSchedules: storedFocusSchedules,
+      focusDurationMode: storedFocusDurationMode,
+      focusCompletionDays: storedGoalCompletionDays,
+      focusMinutesPerPage: storedGoalMinutesPerPage,
+    }),
+  );
+
+  const goalCompletionDays = sanitizeGoalDays(focusCompletionDays);
+  const goalMinutesPerPage = getGoalMinutesPerPage(focusMinutesPerPage);
+  const draftFingerprint = useMemo(
+    () =>
+      getFocusTimesDraftFingerprint({
+        focusSchedules,
+        focusDurationMode,
+        focusCompletionDays: goalCompletionDays,
+        focusMinutesPerPage: goalMinutesPerPage,
+      }),
+    [focusDurationMode, focusSchedules, goalCompletionDays, goalMinutesPerPage],
   );
 
   useEffect(() => {
     setGoalDaysInput(String(goalCompletionDays));
   }, [goalCompletionDays]);
+
+  useEffect(() => {
+    const storeFingerprint = getFocusTimesDraftFingerprint({
+      focusSchedules: storedFocusSchedules,
+      focusDurationMode: storedFocusDurationMode,
+      focusCompletionDays: storedGoalCompletionDays,
+      focusMinutesPerPage: storedGoalMinutesPerPage,
+    });
+    if (storeFingerprint === lastHydratedFingerprintRef.current) {
+      return;
+    }
+    if (draftFingerprint !== lastHydratedFingerprintRef.current) {
+      return;
+    }
+
+    setFocusSchedulesDraft(storedFocusSchedules);
+    setFocusDurationModeDraft(storedFocusDurationMode);
+    setFocusCompletionDaysDraft(storedGoalCompletionDays);
+    setFocusMinutesPerPageDraft(storedGoalMinutesPerPage);
+    setGoalDaysInput(String(storedGoalCompletionDays));
+    setScheduleLabelDrafts(buildScheduleLabelDrafts(storedFocusSchedules));
+    customIndexRef.current =
+      storedFocusSchedules.filter((schedule) => schedule.kind === "custom")
+        .length + 1;
+    lastHydratedFingerprintRef.current = storeFingerprint;
+  }, [
+    draftFingerprint,
+    storedFocusDurationMode,
+    storedFocusSchedules,
+    storedGoalCompletionDays,
+    storedGoalMinutesPerPage,
+  ]);
 
   useEffect(() => {
     if (focusSchedules.length === 0) {
@@ -185,6 +282,9 @@ export function useFocusTimes({
   );
 
   const syncNotificationStatus = useCallback(async () => {
+    if (!isActive) {
+      return null;
+    }
     if (Platform.OS !== "ios") {
       setNotificationStatus("granted");
       return "granted" as const;
@@ -197,7 +297,7 @@ export function useFocusTimes({
     } catch {
       return null;
     }
-  }, [mapNotificationStatus]);
+  }, [isActive, mapNotificationStatus]);
 
   const requestNotifications = useCallback(async () => {
     if (Platform.OS !== "ios") return;
@@ -208,21 +308,23 @@ export function useFocusTimes({
   }, [mapNotificationStatus]);
 
   useEffect(() => {
+    if (!isActive) return;
     void syncNotificationStatus();
-  }, []);
+  }, [isActive, syncNotificationStatus]);
 
   useEffect(() => {
-    if (Platform.OS !== "ios") return;
+    if (!isActive || Platform.OS !== "ios") return;
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active") {
         void syncNotificationStatus();
       }
     });
     return () => subscription.remove();
-  }, []);
+  }, [isActive, syncNotificationStatus]);
 
   useEffect(() => {
     if (
+      !isActive ||
       isEditTimes ||
       Platform.OS !== "ios" ||
       notificationStatus !== "undetermined" ||
@@ -233,22 +335,22 @@ export function useFocusTimes({
 
     hasRequestedNotificationsRef.current = true;
     void requestNotifications();
-  }, [isEditTimes, notificationStatus]);
+  }, [isActive, isEditTimes, notificationStatus, requestNotifications]);
 
   useEffect(() => {
-    if (!onNotificationPermissionChange) return;
+    if (!isActive || !onNotificationPermissionChange) return;
     if (Platform.OS !== "ios") {
       onNotificationPermissionChange(true);
       return;
     }
     if (notificationStatus == null) return;
     onNotificationPermissionChange(notificationStatus === "granted");
-  }, [notificationStatus]);
+  }, [isActive, notificationStatus, onNotificationPermissionChange]);
 
   useEffect(() => {
-    if (!onNotificationPermissionStatusChange) return;
+    if (!isActive || !onNotificationPermissionStatusChange) return;
     onNotificationPermissionStatusChange(notificationStatus);
-  }, [notificationStatus]);
+  }, [isActive, notificationStatus, onNotificationPermissionStatusChange]);
 
   const selectedPrayerIds = useMemo(
     () =>
@@ -280,14 +382,13 @@ export function useFocusTimes({
 
   const setSchedule = useCallback(
     (next: FocusSchedule[]) => {
-      setFocusSchedules(next);
+      setFocusSchedulesDraft(next);
       if (!next.length) {
         setExpandedScheduleId(null);
         return;
       }
-      setQuranMinutesToUnblock(getNextDuration(next));
     },
-    [setFocusSchedules, setQuranMinutesToUnblock],
+    [],
   );
 
   useEffect(() => {
@@ -303,6 +404,7 @@ export function useFocusTimes({
     focusSchedules,
     goalRecommendation.computable,
     goalRecommendation.recommendedMinutes,
+    setSchedule,
   ]);
 
   const applyManualDuration = useCallback(
@@ -451,15 +553,15 @@ export function useFocusTimes({
 
   const onChangeMode = useCallback(
     (nextMode: FocusDurationMode) => {
-      setFocusDurationMode(nextMode);
+      setFocusDurationModeDraft(nextMode);
       if (nextMode !== "goal") {
-        setFocusCompletionDays(undefined);
-        setFocusMinutesPerPage(undefined);
+        setFocusCompletionDaysDraft(30);
+        setFocusMinutesPerPageDraft(DEFAULT_MINUTES_PER_PAGE);
         return;
       }
       const safeDays = goalCompletionDays;
-      setFocusCompletionDays(safeDays);
-      setFocusMinutesPerPage(goalMinutesPerPage);
+      setFocusCompletionDaysDraft(safeDays);
+      setFocusMinutesPerPageDraft(goalMinutesPerPage);
       const recommendation = computeGoalRecommendation({
         completionDays: safeDays,
         scheduleCount: focusSchedules.length,
@@ -476,9 +578,6 @@ export function useFocusTimes({
     [
       focusSchedules,
       goalCompletionDays,
-      setFocusCompletionDays,
-      setFocusDurationMode,
-      setFocusMinutesPerPage,
       setSchedule,
       goalMinutesPerPage,
     ],
@@ -487,19 +586,19 @@ export function useFocusTimes({
   const onStepGoalDays = useCallback(
     (delta: number) => {
       const nextDays = sanitizeGoalDays(goalCompletionDays + delta);
-      setFocusCompletionDays(nextDays);
+      setFocusCompletionDaysDraft(nextDays);
       setGoalDaysInput(String(nextDays));
     },
-    [goalCompletionDays, setFocusCompletionDays],
+    [goalCompletionDays],
   );
 
   const onCommitGoalDays = useCallback(() => {
     const digits = goalDaysInput.replace(/\D/g, "");
     const parsed = digits ? parseInt(digits, 10) : goalCompletionDays;
     const nextDays = sanitizeGoalDays(parsed);
-    setFocusCompletionDays(nextDays);
+    setFocusCompletionDaysDraft(nextDays);
     setGoalDaysInput(String(nextDays));
-  }, [goalCompletionDays, goalDaysInput, setFocusCompletionDays]);
+  }, [goalCompletionDays, goalDaysInput]);
 
   const onAdjustDuration = useCallback(
     (schedule: FocusSchedule, delta: number) => {
@@ -554,6 +653,31 @@ export function useFocusTimes({
     ? `${goalRecommendation.recommendedMinutes} min/session`
     : "Select at least one time";
 
+  const commitDraftToStore = useCallback(() => {
+    setFocusSchedules(focusSchedules);
+    setFocusDurationMode(focusDurationMode);
+    if (focusDurationMode === "goal") {
+      setFocusCompletionDays(goalCompletionDays);
+      setFocusMinutesPerPage(goalMinutesPerPage);
+    } else {
+      setFocusCompletionDays(undefined);
+      setFocusMinutesPerPage(undefined);
+    }
+    setQuranMinutesToUnblock(getNextDuration(focusSchedules));
+    lastHydratedFingerprintRef.current = draftFingerprint;
+  }, [
+    draftFingerprint,
+    focusDurationMode,
+    focusSchedules,
+    goalCompletionDays,
+    goalMinutesPerPage,
+    setFocusCompletionDays,
+    setFocusDurationMode,
+    setFocusMinutesPerPage,
+    setFocusSchedules,
+    setQuranMinutesToUnblock,
+  ]);
+
   return {
     focusSchedules,
     focusDurationMode,
@@ -569,6 +693,7 @@ export function useFocusTimes({
     orderedSchedules,
     summaryMinutesText,
     goalRecommendation,
+    commitDraftToStore,
     setGoalDaysInput,
     onTogglePrayer,
     onRemoveSchedule,

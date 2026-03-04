@@ -1,7 +1,7 @@
 import { PAYWALL_SOURCES } from "@/constants/entitlements";
 import { useFunnelText } from "@/hooks/app";
 import { useHomePermissionStatus } from "@/hooks/home/useHomePermissionStatus";
-import { useHomeScheduleStatus } from "@/hooks/home/useHomeScheduleStatus";
+import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
 import {
   canOpenQuran,
   ensureCanEditFocusTimes,
@@ -137,10 +137,7 @@ export const useHomeScreen = () => {
     statuses,
     activeSchedule,
     refresh: refreshScheduleStatus,
-  } = useHomeScheduleStatus({
-    autoRefreshOnAppActive: false,
-    autoTickMinutes: false,
-  });
+  } = useFocusScheduleStatus();
 
   const {
     getAccumulatedMinutesSnapshot,

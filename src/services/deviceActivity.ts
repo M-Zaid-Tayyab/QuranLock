@@ -9,7 +9,10 @@ import type {
 import {
   blockSelection as libBlockSelection,
   configureActions,
+  getActivities as libGetActivities,
   getAuthorizationStatus,
+  isShieldActive as libIsShieldActive,
+  onDeviceActivityMonitorEvent as libOnDeviceActivityMonitorEvent,
   pollAuthorizationStatus,
   requestAuthorization as libRequestAuthorization,
   startMonitoring as libStartMonitoring,
@@ -17,6 +20,9 @@ import {
   unblockSelection as libUnblockSelection,
   setFamilyActivitySelectionId,
   updateShieldWithId,
+  userDefaultsGet,
+  userDefaultsRemove,
+  userDefaultsSet,
 } from "react-native-device-activity";
 
 const AuthorizationStatus = {
@@ -51,6 +57,25 @@ export function setSelection(familyActivitySelection: string): void {
     id: SCREEN_TIME.SELECTION_ID,
     familyActivitySelection,
   });
+}
+
+export function clearSelection(): void {
+  const selectionIds =
+    userDefaultsGet<Record<string, string>>("familyActivitySelectionIds") ?? {};
+
+  if (!(SCREEN_TIME.SELECTION_ID in selectionIds)) {
+    return;
+  }
+
+  const nextSelectionIds = { ...selectionIds };
+  delete nextSelectionIds[SCREEN_TIME.SELECTION_ID];
+
+  if (Object.keys(nextSelectionIds).length === 0) {
+    userDefaultsRemove("familyActivitySelectionIds");
+    return;
+  }
+
+  userDefaultsSet("familyActivitySelectionIds", nextSelectionIds);
 }
 
 export function configureBlockOnly(
@@ -180,6 +205,20 @@ export async function startDailyBlockScheduleFor(
     repeats: true,
   };
   await libStartMonitoring(activityName, schedule, []);
+}
+
+export function getMonitoredActivities(): string[] {
+  return libGetActivities();
+}
+
+export function isShieldEnabled(): boolean {
+  return libIsShieldActive();
+}
+
+export function onMonitorEvent(
+  listener: Parameters<typeof libOnDeviceActivityMonitorEvent>[0],
+) {
+  return libOnDeviceActivityMonitorEvent(listener);
 }
 
 const SHIELD_THEME = {

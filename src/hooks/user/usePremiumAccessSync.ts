@@ -1,14 +1,24 @@
+import { SCREEN_TIME } from "@/constants/screenTime";
+import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
 import {
   blockSelectionNow,
+  clearSelection,
+  getMonitoredActivities,
+  isShieldEnabled,
+  onMonitorEvent,
   setSelection,
   unblockSelection,
 } from "@/services/deviceActivity";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore, type FocusSchedule } from "@/store/user";
-import { areFocusSchedulesEqual } from "@/utils/focusScheduleEntitlement";
+import {
+  getActiveScheduleSyncPlan,
+  getBlockingReconciliationPlan,
+  getFocusMonitorRegistrationPlan,
+} from "@/utils/focusScheduleCoordinator";
 import { applyFocusSchedulesToDevice } from "@/utils/focusScheduleRuntime";
-import { getDateKey, getScheduleStatuses } from "@/utils/scheduleEngine";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { AppState } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
 interface PremiumSyncState {
@@ -19,35 +29,48 @@ interface PremiumSyncState {
   familyActivitySelection: string | null;
 }
 
-const usePremiumSelectionSync = ({
+const getRelevantNativeActivities = () =>
+  getMonitoredActivities().filter((activityName) =>
+    activityName.startsWith(`${SCREEN_TIME.ACTIVITY_NAME}-`),
+  );
+
+const useFamilyActivitySelectionSync = ({
   onboardingComplete,
   isPremium,
+  isBlockingPaused,
   familyActivitySelection,
 }: Pick<
   PremiumSyncState,
-  "onboardingComplete" | "isPremium" | "familyActivitySelection"
+  "onboardingComplete" | "isPremium" | "isBlockingPaused" | "familyActivitySelection"
 >) => {
-  const appliedSelectionRef = useRef<string | null>(null);
+  const appliedSelectionRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
-    if (!onboardingComplete) return;
+    if (!onboardingComplete || !isPremium) return;
+    if (appliedSelectionRef.current === familyActivitySelection) return;
 
-    if (!isPremium) {
-      appliedSelectionRef.current = null;
-      return;
-    }
-
-    if (
-      familyActivitySelection &&
-      appliedSelectionRef.current !== familyActivitySelection
-    ) {
+    if (familyActivitySelection) {
       setSelection(familyActivitySelection);
-      appliedSelectionRef.current = familyActivitySelection;
+      if (!isBlockingPaused && isShieldEnabled()) {
+        blockSelectionNow();
+      }
+    } else {
+      if (isShieldEnabled()) {
+        unblockSelection();
+      }
+      clearSelection();
     }
-  }, [familyActivitySelection, isPremium, onboardingComplete]);
+
+    appliedSelectionRef.current = familyActivitySelection;
+  }, [
+    familyActivitySelection,
+    isBlockingPaused,
+    isPremium,
+    onboardingComplete,
+  ]);
 };
 
-const usePremiumScheduleSync = ({
+const useFocusMonitorRegistration = ({
   onboardingComplete,
   isPremium,
   isBlockingPaused,
@@ -56,104 +79,209 @@ const usePremiumScheduleSync = ({
   PremiumSyncState,
   "onboardingComplete" | "isPremium" | "isBlockingPaused" | "focusSchedules"
 >) => {
-  const setQuranMinutesToUnblock = useBlockingStore(
-    (s) => s.setQuranMinutesToUnblock,
+  const {
+    nativeScheduleFingerprint,
+    setNativeScheduleFingerprint,
+    setQuranMinutesToUnblock,
+  } = useBlockingStore(
+    useShallow((s) => ({
+      nativeScheduleFingerprint: s.nativeScheduleFingerprint,
+      setNativeScheduleFingerprint: s.setNativeScheduleFingerprint,
+      setQuranMinutesToUnblock: s.setQuranMinutesToUnblock,
+    })),
   );
-  const appliedSchedulesRef = useRef<FocusSchedule[]>([]);
 
   useEffect(() => {
-    if (!onboardingComplete) return;
+    const existingActivityNames = getRelevantNativeActivities();
+    const plan = getFocusMonitorRegistrationPlan({
+      onboardingComplete,
+      isPremium,
+      isBlockingPaused,
+      focusSchedules,
+      nativeScheduleFingerprint,
+      existingActivityNames,
+    });
 
-    const nextSchedules =
-      isPremium && !isBlockingPaused ? focusSchedules : [];
-    const previousSchedules = appliedSchedulesRef.current;
-    if (areFocusSchedulesEqual(previousSchedules, nextSchedules)) {
+    setQuranMinutesToUnblock(plan.quranMinutesToUnblock);
+
+    if (plan.kind === "skip") {
       return;
     }
 
-    appliedSchedulesRef.current = nextSchedules;
+    if (plan.kind === "clear") {
+      if (plan.stopActivityNames.length > 0) {
+        void applyFocusSchedulesToDevice({
+          schedules: [],
+          setQuranMinutesToUnblock,
+          stopActivityNames: plan.stopActivityNames,
+        });
+      }
+      if (nativeScheduleFingerprint !== plan.nextFingerprint) {
+        setNativeScheduleFingerprint(plan.nextFingerprint);
+      }
+      return;
+    }
+
+    if (plan.kind === "adopt" || plan.kind === "noop") {
+      if (nativeScheduleFingerprint !== plan.nextFingerprint) {
+        setNativeScheduleFingerprint(plan.nextFingerprint);
+      }
+      return;
+    }
+
+    let cancelled = false;
     void applyFocusSchedulesToDevice({
-      previousSchedules,
-      nextSchedules,
+      schedules: plan.schedules,
       setQuranMinutesToUnblock,
-    }).catch(() => {});
+      stopActivityNames: plan.stopActivityNames,
+    }).then(() => {
+      if (cancelled) return;
+      setNativeScheduleFingerprint(plan.nextFingerprint);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     focusSchedules,
     isBlockingPaused,
     isPremium,
+    nativeScheduleFingerprint,
     onboardingComplete,
+    setNativeScheduleFingerprint,
     setQuranMinutesToUnblock,
   ]);
 };
 
-const usePremiumWindowEnforcement = ({
+const useFocusScheduleCoordinator = ({
   onboardingComplete,
   isPremium,
   isBlockingPaused,
-  focusSchedules,
   familyActivitySelection,
-}: PremiumSyncState) => {
-  const resetAfterUnblock = useBlockingStore((s) => s.resetAfterUnblock);
+}: Pick<
+  PremiumSyncState,
+  "onboardingComplete" | "isPremium" | "isBlockingPaused" | "familyActivitySelection"
+>) => {
+  const {
+    activeScheduleDate,
+    activeScheduleId,
+    completedScheduleDate,
+    ensureCompletionDate,
+    lastBlockedAt,
+    requiredQuranMinutes,
+    resetAfterUnblock,
+    setActiveSchedule,
+  } = useBlockingStore(
+    useShallow((s) => ({
+      activeScheduleDate: s.activeScheduleDate,
+      activeScheduleId: s.activeScheduleId,
+      completedScheduleDate: s.completedScheduleDate,
+      ensureCompletionDate: s.ensureCompletionDate,
+      lastBlockedAt: s.lastBlockedAt,
+      requiredQuranMinutes: s.requiredQuranMinutes,
+      resetAfterUnblock: s.resetAfterUnblock,
+      setActiveSchedule: s.setActiveSchedule,
+    })),
+  );
+
+  const { dateKey, activeSchedule, refresh } = useFocusScheduleStatus();
+  const shouldUseScheduleSystem =
+    onboardingComplete &&
+    isPremium &&
+    !isBlockingPaused &&
+    familyActivitySelection != null;
 
   useEffect(() => {
     if (!onboardingComplete) return;
+    if (completedScheduleDate === dateKey) return;
+    ensureCompletionDate(dateKey);
+  }, [completedScheduleDate, dateKey, ensureCompletionDate, onboardingComplete]);
 
-    if (!isPremium) {
-      unblockSelection();
-      resetAfterUnblock();
-      return;
-    }
-
-    if (isBlockingPaused) {
-      unblockSelection();
-      return;
-    }
-
-    const blockingState = useBlockingStore.getState();
-    const now = new Date();
-    const dateKey = getDateKey(now);
-
-    if (blockingState.completedScheduleDate !== dateKey) {
-      blockingState.ensureCompletionDate(dateKey);
-    }
-
-    const {
-      activeScheduleDate,
+  useEffect(() => {
+    if (!onboardingComplete) return;
+    const plan = getActiveScheduleSyncPlan({
+      completedScheduleDate,
+      dateKey,
+      shouldUseScheduleSystem,
+      activeSchedule,
       activeScheduleId,
-      completedScheduleIds,
-      setActiveSchedule,
-    } = useBlockingStore.getState();
-    const nextPending =
-      getScheduleStatuses(focusSchedules, completedScheduleIds, now).find(
-        (entry) => entry.status === "pending",
-      ) ?? null;
-    const nextPendingId = nextPending?.schedule.id ?? null;
+      activeScheduleDate,
+      requiredQuranMinutes,
+    });
+    if (!plan.isReady || !plan.needsUpdate) return;
+    setActiveSchedule(
+      plan.nextActiveScheduleId,
+      plan.nextRequiredMinutes,
+      dateKey,
+    );
+  }, [
+    activeSchedule,
+    activeScheduleDate,
+    activeScheduleId,
+    completedScheduleDate,
+    dateKey,
+    onboardingComplete,
+    requiredQuranMinutes,
+    setActiveSchedule,
+    shouldUseScheduleSystem,
+  ]);
 
-    if (
-      nextPendingId !== activeScheduleId ||
-      (nextPendingId != null && activeScheduleDate !== dateKey)
-    ) {
-      setActiveSchedule(
-        nextPendingId,
-        nextPending?.schedule.durationMinutes ?? 0,
-        dateKey,
-      );
-    }
+  const reconcileBlocking = useCallback(() => {
+    const plan = getBlockingReconciliationPlan({
+      completedScheduleDate,
+      dateKey,
+      shouldUseScheduleSystem,
+      activeSchedule,
+      shieldEnabled: isShieldEnabled(),
+      activeScheduleId,
+      lastBlockedAt,
+      requiredQuranMinutes,
+    });
 
-    if (nextPending && familyActivitySelection) {
+    if (plan.action === "block") {
       blockSelectionNow();
       return;
     }
 
-    unblockSelection();
+    if (plan.action === "unblock") {
+      unblockSelection();
+    }
+
+    if (plan.shouldResetAfterUnblock) {
+      resetAfterUnblock();
+    }
   }, [
-    familyActivitySelection,
-    focusSchedules,
-    isBlockingPaused,
-    isPremium,
-    onboardingComplete,
+    activeSchedule,
+    activeScheduleId,
+    completedScheduleDate,
+    dateKey,
+    lastBlockedAt,
+    requiredQuranMinutes,
     resetAfterUnblock,
+    shouldUseScheduleSystem,
   ]);
+
+  useEffect(() => {
+    reconcileBlocking();
+  }, [reconcileBlocking]);
+
+  useEffect(() => {
+    const monitorSubscription = onMonitorEvent(() => {
+      refresh();
+    });
+    const appStateSubscription = AppState.addEventListener(
+      "change",
+      (nextState) => {
+        if (nextState !== "active") return;
+        refresh();
+      },
+    );
+
+    return () => {
+      monitorSubscription.remove();
+      appStateSubscription.remove();
+    };
+  }, [refresh]);
 };
 
 export const usePremiumAccessSync = () => {
@@ -167,7 +295,7 @@ export const usePremiumAccessSync = () => {
     })),
   );
 
-  usePremiumSelectionSync(state);
-  usePremiumScheduleSync(state);
-  usePremiumWindowEnforcement(state);
+  useFamilyActivitySelectionSync(state);
+  useFocusMonitorRegistration(state);
+  useFocusScheduleCoordinator(state);
 };

@@ -4,8 +4,7 @@ import { useFunnelText } from "@/hooks/app";
 import {
   FOCUS_DURATION_STEP,
   FOCUS_LABEL_MAX_LENGTH,
-  type FocusNotificationStatus,
-  useFocusTimes,
+  type UseFocusTimesResult,
 } from "@/hooks/focus";
 import { GOAL_DAYS_MAX, GOAL_DAYS_MIN } from "@/utils/focusPlan";
 import { Ionicons } from "@expo/vector-icons";
@@ -14,17 +13,15 @@ import DatePicker from "react-native-date-picker";
 import { Pressable, Text, TextInput, View } from "react-native";
 
 interface FocusTimesStepProps {
+  focusTimes: UseFocusTimesResult;
   isEditTimes: boolean;
   scheduleError: string | null;
-  onNotificationPermissionChange?: (approved: boolean) => void;
-  onNotificationPermissionStatusChange?: (status: FocusNotificationStatus) => void;
 }
 
 export function FocusTimesStep({
+  focusTimes,
   isEditTimes,
   scheduleError,
-  onNotificationPermissionChange,
-  onNotificationPermissionStatusChange,
 }: FocusTimesStepProps) {
   const funnelText = useFunnelText();
   const {
@@ -55,11 +52,7 @@ export function FocusTimesStep({
     onCommitDurationInput,
     onChangeScheduleLabel,
     onCommitScheduleLabel,
-  } = useFocusTimes({
-    isEditTimes,
-    onNotificationPermissionChange,
-    onNotificationPermissionStatusChange,
-  });
+  } = focusTimes;
 
   const notificationMeta = (() => {
     if (notificationStatus === "granted") {

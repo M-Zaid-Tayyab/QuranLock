@@ -1,8 +1,7 @@
-import { useVerseScheduleController } from "@/hooks/verse/useVerseScheduleController";
+import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
 import { unblockSelection } from "@/services/deviceActivity";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
-import { getScheduleStatuses } from "@/utils/scheduleEngine";
 import { useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, type AppStateStatus } from "react-native";
@@ -20,7 +19,6 @@ export const useVerseFocusSessionTicker = () => {
     setSessionNowMs,
     completedScheduleIds,
     markScheduleCompleted,
-    setActiveSchedule,
   } = useBlockingStore(
     useShallow((s) => ({
       getRequiredMinutes: s.getRequiredMinutes,
@@ -31,7 +29,6 @@ export const useVerseFocusSessionTicker = () => {
       setSessionNowMs: s.setSessionNowMs,
       completedScheduleIds: s.completedScheduleIds,
       markScheduleCompleted: s.markScheduleCompleted,
-      setActiveSchedule: s.setActiveSchedule,
     })),
   );
 
@@ -50,7 +47,7 @@ export const useVerseFocusSessionTicker = () => {
   );
 
   const { dateKey, activeSchedule, pendingSchedules, refresh } =
-    useVerseScheduleController();
+    useFocusScheduleStatus();
   const isFocused = useIsFocused();
   const [appState, setAppState] = useState<AppStateStatus>(
     AppState.currentState,
@@ -89,26 +86,11 @@ export const useVerseFocusSessionTicker = () => {
         markStreakDayCompleted(dateKey);
       }
       markScheduleCompleted(activeSchedule.schedule.id, dateKey);
-      const statuses = getScheduleStatuses(
-        focusSchedules,
-        completedIds,
-        new Date(),
-      );
-      const nextPending = statuses.find((entry) => entry.status === "pending");
-      if (nextPending) {
-        setActiveSchedule(
-          nextPending.schedule.id,
-          nextPending.schedule.durationMinutes,
-          dateKey,
-        );
-      } else {
-        setActiveSchedule(null, 0, dateKey);
-        unblockSelection();
-        resetAfterUnblock();
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
-        }
+      unblockSelection();
+      resetAfterUnblock();
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
       return;
     }
@@ -132,7 +114,6 @@ export const useVerseFocusSessionTicker = () => {
     pauseLiveProgress,
     resetAfterUnblock,
     setSessionNowMs,
-    setActiveSchedule,
   ]);
 
   useEffect(() => {

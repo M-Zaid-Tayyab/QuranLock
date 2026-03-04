@@ -20,11 +20,16 @@ interface SelectAppsStepProps {
 
 interface SettingsSelectAppsStepProps {
   familyActivitySelection: string | null;
+  selectionSummary?: string;
   onSelectionChange: (selection: string | null) => void;
+  onSelectionDone?: () => void | Promise<void>;
+  onDismiss?: () => void;
+  onOpenPicker?: () => void;
 }
 
 interface AppsPickerPanelProps {
   familyActivitySelection: string | null;
+  selectionSummary?: string;
   onOpenPicker: () => void;
   animated: boolean;
   withTopMargin?: boolean;
@@ -34,6 +39,8 @@ interface AppsPickerSheetProps {
   familyActivitySelection: string | null;
   onSelectionChange: (selection: string | null) => void;
   onSelectionDone?: () => void | Promise<void>;
+  onDismiss?: () => void;
+  doneLabel: string;
   sheetRef: RefObject<GorhomBottomSheetModal | null>;
 }
 
@@ -55,6 +62,7 @@ const useAppsPickerAutoOpen = (
 
 function AppsPickerPanel({
   familyActivitySelection,
+  selectionSummary,
   onOpenPicker,
   animated,
   withTopMargin = false,
@@ -75,9 +83,10 @@ function AppsPickerPanel({
               App picker
             </Text>
             <Text className="mt-1 text-sm font-sfPro text-muted">
-              {familyActivitySelection
-                ? "Selection saved"
-                : "No apps selected yet"}
+              {selectionSummary ??
+                (familyActivitySelection
+                  ? "Selection saved"
+                  : "No apps selected yet")}
             </Text>
           </View>
           <Pressable
@@ -97,7 +106,10 @@ function AppsPickerPanel({
         <View>
           <Text className="font-sfPro-semibold text-foreground">App picker</Text>
           <Text className="mt-1 text-sm font-sfPro text-muted">
-            {familyActivitySelection ? "Selection saved" : "No apps selected yet"}
+            {selectionSummary ??
+              (familyActivitySelection
+                ? "Selection saved"
+                : "No apps selected yet")}
           </Text>
         </View>
         <Pressable
@@ -115,6 +127,8 @@ function AppsPickerSheet({
   familyActivitySelection,
   onSelectionChange,
   onSelectionDone,
+  onDismiss,
+  doneLabel,
   sheetRef,
 }: AppsPickerSheetProps) {
   const handleChange = (
@@ -124,7 +138,12 @@ function AppsPickerSheet({
   };
 
   return (
-    <BottomSheetModal sheetRef={sheetRef} showHandle scrollView>
+    <BottomSheetModal
+      sheetRef={sheetRef}
+      showHandle
+      scrollView
+      onDismiss={onDismiss}
+    >
       <View className="px-6 pt-4 pb-8">
         <Text className="text-lg font-sfPro-semibold text-foreground">
           Select apps to block
@@ -140,7 +159,7 @@ function AppsPickerSheet({
           />
         </View>
         <PrimaryButton
-          title={onSelectionDone ? "Continue" : "Done"}
+          title={doneLabel}
           onPress={() => {
             if (onSelectionDone) {
               void onSelectionDone();
@@ -210,6 +229,7 @@ export function SelectAppsStep({
         familyActivitySelection={familyActivitySelection}
         onSelectionChange={onSelectionChange}
         onSelectionDone={onSelectionDone}
+        doneLabel={onSelectionDone ? "Continue" : "Done"}
         sheetRef={sheetRef}
       />
     </View>
@@ -218,9 +238,25 @@ export function SelectAppsStep({
 
 export function SettingsSelectAppsStep({
   familyActivitySelection,
+  selectionSummary,
   onSelectionChange,
+  onSelectionDone,
+  onDismiss,
+  onOpenPicker,
 }: SettingsSelectAppsStepProps) {
   const sheetRef = useRef<GorhomBottomSheetModal | null>(null);
+
+  const handleOpenPicker = () => {
+    onOpenPicker?.();
+    sheetRef.current?.present();
+  };
+
+  const handleSelectionDone = async () => {
+    if (onSelectionDone) {
+      await onSelectionDone();
+    }
+    sheetRef.current?.dismiss();
+  };
 
   if (Platform.OS !== "ios") {
     return (
@@ -234,12 +270,16 @@ export function SettingsSelectAppsStep({
     <View className="w-full">
       <AppsPickerPanel
         familyActivitySelection={familyActivitySelection}
-        onOpenPicker={() => sheetRef.current?.present()}
+        selectionSummary={selectionSummary}
+        onOpenPicker={handleOpenPicker}
         animated={false}
       />
       <AppsPickerSheet
         familyActivitySelection={familyActivitySelection}
         onSelectionChange={onSelectionChange}
+        onSelectionDone={handleSelectionDone}
+        onDismiss={onDismiss}
+        doneLabel="Done"
         sheetRef={sheetRef}
       />
     </View>

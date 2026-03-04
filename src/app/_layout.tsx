@@ -19,10 +19,10 @@ import { configureRevenueCat } from "@/services/revenueCat";
 import { useUserStore } from "@/store/user";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as Notifications from "expo-notifications";
-import { Stack, useRouter } from "expo-router";
+import { Stack, usePathname, useRootNavigationState, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
@@ -42,20 +42,30 @@ SplashScreen.setOptions({
 
 function useDeepLinkToVerse() {
   const router = useRouter();
+  const pathname = usePathname();
+  const rootNavigationState = useRootNavigationState();
   const isPremium = useUserStore((s) => s.isPremium);
   const handledNotificationIdRef = useRef<string | null>(null);
+  const pendingUrlRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    const handleUrl = (url: string | null) => {
+  const routeFromUrl = useCallback(
+    (url: string | null) => {
       if (
-        url &&
-        (url === "quranlock://verse" || url.startsWith("quranlock://verse"))
+        !url ||
+        (url !== "quranlock://verse" && !url.startsWith("quranlock://verse"))
       ) {
-        const gate = canOpenQuran({ isPremium });
-        if (gate.allowed) {
+        return;
+      }
+
+      const gate = canOpenQuran({ isPremium });
+      if (gate.allowed) {
+        if (pathname !== "/verse") {
           router.replace("/verse");
-          return;
         }
+        return;
+      }
+
+      if (pathname !== "/paywall") {
         openPaywallForBlockedDecision(
           router,
           gate,
@@ -65,11 +75,12 @@ function useDeepLinkToVerse() {
           },
         );
       }
-    };
+    },
+    [isPremium, pathname, router],
+  );
 
-    const handleNotificationResponse = (
-      response: Notifications.NotificationResponse | null,
-    ) => {
+  const queueNotificationResponse = useCallback(
+    (response: Notifications.NotificationResponse | null) => {
       if (!response) return;
       const notificationId = response.notification.request.identifier;
       if (handledNotificationIdRef.current === notificationId) {
@@ -88,20 +99,38 @@ function useDeepLinkToVerse() {
         (triggerPayload as { url?: string } | undefined)?.url ??
         ((triggerPayload as { userInfo?: { url?: string } } | undefined)
           ?.userInfo?.url as string | undefined);
-      void handleUrl(url ?? null);
+      if (!url) {
+        return;
+      }
+      pendingUrlRef.current = url;
       Notifications.clearLastNotificationResponse();
-    };
+    },
+    [],
+  );
 
-    handleNotificationResponse(Notifications.getLastNotificationResponse());
+  useEffect(() => {
+    if (!rootNavigationState?.key) {
+      return;
+    }
+    const pendingUrl = pendingUrlRef.current;
+    if (!pendingUrl) {
+      return;
+    };
+    pendingUrlRef.current = null;
+    routeFromUrl(pendingUrl);
+  }, [rootNavigationState?.key, routeFromUrl]);
+
+  useEffect(() => {
+    queueNotificationResponse(Notifications.getLastNotificationResponse());
     const notificationSub =
       Notifications.addNotificationResponseReceivedListener(
-        handleNotificationResponse,
+        queueNotificationResponse,
       );
 
     return () => {
       notificationSub.remove();
     };
-  }, [isPremium, router]);
+  }, [queueNotificationResponse]);
 }
 
 function RootLayoutContent() {

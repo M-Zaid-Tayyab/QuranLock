@@ -27,7 +27,7 @@ interface VerseActions {
 const initialState: VerseState = {
   translationEnabled: false,
   readingMode: "mushaf",
-  recitationVisible: false,
+  recitationVisible: true,
   selectedVerseKey: null,
   hasMigratedFromUserStore: false,
 };

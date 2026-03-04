@@ -1,7 +1,7 @@
 import { SettingsSelectAppsStep } from "@/components/onboarding";
 import {
+  clearSelection,
   SCREEN_TIME,
-  setSelection,
   stopMonitoring,
   unblockSelection,
 } from "@/services/deviceActivity";
@@ -12,7 +12,7 @@ import { sanitizeGoalDays } from "@/utils/focusPlan";
 import { Ionicons } from "@expo/vector-icons";
 import * as Application from "expo-application";
 import { useRouter } from "expo-router";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
@@ -70,17 +70,35 @@ export default function SettingsScreen() {
     Linking.openURL(url).catch(() => undefined);
   }, []);
 
-  const handleSelectionChange = useCallback(
-    (selection: string | null) => {
-      setFamilyActivitySelection(selection);
-      if (selection) {
-        setSelection(selection);
-        setHasSelectedApps(true);
-      } else {
-        setHasSelectedApps(false);
-      }
+  const [familyActivitySelectionDraft, setFamilyActivitySelectionDraft] =
+    useState<string | null>(() => familyActivitySelection);
+
+  useEffect(() => {
+    setFamilyActivitySelectionDraft(familyActivitySelection);
+  }, [familyActivitySelection]);
+
+  const handleSelectionChange = useCallback((selection: string | null) => {
+    setFamilyActivitySelectionDraft(selection);
+  }, []);
+
+  const handleSelectionOpen = useCallback(() => {
+    setFamilyActivitySelectionDraft(familyActivitySelection);
+  }, [familyActivitySelection]);
+
+  const handleSelectionDismiss = useCallback(() => {
+    setFamilyActivitySelectionDraft(familyActivitySelection);
+  }, [familyActivitySelection]);
+
+  const handleSelectionDone = useCallback(
+    () => {
+      setFamilyActivitySelection(familyActivitySelectionDraft);
+      setHasSelectedApps(familyActivitySelectionDraft != null);
     },
-    [setFamilyActivitySelection, setHasSelectedApps],
+    [
+      familyActivitySelectionDraft,
+      setFamilyActivitySelection,
+      setHasSelectedApps,
+    ],
   );
 
   const orderedSchedules = useMemo(
@@ -115,6 +133,7 @@ export default function SettingsScreen() {
       ];
       stopMonitoring(Array.from(new Set(activityNames)));
       unblockSelection();
+      clearSelection();
     }
 
     resetAllStores();
@@ -126,6 +145,18 @@ export default function SettingsScreen() {
     const displayHour = hour % 12 === 0 ? 12 : hour % 12;
     return `${displayHour}:${minute.toString().padStart(2, "0")} ${suffix}`;
   };
+
+  const appSelectionSummary = useMemo(
+    () => {
+      if (familyActivitySelectionDraft !== familyActivitySelection) {
+        return "Unsaved changes";
+      }
+      return familyActivitySelectionDraft == null
+        ? "No apps selected yet"
+        : "Selection saved";
+    },
+    [familyActivitySelection, familyActivitySelectionDraft],
+  );
 
   return (
     <View className="flex-1 bg-background pt-safe">
@@ -242,8 +273,12 @@ export default function SettingsScreen() {
           </Text>
           <View className="mt-4">
             <SettingsSelectAppsStep
-              familyActivitySelection={familyActivitySelection}
+              familyActivitySelection={familyActivitySelectionDraft}
+              selectionSummary={appSelectionSummary}
               onSelectionChange={handleSelectionChange}
+              onSelectionDone={handleSelectionDone}
+              onDismiss={handleSelectionDismiss}
+              onOpenPicker={handleSelectionOpen}
             />
           </View>
         </View>
