@@ -25,7 +25,7 @@ interface AppConfigActions {
 }
 
 const createInitialAppConfigState = (): AppConfigState => ({
-  isRamadan: false,
+  isRamadan: true,
   funnelVariant: DEFAULT_FUNNEL_VARIANT,
   lastSyncedAt: null,
 });
@@ -87,7 +87,9 @@ export const useAppConfigStore = create<AppConfigState & AppConfigActions>()(
                 : undefined,
           }),
           lastSyncedAt:
-            typeof legacy.lastSyncedAt === "number" ? legacy.lastSyncedAt : null,
+            typeof legacy.lastSyncedAt === "number"
+              ? legacy.lastSyncedAt
+              : null,
         };
       },
     },

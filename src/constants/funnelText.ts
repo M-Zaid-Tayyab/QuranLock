@@ -6,7 +6,7 @@ export const FUNNEL_VARIANTS = {
 export type FunnelVariant =
   (typeof FUNNEL_VARIANTS)[keyof typeof FUNNEL_VARIANTS];
 
-export const DEFAULT_FUNNEL_VARIANT = FUNNEL_VARIANTS.REGULAR;
+export const DEFAULT_FUNNEL_VARIANT = FUNNEL_VARIANTS.RAMADAN;
 
 interface FunnelText {
   welcome: {
@@ -67,7 +67,8 @@ export const FUNNEL_TEXT_BY_VARIANT: Record<FunnelVariant, FunnelText> = {
       reasonsQuestion: "What keeps you from staying connected with Allah?",
       screenTimeShieldBody:
         "Screen Time powers a gentle shield. When it appears, open QuranLock and read to unlock your apps.",
-      screenTimeFirstBullet: "Shield appears only in your scheduled focus times",
+      screenTimeFirstBullet:
+        "Shield appears only in your scheduled focus times",
       selectAppsDescription:
         "We’ll only block the apps you select during focus time.",
       focusEmptyState: "Select a prayer time or add a custom time to continue.",
