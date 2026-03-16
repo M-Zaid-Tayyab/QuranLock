@@ -1,5 +1,11 @@
 import { SettingsSelectAppsStep } from "@/components/onboarding";
 import {
+  canOpenStoreReviewPage,
+  canShareApp,
+  openStoreReviewPage,
+  shareApp,
+} from "@/services/appFeedback";
+import {
   clearSelection,
   SCREEN_TIME,
   stopMonitoring,
@@ -57,6 +63,8 @@ export default function SettingsScreen() {
     process.env.EXPO_PUBLIC_INSTAGRAM_URL,
   );
   const xUrl = normalizeExternalUrl(process.env.EXPO_PUBLIC_X_URL);
+  const reviewEnabled = canOpenStoreReviewPage();
+  const shareEnabled = canShareApp();
 
   const appVersion = Application.nativeApplicationVersion ?? "";
   const buildVersion = Application.nativeBuildVersion ?? "";
@@ -68,6 +76,14 @@ export default function SettingsScreen() {
   const openLink = useCallback((url: string) => {
     if (!url) return;
     Linking.openURL(url).catch(() => undefined);
+  }, []);
+
+  const handleOpenReview = useCallback(() => {
+    void openStoreReviewPage();
+  }, []);
+
+  const handleShareApp = useCallback(() => {
+    void shareApp();
   }, []);
 
   const [familyActivitySelectionDraft, setFamilyActivitySelectionDraft] =
@@ -285,10 +301,10 @@ export default function SettingsScreen() {
 
         <View className="mb-6 rounded-2xl border border-outline bg-surface px-5 py-5">
           <Text className="font-sfPro-semibold text-foreground">
-            Connect with us
+            Contact us
           </Text>
           <Text className="mt-1 text-sm font-sfPro text-muted">
-            Questions or feedback? Reach out anytime.
+            Want to talk to us directly? Reach out anytime.
           </Text>
           <View className="mt-4 flex-row items-center gap-3">
             <Pressable
@@ -314,6 +330,50 @@ export default function SettingsScreen() {
               style={!xUrl ? { opacity: 0.5 } : undefined}
             >
               <Ionicons name="logo-twitter" size={20} color="#94a3b8" />
+            </Pressable>
+          </View>
+        </View>
+
+        <View className="mb-6 rounded-2xl border border-outline bg-surface px-5 py-5">
+          <Text className="font-sfPro-semibold text-foreground">
+            Support QuranLock
+          </Text>
+          <Text className="mt-1 text-sm font-sfPro text-muted">
+            Enjoying the app? You can leave a review or share it with someone
+            else.
+          </Text>
+          <View className="mt-4 gap-3">
+            <Pressable
+              onPress={handleOpenReview}
+              disabled={!reviewEnabled}
+              className="flex-row items-center justify-between rounded-xl border border-outline bg-backgroundElevated px-4 py-3"
+              style={!reviewEnabled ? { opacity: 0.5 } : undefined}
+            >
+              <View className="flex-row items-center gap-3">
+                <Ionicons name="star-outline" size={18} color="#94a3b8" />
+                <Text className="font-sfPro text-sm text-foreground">
+                  Give a review
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
+            </Pressable>
+            <Pressable
+              onPress={handleShareApp}
+              disabled={!shareEnabled}
+              className="flex-row items-center justify-between rounded-xl border border-outline bg-backgroundElevated px-4 py-3"
+              style={!shareEnabled ? { opacity: 0.5 } : undefined}
+            >
+              <View className="flex-row items-center gap-3">
+                <Ionicons
+                  name="share-social-outline"
+                  size={18}
+                  color="#94a3b8"
+                />
+                <Text className="font-sfPro text-sm text-foreground">
+                  Share the app
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#94a3b8" />
             </Pressable>
           </View>
         </View>

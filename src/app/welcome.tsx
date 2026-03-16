@@ -1,9 +1,13 @@
-import { PrimaryButton } from "@/components/common";
+import {
+  AnimatedTypingText,
+  PrimaryButton,
+  getTypingAnimationDuration,
+} from "@/components/common";
 import { IMAGES } from "@/constants";
 import { colors, rgba } from "@/constants/colors";
 import { useFunnelText } from "@/hooks/app";
 import { Stack, useRouter, type Href } from "expo-router";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Image, Text, View } from "react-native";
 import Animated, {
   Easing,
@@ -20,8 +24,17 @@ export default function Welcome() {
   const onboardingHref: Href = "/onboarding";
 
   const heroText = funnelText.welcome.heroText;
-  const heroWords = heroText.split(" ");
   const highlightedWords = funnelText.welcome.highlightedWords;
+  const buttonStart = useMemo(
+    () =>
+      getTypingAnimationDuration(heroText, {
+        initialDelayMs: 120,
+        charDelayMs: 42,
+        durationMs: 120,
+        endDelayMs: 140,
+      }),
+    [heroText],
+  );
 
   const buttonOpacity = useSharedValue(0);
   const buttonScale = useSharedValue(0.92);
@@ -32,8 +45,6 @@ export default function Welcome() {
   }));
 
   useEffect(() => {
-    const buttonStart = 360;
-
     buttonOpacity.value = withDelay(
       buttonStart,
       withTiming(1, {
@@ -48,7 +59,7 @@ export default function Welcome() {
         easing: Easing.out(Easing.cubic),
       }),
     );
-  }, [buttonOpacity, buttonScale]);
+  }, [buttonOpacity, buttonScale, buttonStart]);
 
   return (
     <View className="flex-1 bg-background pt-safe pb-safe">
@@ -100,30 +111,24 @@ export default function Welcome() {
           </Animated.View>
 
           <View className="mt-8 self-center">
-            <View className="flex-row flex-wrap max-w-[344px] items-center justify-center">
-              {heroWords.map((word, index) => (
-                <Animated.Text
-                  key={`${word}-${index}`}
-                  entering={FadeInDown.delay(120 + index * 140)
-                    .duration(260)
-                    .easing(Easing.out(Easing.cubic))}
-                  className="text-center font-sfPro-bold"
-                  style={{
-                    fontSize: 32,
-                    lineHeight: 49,
-                    letterSpacing: 0.35,
-                    color: highlightedWords.includes(
-                      word.replace(/[^a-z]/gi, "").toLowerCase(),
-                    )
-                      ? colors.accent
-                      : colors.white,
-                  }}
-                >
-                  {word}
-                  {index < heroWords.length - 1 ? " " : ""}
-                </Animated.Text>
-              ))}
-            </View>
+            <AnimatedTypingText
+              text={heroText}
+              highlightedWords={highlightedWords}
+              defaultColor={colors.white}
+              highlightColor={colors.accent}
+              containerClassName="max-w-[344px]"
+              textClassName="text-center font-sfPro-bold"
+              textStyle={{
+                fontSize: 32,
+                lineHeight: 49,
+                letterSpacing: 0.35,
+              }}
+              initialDelayMs={120}
+              charDelayMs={42}
+              durationMs={120}
+              enableWordHaptics
+              keyPrefix="welcome-hero"
+            />
           </View>
         </View>
 

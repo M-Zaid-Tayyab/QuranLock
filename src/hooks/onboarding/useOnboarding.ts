@@ -1,4 +1,6 @@
+import { getTypingAnimationDuration } from "@/components/common";
 import {
+  INTRO_STEPS,
   REVIEW_STEP,
   STEP_ICONS,
   STEP_SUBTITLES,
@@ -18,7 +20,7 @@ import { ensureCanEditFocusTimes } from "@/services/entitlements";
 import { useUserStore } from "@/store/user";
 import * as Notifications from "expo-notifications";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, Platform } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
@@ -375,6 +377,22 @@ export function useOnboarding(): UseOnboardingResult {
     funnelText.onboarding.stepSubtitles[activeStep] ??
     STEP_SUBTITLES[activeStep] ??
     "";
+  const introTitle = useMemo(() => {
+    if (stepIndex > 2) return "";
+    return (
+      funnelText.onboarding.introTitles[stepIndex] ??
+      INTRO_STEPS[stepIndex]?.title ??
+      ""
+    );
+  }, [funnelText.onboarding.introTitles, stepIndex]);
+  const introCtaDelayMs = useMemo(() => {
+    if (!introTitle) return 360;
+    return getTypingAnimationDuration(introTitle, {
+      charDelayMs: 42,
+      durationMs: 120,
+      endDelayMs: 140,
+    });
+  }, [introTitle]);
   const icon = STEP_ICONS[activeStep] ?? undefined;
   const scheduleError =
     hasAttemptedScheduleSubmit && focusTimes.focusSchedules.length === 0
@@ -387,7 +405,7 @@ export function useOnboarding(): UseOnboardingResult {
     ageInput,
     animateCTA: !isEditTimes && stepIndex <= 2,
     animateTitleWords: isReviewStep,
-    ctaDelayMs: 360,
+    ctaDelayMs: introCtaDelayMs,
     ctaKey: isEditTimes ? "edit-times" : stepIndex,
     familyActivitySelection: familyActivitySelectionDraft,
     hideProgress: isEditTimes,

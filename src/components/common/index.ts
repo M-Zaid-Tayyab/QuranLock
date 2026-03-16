@@ -1,3 +1,4 @@
+export * from "./AnimatedTypingText";
 export * from "./BottomSheetInput";
 export * from "./BottomSheetModal";
 export * from "./Header";

@@ -1,52 +1,12 @@
+import { AnimatedTypingText } from "@/components/common";
 import { colors, rgba } from "@/constants/colors";
 import { INTRO_STEPS } from "@/configs/onboarding";
 import { useFunnelText } from "@/hooks/app";
 import { Text, View } from "react-native";
-import Animated, { Easing, FadeInDown } from "react-native-reanimated";
 
 interface IntroStepProps {
   step: number;
 }
-
-const renderAnimatedHeadline = (
-  title: string,
-  highlight: string,
-  accent: string,
-  stepKey: string,
-) => {
-  const words = title.split(" ");
-  const highlightWords = new Set(
-    highlight
-      .split(" ")
-      .map((word) => word.replace(/[^a-z]/gi, "").toLowerCase())
-      .filter(Boolean),
-  );
-
-  return (
-    <View className="flex-row flex-wrap max-w-[320px]">
-      {words.map((word, index) => {
-        const clean = word.replace(/[^a-z]/gi, "").toLowerCase();
-        const isHighlight = highlightWords.has(clean);
-        return (
-          <Animated.Text
-            key={`${stepKey}-${word}-${index}`}
-            entering={FadeInDown.delay(index * 140)
-              .duration(240)
-              .easing(Easing.out(Easing.cubic))}
-            className="text-4xl font-sfPro-bold leading-tight"
-            style={{
-              letterSpacing: 0.6,
-              color: isHighlight ? accent : colors.foreground,
-            }}
-          >
-            {word}
-            {index < words.length - 1 ? " " : ""}
-          </Animated.Text>
-        );
-      })}
-    </View>
-  );
-};
 
 export function IntroStep({ step }: IntroStepProps) {
   const funnelText = useFunnelText();
@@ -74,12 +34,19 @@ export function IntroStep({ step }: IntroStepProps) {
         </View>
 
         <View className="mt-5">
-          {renderAnimatedHeadline(
-            title,
-            currentStep.highlight,
-            currentStep.accent,
-            `intro-${step}`,
-          )}
+          <AnimatedTypingText
+            text={title}
+            highlightedWords={currentStep.highlight.split(" ")}
+            defaultColor={colors.foreground}
+            highlightColor={currentStep.accent}
+            containerClassName="max-w-[320px]"
+            textClassName="text-4xl font-sfPro-bold leading-tight"
+            textStyle={{ letterSpacing: 0.6 }}
+            charDelayMs={42}
+            durationMs={120}
+            enableWordHaptics
+            keyPrefix={`intro-${step}`}
+          />
         </View>
       </View>
     </View>
