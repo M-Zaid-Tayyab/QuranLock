@@ -25,7 +25,7 @@ interface AppConfigActions {
 }
 
 const createInitialAppConfigState = (): AppConfigState => ({
-  isRamadan: true,
+  isRamadan: false,
   funnelVariant: DEFAULT_FUNNEL_VARIANT,
   lastSyncedAt: null,
 });

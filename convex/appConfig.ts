@@ -6,7 +6,7 @@ const FUNNEL_VARIANTS = {
 } as const;
 
 const APP_FLAGS = {
-  isRamadan: true,
+  isRamadan: false,
 } as const;
 
 export const getFlags = query({
