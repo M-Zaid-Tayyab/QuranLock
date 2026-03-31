@@ -41,6 +41,10 @@ coverage/
 
 app-example
 
+targets/
+
+._*
+
 # generated native folders
 /ios
 /android
