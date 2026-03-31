@@ -35,13 +35,6 @@ const resolveFunnelVariant = (input: {
   funnelVariant?: string;
   experienceKey?: string;
 }): FunnelVariant => {
-  const variantKey = input.funnelVariant ?? input.experienceKey;
-  if (variantKey === FUNNEL_VARIANTS.RAMADAN) {
-    return FUNNEL_VARIANTS.RAMADAN;
-  }
-  if (variantKey === FUNNEL_VARIANTS.REGULAR) {
-    return FUNNEL_VARIANTS.REGULAR;
-  }
   return input.isRamadan ? FUNNEL_VARIANTS.RAMADAN : FUNNEL_VARIANTS.REGULAR;
 };
 
@@ -72,19 +65,12 @@ export const useAppConfigStore = create<AppConfigState & AppConfigActions>()(
           experienceKey?: unknown;
           lastSyncedAt?: unknown;
         };
+        const isRamadan = Boolean(legacy.isRamadan);
 
         return {
-          isRamadan: Boolean(legacy.isRamadan),
+          isRamadan,
           funnelVariant: resolveFunnelVariant({
-            isRamadan: Boolean(legacy.isRamadan),
-            funnelVariant:
-              typeof legacy.funnelVariant === "string"
-                ? legacy.funnelVariant
-                : undefined,
-            experienceKey:
-              typeof legacy.experienceKey === "string"
-                ? legacy.experienceKey
-                : undefined,
+            isRamadan,
           }),
           lastSyncedAt:
             typeof legacy.lastSyncedAt === "number"

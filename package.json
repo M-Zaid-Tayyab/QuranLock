@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "clean:appledouble": "find . -name '._*' -delete",
     "postinstall": "patch-package",
     "lint": "expo lint",
     "build:quran-pack-lite": "node src/scripts/build-quran-pack-lite.mjs",

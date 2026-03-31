@@ -6,7 +6,7 @@ export const FUNNEL_VARIANTS = {
 export type FunnelVariant =
   (typeof FUNNEL_VARIANTS)[keyof typeof FUNNEL_VARIANTS];
 
-export const DEFAULT_FUNNEL_VARIANT = FUNNEL_VARIANTS.RAMADAN;
+export const DEFAULT_FUNNEL_VARIANT = FUNNEL_VARIANTS.REGULAR;
 
 interface FunnelText {
   welcome: {
