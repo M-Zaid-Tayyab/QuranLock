@@ -37,14 +37,21 @@ export default defineSchema({
     translationEnabled: v.boolean(),
     quranFontScale: v.optional(v.number()),
     isPremium: v.boolean(),
-    subscriptionTier: v.optional(
-      v.union(v.literal("free"), v.literal("pro")),
-    ),
+    subscriptionTier: v.optional(v.union(v.literal("free"), v.literal("pro"))),
     completedUnlockSessions: v.number(),
     streakCompletedDates: v.array(v.string()),
     expoPushToken: v.optional(v.string()),
     notificationPermissionStatus: v.optional(notificationPermissionStatus),
     pushTokenUpdatedAt: v.optional(v.number()),
+    subscriptionFeedbackNudgeSentAt: v.optional(v.number()),
+    feedbackSupportCode: v.optional(v.string()),
     updatedAt: v.number(),
-  }).index("by_appUserId", ["appUserId"]),
+  })
+    .index("by_appUserId", ["appUserId"])
+    .index("by_feedbackSupportCode", ["feedbackSupportCode"])
+    .index("by_subscription_feedback_nudge", [
+      "isPremium",
+      "notificationPermissionStatus",
+      "subscriptionFeedbackNudgeSentAt",
+    ]),
 });

@@ -19,7 +19,12 @@ import { configureRevenueCat } from "@/services/revenueCat";
 import { useUserStore } from "@/store/user";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import * as Notifications from "expo-notifications";
-import { Stack, usePathname, useRootNavigationState, useRouter } from "expo-router";
+import {
+  Stack,
+  usePathname,
+  useRootNavigationState,
+  useRouter,
+} from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef } from "react";
@@ -115,7 +120,7 @@ function useDeepLinkToVerse() {
     const pendingUrl = pendingUrlRef.current;
     if (!pendingUrl) {
       return;
-    };
+    }
     pendingUrlRef.current = null;
     routeFromUrl(pendingUrl);
   }, [rootNavigationState?.key, routeFromUrl]);
@@ -159,6 +164,7 @@ function RootLayoutContent() {
   const initialAppUserIdRef = useRef(appUserId);
 
   useEffect(() => {
+    // resetAllStores();
     if (Platform.OS === "web") return;
     let isMounted = true;
     let listener: ((info: CustomerInfo) => void) | null = null;

@@ -216,7 +216,7 @@ export function ReviewsStep({ onContinue }: ReviewsStepProps) {
       <ReviewsTicker reviews={REVIEWS} />
       <View className="mt-4">
         {showContinueButton ? (
-          <PrimaryButton title="Continue" onPress={() => void onContinue()} />
+          <PrimaryButton title="Continue" onPress={onContinue} />
         ) : (
           <View className="h-[58px]" />
         )}

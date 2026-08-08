@@ -1,6 +1,13 @@
 import { getTypingAnimationDuration } from "@/components/common";
 import {
+  CONTACT_STEP,
   INTRO_STEPS,
+  ONBOARDING_CONTACT_BUTTON_COUNT,
+  ONBOARDING_CONTACT_BUTTON_ENTER_DURATION_MS,
+  ONBOARDING_CONTACT_BUTTON_STAGGER_MS,
+  ONBOARDING_CONTACT_CTA_GAP_MS,
+  ONBOARDING_CONTACT_MESSAGE,
+  ONBOARDING_CONTACT_TYPING_OPTIONS,
   REVIEW_STEP,
   STEP_ICONS,
   STEP_SUBTITLES,
@@ -20,12 +27,20 @@ import { ensureCanEditFocusTimes } from "@/services/entitlements";
 import { useUserStore } from "@/store/user";
 import * as Notifications from "expo-notifications";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Linking, Platform } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 
-const AuthorizationStatus = { notDetermined: 0, denied: 1, approved: 2 } as const;
-type NotificationPermissionStatus = "granted" | "denied" | "undetermined" | null;
+const AuthorizationStatus = {
+  notDetermined: 0,
+  denied: 1,
+  approved: 2,
+} as const;
+type NotificationPermissionStatus =
+  | "granted"
+  | "denied"
+  | "undetermined"
+  | null;
 
 export interface UseOnboardingResult {
   activeStep: number;
@@ -57,7 +72,9 @@ export interface UseOnboardingResult {
   onScreenTimeAuthorizationChange: (approved: boolean) => void;
   onScreenTimeAuthorizationStatusChange: (status: number) => void;
   onNotificationPermissionChange: (approved: boolean) => void;
-  onNotificationPermissionStatusChange: (status: NotificationPermissionStatus) => void;
+  onNotificationPermissionStatusChange: (
+    status: NotificationPermissionStatus,
+  ) => void;
   onSetNameInput: (value: string) => void;
   onSetAgeInput: (value: string) => void;
   onSetFamilyActivitySelection: (selection: string | null) => void;
@@ -107,8 +124,8 @@ export function useOnboarding(): UseOnboardingResult {
     Platform.OS === "ios" ? getAuthStatus() : AuthorizationStatus.approved,
   );
   const [screenTimeResolving, setScreenTimeResolving] = useState(false);
-  const [notificationApproved, setNotificationApproved] = useState(() =>
-    Platform.OS !== "ios",
+  const [notificationApproved, setNotificationApproved] = useState(
+    () => Platform.OS !== "ios",
   );
   const [notificationStatus, setNotificationStatus] =
     useState<NotificationPermissionStatus>(null);
@@ -144,10 +161,13 @@ export function useOnboarding(): UseOnboardingResult {
     setScreenTimeApproved(approved);
   }, []);
 
-  const onScreenTimeAuthorizationStatusChange = useCallback((status: number) => {
-    setScreenTimeStatus(status);
-    setScreenTimeApproved(status === AuthorizationStatus.approved);
-  }, []);
+  const onScreenTimeAuthorizationStatusChange = useCallback(
+    (status: number) => {
+      setScreenTimeStatus(status);
+      setScreenTimeApproved(status === AuthorizationStatus.approved);
+    },
+    [],
+  );
 
   const onNotificationPermissionChange = useCallback((approved: boolean) => {
     setNotificationApproved(approved);
@@ -184,11 +204,7 @@ export function useOnboarding(): UseOnboardingResult {
 
   useEffect(() => {
     if (!isEditTimes) return;
-    ensureCanEditFocusTimes(
-      router,
-      { isPremium },
-      { replace: true },
-    );
+    ensureCanEditFocusTimes(router, { isPremium }, { replace: true });
   }, [isEditTimes, isPremium, router]);
 
   useEffect(() => {
@@ -255,11 +271,7 @@ export function useOnboarding(): UseOnboardingResult {
     }
 
     if (activeStep === 9) {
-      if (
-        !isEditTimes &&
-        Platform.OS === "ios" &&
-        !notificationApproved
-      ) {
+      if (!isEditTimes && Platform.OS === "ios" && !notificationApproved) {
         setNotificationResolving(true);
         try {
           const { status: current } = await Notifications.getPermissionsAsync();
@@ -292,10 +304,15 @@ export function useOnboarding(): UseOnboardingResult {
       setHasAttemptedScheduleSubmit(false);
       focusTimes.commitDraftToStore();
       if (!isEditTimes) {
-        setStepIndex(REVIEW_STEP);
+        setStepIndex(CONTACT_STEP);
       } else {
         router.back();
       }
+      return;
+    }
+
+    if (!isEditTimes && activeStep === CONTACT_STEP) {
+      setStepIndex(REVIEW_STEP);
       return;
     }
 
@@ -377,39 +394,46 @@ export function useOnboarding(): UseOnboardingResult {
     funnelText.onboarding.stepSubtitles[activeStep] ??
     STEP_SUBTITLES[activeStep] ??
     "";
-  const introTitle = useMemo(() => {
-    if (stepIndex > 2) return "";
-    return (
-      funnelText.onboarding.introTitles[stepIndex] ??
-      INTRO_STEPS[stepIndex]?.title ??
-      ""
-    );
-  }, [funnelText.onboarding.introTitles, stepIndex]);
-  const introCtaDelayMs = useMemo(() => {
-    if (!introTitle) return 360;
-    return getTypingAnimationDuration(introTitle, {
-      charDelayMs: 42,
-      durationMs: 120,
-      endDelayMs: 140,
-    });
-  }, [introTitle]);
+  const introTitle =
+    stepIndex > 2
+      ? ""
+      : (funnelText.onboarding.introTitles[stepIndex] ??
+        INTRO_STEPS[stepIndex]?.title ??
+        "");
+  const introCtaDelayMs = introTitle
+    ? getTypingAnimationDuration(introTitle, {
+        charDelayMs: 42,
+        durationMs: 120,
+        endDelayMs: 140,
+      })
+    : 360;
+  const contactCtaDelayMs =
+    getTypingAnimationDuration(
+      ONBOARDING_CONTACT_MESSAGE,
+      ONBOARDING_CONTACT_TYPING_OPTIONS,
+    ) +
+    (ONBOARDING_CONTACT_BUTTON_COUNT - 1) *
+      ONBOARDING_CONTACT_BUTTON_STAGGER_MS +
+    ONBOARDING_CONTACT_BUTTON_ENTER_DURATION_MS +
+    ONBOARDING_CONTACT_CTA_GAP_MS;
   const icon = STEP_ICONS[activeStep] ?? undefined;
   const scheduleError =
     hasAttemptedScheduleSubmit && focusTimes.focusSchedules.length === 0
       ? "Please select at least one focus time."
       : null;
   const isReviewStep = !isEditTimes && activeStep === REVIEW_STEP;
+  const isContactStep = !isEditTimes && activeStep === CONTACT_STEP;
 
   return {
     activeStep,
     ageInput,
-    animateCTA: !isEditTimes && stepIndex <= 2,
+    animateCTA: !isEditTimes && (stepIndex <= 2 || isContactStep),
     animateTitleWords: isReviewStep,
-    ctaDelayMs: introCtaDelayMs,
+    ctaDelayMs: isContactStep ? contactCtaDelayMs : introCtaDelayMs,
     ctaKey: isEditTimes ? "edit-times" : stepIndex,
     familyActivitySelection: familyActivitySelectionDraft,
     hideProgress: isEditTimes,
-    headerAlign: isReviewStep ? "center" : "left",
+    headerAlign: isReviewStep || isContactStep ? "center" : "left",
     icon,
     isEditTimes,
     nameInput,

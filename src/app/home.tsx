@@ -1,3 +1,4 @@
+import { FeedbackContactCard } from "@/components/feedback";
 import {
   HomeHeader,
   JourneyHeroCard,
@@ -11,7 +12,7 @@ import { useFunnelText } from "@/hooks/app";
 import { useHomeScreen } from "@/hooks/home";
 import { RefreshControl, ScrollView, View } from "react-native";
 
-export default function HomeScreen() {
+const HomeScreen = () => {
   const funnelText = useFunnelText();
   const vm = useHomeScreen();
 
@@ -78,6 +79,8 @@ export default function HomeScreen() {
           />
         )}
 
+        <FeedbackContactCard source="home" />
+
         {vm.flags.showTimeline && (
           <JourneyTimelineCard
             items={vm.timeline.items}
@@ -101,4 +104,6 @@ export default function HomeScreen() {
       </ScrollView>
     </View>
   );
-}
+};
+
+export default HomeScreen;

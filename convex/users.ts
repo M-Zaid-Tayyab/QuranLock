@@ -1,5 +1,6 @@
 import { mutation } from "./_generated/server";
 import { v } from "convex/values";
+import { createFeedbackSupportCode } from "./feedbackSupportCode";
 
 const focusDurationMode = v.union(v.literal("manual"), v.literal("goal"));
 
@@ -42,9 +43,7 @@ export const upsertUser = mutation({
     translationEnabled: v.boolean(),
     quranFontScale: v.optional(v.number()),
     isPremium: v.boolean(),
-    subscriptionTier: v.optional(
-      v.union(v.literal("free"), v.literal("pro")),
-    ),
+    subscriptionTier: v.optional(v.union(v.literal("free"), v.literal("pro"))),
     completedUnlockSessions: v.number(),
     streakCompletedDates: v.array(v.string()),
   },
@@ -136,7 +135,8 @@ export const upsertUser = mutation({
       ...args,
       deferredFocusSchedules:
         args.deferredFocusSchedules ??
-        (primary?.deferredFocusSchedules ?? undefined),
+        primary?.deferredFocusSchedules ??
+        undefined,
       focusDurationMode: args.focusDurationMode ?? primary?.focusDurationMode,
       focusCompletionDays:
         args.focusCompletionDays ?? primary?.focusCompletionDays,
@@ -148,6 +148,7 @@ export const upsertUser = mutation({
     if (!primary) {
       return ctx.db.insert("users", {
         ...normalizedPayload,
+        feedbackSupportCode: createFeedbackSupportCode(args.appUserId),
         updatedAt: Date.now(),
       });
     }
@@ -183,6 +184,11 @@ export const upsertUser = mutation({
         expoPushToken: primary.expoPushToken,
         notificationPermissionStatus: primary.notificationPermissionStatus,
         pushTokenUpdatedAt: primary.pushTokenUpdatedAt,
+        subscriptionFeedbackNudgeSentAt:
+          primary.subscriptionFeedbackNudgeSentAt,
+        feedbackSupportCode:
+          primary.feedbackSupportCode ??
+          createFeedbackSupportCode(primary.appUserId),
         updatedAt: Date.now(),
       });
     }

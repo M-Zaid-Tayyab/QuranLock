@@ -123,3 +123,49 @@ await convexClient.action("quranFoundation:proxyGet", {
   query: { q: "sabr", size: "10", page: "1" },
 });
 ```
+
+## Direct feedback contact
+
+The final onboarding step includes WhatsApp, Instagram, TikTok, and X contact
+buttons. The compact paywall contact includes WhatsApp, Instagram, and TikTok.
+Home shows the same compact three-channel contact after any required setup cards
+and before the journey timeline.
+Configure these Expo public environment variables before building the app:
+
+- `EXPO_PUBLIC_WHATSAPP_URL` — existing `wa.me` contact URL.
+- `EXPO_PUBLIC_INSTAGRAM_DM_URL` — preferred direct conversation URL.
+- `EXPO_PUBLIC_INSTAGRAM_URL` — profile URL fallback when no DM URL is set.
+- `EXPO_PUBLIC_TIKTOK_URL` — TikTok profile URL.
+- `EXPO_PUBLIC_X_URL` — X profile URL.
+
+Each user has one indexed `feedbackSupportCode` on their existing `users` row.
+The code is added to the WhatsApp draft or copied for Instagram, TikTok, and X
+so an incoming message can be matched to its QuranLock app user ID. External
+messaging apps still require the user to send the prepared message themselves.
+
+Look up an incoming support code on the current deployment with:
+
+```sh
+npx convex run feedback:getUserBySupportCode '{"supportCode":"QL-XXXXXXXXXXXX"}'
+```
+
+Add `--prod` when looking up a production message.
+
+## Subscription feedback nudge
+
+`crons.ts` checks once every six hours for users who:
+
+- completed onboarding;
+- are not premium;
+- granted notification permission and have an Expo push token;
+- have been users for at least 24 hours; and
+- have not received this feedback request in the previous seven days.
+
+The job sends at most 50 reminders per run to users who signed up at least 24
+hours ago. `EXPO_ACCESS_TOKEN` is required only when enhanced Expo push security is
+enabled for the project.
+The cron runs automatically after the Convex functions are deployed.
+
+Successful sends update `subscriptionFeedbackNudgeSentAt`, making the user
+eligible again after seven days unless they purchase Premium. Failed sends
+remain eligible for a later run, and invalid Expo tokens are removed.

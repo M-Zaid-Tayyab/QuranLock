@@ -1,4 +1,5 @@
 import { PrimaryButton } from "@/components/common/PrimaryButton";
+import { FeedbackContactCard } from "@/components/feedback";
 import { colors } from "@/constants/colors";
 import { useFunnelText } from "@/hooks/app";
 import {
@@ -139,8 +140,11 @@ export default function PaywallScreen() {
 
   const hasEligibleFreeTrial = useMemo(() => {
     if (!selectedPackage || selectedTrialDays < 1) return false;
-    const status = introEligibilityByProduct[selectedPackage.product.identifier];
-    return status === INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE;
+    const status =
+      introEligibilityByProduct[selectedPackage.product.identifier];
+    return (
+      status === INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE
+    );
   }, [introEligibilityByProduct, selectedPackage, selectedTrialDays]);
 
   const purchaseCtaTitle = useMemo(() => {
@@ -351,7 +355,9 @@ export default function PaywallScreen() {
                   }}
                 >
                   {word}
-                  {index < funnelText.paywall.headlineWords.length - 1 ? " " : ""}
+                  {index < funnelText.paywall.headlineWords.length - 1
+                    ? " "
+                    : ""}
                 </Text>
               ))}
             </View>
@@ -392,7 +398,7 @@ export default function PaywallScreen() {
             </View>
           </View>
 
-          <View className="mt-10">
+          <View className="mt-6">
             <View className="flex-row items-center justify-between">
               <Text className="mt-1 text-2xl font-sfPro-bold text-foreground">
                 Choose your plan
@@ -451,6 +457,8 @@ export default function PaywallScreen() {
               </Text>
             </Pressable>
 
+            <FeedbackContactCard source="paywall" />
+
             <View className="flex-row items-center justify-center gap-2">
               <Pressable
                 onPress={() => openLink(privacyUrl, "Privacy Policy")}
@@ -461,7 +469,10 @@ export default function PaywallScreen() {
                 </Text>
               </Pressable>
               <Text className="text-xs font-sfPro text-muted">•</Text>
-              <Pressable onPress={() => openLink(termsUrl, "Terms")} hitSlop={8}>
+              <Pressable
+                onPress={() => openLink(termsUrl, "Terms")}
+                hitSlop={8}
+              >
                 <Text className="text-xs font-sfPro-semibold text-foreground">
                   Terms
                 </Text>

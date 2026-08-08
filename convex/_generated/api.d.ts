@@ -9,9 +9,14 @@
  */
 
 import type * as appConfig from "../appConfig.js";
+import type * as crons from "../crons.js";
+import type * as feedback from "../feedback.js";
+import type * as feedbackSupportCode from "../feedbackSupportCode.js";
 import type * as http from "../http.js";
 import type * as quranFoundation from "../quranFoundation.js";
 import type * as quranPack from "../quranPack.js";
+import type * as subscriptionFeedbackNudge from "../subscriptionFeedbackNudge.js";
+import type * as subscriptionFeedbackNudgeActions from "../subscriptionFeedbackNudgeActions.js";
 import type * as users from "../users.js";
 
 import type {
@@ -22,9 +27,14 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   appConfig: typeof appConfig;
+  crons: typeof crons;
+  feedback: typeof feedback;
+  feedbackSupportCode: typeof feedbackSupportCode;
   http: typeof http;
   quranFoundation: typeof quranFoundation;
   quranPack: typeof quranPack;
+  subscriptionFeedbackNudge: typeof subscriptionFeedbackNudge;
+  subscriptionFeedbackNudgeActions: typeof subscriptionFeedbackNudgeActions;
   users: typeof users;
 }>;
 

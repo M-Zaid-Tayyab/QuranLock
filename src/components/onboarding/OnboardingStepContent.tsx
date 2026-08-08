@@ -1,12 +1,15 @@
 import { colors } from "@/constants/colors";
 import {
+  CONTACT_STEP,
   QURAN_FREQUENCY_OPTIONS,
   REASONS_OPTIONS,
+  REVIEW_STEP,
 } from "@/configs/onboarding";
+import { FeedbackContactCard } from "@/components/feedback";
 import { useFunnelText } from "@/hooks/app";
 import type { UseOnboardingResult } from "@/hooks/onboarding/useOnboarding";
 import { useUserStore } from "@/store/user";
-import { useCallback } from "react";
+import { View } from "react-native";
 import { useShallow } from "zustand/react/shallow";
 import { FocusTimesStep } from "./FocusTimesStep";
 import { IntroStep } from "./IntroStep";
@@ -51,15 +54,12 @@ function ReasonsQuestion() {
     })),
   );
 
-  const onToggleReason = useCallback(
-    (value: string) => {
-      const next = new Set(reasonsDisconnect);
-      if (next.has(value)) next.delete(value);
-      else next.add(value);
-      setReasonsDisconnect(Array.from(next));
-    },
-    [reasonsDisconnect, setReasonsDisconnect],
-  );
+  const onToggleReason = (value: string) => {
+    const next = new Set(reasonsDisconnect);
+    if (next.has(value)) next.delete(value);
+    else next.add(value);
+    setReasonsDisconnect(Array.from(next));
+  };
 
   return (
     <QuestionCard
@@ -143,9 +143,7 @@ export function OnboardingStepContent({
       <SelectAppsStep
         familyActivitySelection={onboarding.familyActivitySelection}
         onSelectionChange={onboarding.onSetFamilyActivitySelection}
-        onSelectionDone={() => {
-          void onboarding.onNext();
-        }}
+        onSelectionDone={onboarding.onNext}
       />
     );
   }
@@ -160,8 +158,16 @@ export function OnboardingStepContent({
     );
   }
 
-  if (onboarding.activeStep === 10) {
+  if (onboarding.activeStep === REVIEW_STEP) {
     return <ReviewsStep onContinue={onboarding.onNext} />;
+  }
+
+  if (onboarding.activeStep === CONTACT_STEP) {
+    return (
+      <View className="flex-1 justify-center">
+        <FeedbackContactCard source="onboarding" />
+      </View>
+    );
   }
 
   return null;

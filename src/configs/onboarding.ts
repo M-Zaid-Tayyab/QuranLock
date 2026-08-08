@@ -16,8 +16,27 @@ export interface IntroStepData {
   accent: string;
 }
 
-export const TOTAL_STEPS = 10;
-export const REVIEW_STEP = 10;
+export const TOTAL_STEPS = 12;
+export const CONTACT_STEP = 10;
+export const REVIEW_STEP = 11;
+
+export const ONBOARDING_CONTACT_MESSAGE =
+  "Have an idea, criticism, or something you want changed in QuranLock? Tell me honestly. I read every message myself.";
+export const ONBOARDING_CONTACT_HIGHLIGHTED_WORDS = [
+  "idea",
+  "criticism",
+  "honestly",
+];
+export const ONBOARDING_CONTACT_TYPING_OPTIONS = {
+  initialDelayMs: 180,
+  charDelayMs: 22,
+  durationMs: 160,
+  endDelayMs: 140,
+} as const;
+export const ONBOARDING_CONTACT_BUTTON_ENTER_DURATION_MS = 260;
+export const ONBOARDING_CONTACT_BUTTON_STAGGER_MS = 70;
+export const ONBOARDING_CONTACT_BUTTON_COUNT = 4;
+export const ONBOARDING_CONTACT_CTA_GAP_MS = 120;
 
 export const STEP_TITLES: Record<number, string> = {
   0: "",
@@ -30,7 +49,8 @@ export const STEP_TITLES: Record<number, string> = {
   7: "Enable Screen Time",
   8: "Select apps to block",
   9: "Set your daily focus times",
-  10: "Help the Ummah complete the Quran",
+  10: "",
+  11: "Help the Ummah complete the Quran",
 };
 
 export const STEP_SUBTITLES: Record<number, string> = {
@@ -44,7 +64,8 @@ export const STEP_SUBTITLES: Record<number, string> = {
   7: "We use Screen Time to protect your focus window and pause distracting apps.",
   8: "Choose the apps that tend to pull your attention away.",
   9: "Pick prayer times and set a Quran completion goal.",
-  10: "Read community stories and share your own review.",
+  10: "",
+  11: "Read community stories and share your own review.",
 };
 
 export const STEP_ICONS: Partial<Record<number, string>> = {};
