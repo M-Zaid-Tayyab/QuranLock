@@ -50,6 +50,7 @@ export interface UseOnboardingResult {
   ctaKey: string | number;
   animateTitleWords: boolean;
   nameInput: string;
+  blockAllApps: boolean;
   familyActivitySelection: string | null;
   hideProgress: boolean;
   headerAlign: "left" | "center";
@@ -77,6 +78,7 @@ export interface UseOnboardingResult {
   ) => void;
   onSetNameInput: (value: string) => void;
   onSetAgeInput: (value: string) => void;
+  onBlockAllAppsChange: (blockAllApps: boolean) => void;
   onSetFamilyActivitySelection: (selection: string | null) => void;
 }
 
@@ -92,6 +94,7 @@ export function useOnboarding(): UseOnboardingResult {
     setAge,
     quranFrequency,
     reasonsDisconnect,
+    blockAllApps,
     familyActivitySelection,
     isPremium,
     setOnboardingComplete,
@@ -103,6 +106,7 @@ export function useOnboarding(): UseOnboardingResult {
       setAge: s.setAge,
       quranFrequency: s.quranFrequency,
       reasonsDisconnect: s.reasonsDisconnect,
+      blockAllApps: s.blockAllApps,
       familyActivitySelection: s.familyActivitySelection,
       isPremium: s.isPremium,
       setOnboardingComplete: s.setOnboardingComplete,
@@ -117,6 +121,9 @@ export function useOnboarding(): UseOnboardingResult {
   );
   const [familyActivitySelectionDraft, setFamilyActivitySelectionDraft] =
     useState<string | null>(() => familyActivitySelection);
+  const [blockAllAppsDraft, setBlockAllAppsDraft] = useState(
+    () => familyActivitySelection == null || blockAllApps,
+  );
   const [screenTimeApproved, setScreenTimeApproved] = useState(() =>
     canProceedScreenTime(),
   );
@@ -144,6 +151,12 @@ export function useOnboarding(): UseOnboardingResult {
   useEffect(() => {
     setFamilyActivitySelectionDraft(familyActivitySelection);
   }, [familyActivitySelection]);
+
+  useEffect(() => {
+    if (familyActivitySelection != null || blockAllApps) {
+      setBlockAllAppsDraft(blockAllApps);
+    }
+  }, [blockAllApps, familyActivitySelection]);
 
   const onBack = useCallback(() => {
     setStepError(null);
@@ -265,7 +278,7 @@ export function useOnboarding(): UseOnboardingResult {
       !isEditTimes &&
       activeStep === 8 &&
       Platform.OS === "ios" &&
-      !commitSelectApps(familyActivitySelectionDraft)
+      !commitSelectApps(familyActivitySelectionDraft, blockAllAppsDraft)
     ) {
       return;
     }
@@ -331,6 +344,7 @@ export function useOnboarding(): UseOnboardingResult {
   }, [
     activeStep,
     ageInput,
+    blockAllAppsDraft,
     familyActivitySelectionDraft,
     focusTimes,
     isEditTimes,
@@ -353,7 +367,9 @@ export function useOnboarding(): UseOnboardingResult {
     parsedAge >= 1 &&
     parsedAge <= 120;
   const hasSelectedApps =
-    Platform.OS !== "ios" || familyActivitySelectionDraft != null;
+    Platform.OS !== "ios" ||
+    familyActivitySelectionDraft != null ||
+    blockAllAppsDraft;
 
   const nextDisabled = (() => {
     if (activeStep === 3) return trimmedName.length === 0;
@@ -429,6 +445,7 @@ export function useOnboarding(): UseOnboardingResult {
     ageInput,
     animateCTA: !isEditTimes && (stepIndex <= 2 || isContactStep),
     animateTitleWords: isReviewStep,
+    blockAllApps: blockAllAppsDraft,
     ctaDelayMs: isContactStep ? contactCtaDelayMs : introCtaDelayMs,
     ctaKey: isEditTimes ? "edit-times" : stepIndex,
     familyActivitySelection: familyActivitySelectionDraft,
@@ -440,6 +457,7 @@ export function useOnboarding(): UseOnboardingResult {
     nextDisabled,
     nextLabel,
     onBack,
+    onBlockAllAppsChange: setBlockAllAppsDraft,
     onNext,
     onNotificationPermissionChange,
     onNotificationPermissionStatusChange,

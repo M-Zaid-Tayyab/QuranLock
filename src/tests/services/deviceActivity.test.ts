@@ -1,10 +1,15 @@
 import { SCREEN_TIME } from "@/constants/screenTime";
-import { clearSelection } from "@/services/deviceActivity";
+import {
+  clearSelection,
+  configureBlockUnblock,
+} from "@/services/deviceActivity";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   blockSelection: vi.fn(),
   configureActions: vi.fn(),
+  disableBlockAllMode: vi.fn(),
+  enableBlockAllMode: vi.fn(),
   getActivities: vi.fn(() => []),
   getAuthorizationStatus: vi.fn(() => 0),
   isShieldActive: vi.fn(() => false),
@@ -67,5 +72,26 @@ describe("deviceActivity.clearSelection", () => {
 
     expect(mocks.userDefaultsSet).not.toHaveBeenCalled();
     expect(mocks.userDefaultsRemove).not.toHaveBeenCalled();
+  });
+});
+
+describe("deviceActivity.configureBlockUnblock", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("uses all-app blocking actions for the recommended selection", () => {
+    configureBlockUnblock("daily-focus", "selection", "shield", true);
+
+    expect(mocks.configureActions).toHaveBeenNthCalledWith(1, {
+      activityName: "daily-focus",
+      callbackName: "intervalDidStart",
+      actions: [{ type: "enableBlockAllMode" }],
+    });
+    expect(mocks.configureActions).toHaveBeenNthCalledWith(2, {
+      activityName: "daily-focus",
+      callbackName: "intervalDidEnd",
+      actions: [{ type: "disableBlockAllMode" }],
+    });
   });
 });

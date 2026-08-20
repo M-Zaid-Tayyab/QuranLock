@@ -15,6 +15,7 @@ export interface UserState {
   focusMinutesPerPage?: number;
   onboardingComplete: boolean;
   hasSelectedApps: boolean;
+  blockAllApps: boolean;
   familyActivitySelection: string | null;
   lastReadPage: number;
   translationEnabled: boolean;
@@ -49,6 +50,7 @@ interface UserActions {
   setFocusMinutesPerPage: (value?: number) => void;
   setOnboardingComplete: (value: boolean) => void;
   setHasSelectedApps: (value: boolean) => void;
+  setBlockAllApps: (value: boolean) => void;
   setFamilyActivitySelection: (value: string | null) => void;
   setLastReadPage: (page: number) => void;
   setTranslationEnabled: (value: boolean) => void;
@@ -78,6 +80,7 @@ const createInitialUserState = (): UserState => ({
   focusDurationMode: "goal",
   onboardingComplete: false,
   hasSelectedApps: false,
+  blockAllApps: true,
   familyActivitySelection: null,
   lastReadPage: 1,
   translationEnabled: false,
@@ -108,6 +111,7 @@ export const useUserStore = create<UserState & UserActions>()(
       setOnboardingComplete: (onboardingComplete) =>
         set({ onboardingComplete }),
       setHasSelectedApps: (hasSelectedApps) => set({ hasSelectedApps }),
+      setBlockAllApps: (blockAllApps) => set({ blockAllApps }),
       setFamilyActivitySelection: (familyActivitySelection) =>
         set({ familyActivitySelection }),
       setLastReadPage: (lastReadPage) => set({ lastReadPage }),

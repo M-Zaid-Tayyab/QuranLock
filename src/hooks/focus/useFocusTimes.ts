@@ -12,6 +12,7 @@ import {
 import {
   applyGoalDurationToSchedules,
   computeGoalRecommendation,
+  DEFAULT_GOAL_DAYS,
   DEFAULT_MINUTES_PER_PAGE,
   sanitizeGoalDays,
   sanitizeManualDuration,
@@ -26,6 +27,8 @@ export type FocusNotificationStatus =
   | "denied"
   | "undetermined"
   | null;
+
+const LEGACY_ONBOARDING_GOAL_DAYS = 30;
 
 export interface UseFocusTimesArgs {
   isEditTimes: boolean;
@@ -137,7 +140,10 @@ export function useFocusTimes({
   );
 
   const storedGoalCompletionDays = sanitizeGoalDays(
-    storedFocusCompletionDays ?? 30,
+    !isEditTimes &&
+      storedFocusCompletionDays === LEGACY_ONBOARDING_GOAL_DAYS
+      ? DEFAULT_GOAL_DAYS
+      : (storedFocusCompletionDays ?? DEFAULT_GOAL_DAYS),
   );
   const storedGoalMinutesPerPage = getGoalMinutesPerPage(
     storedFocusMinutesPerPage,
@@ -555,7 +561,7 @@ export function useFocusTimes({
     (nextMode: FocusDurationMode) => {
       setFocusDurationModeDraft(nextMode);
       if (nextMode !== "goal") {
-        setFocusCompletionDaysDraft(30);
+        setFocusCompletionDaysDraft(DEFAULT_GOAL_DAYS);
         setFocusMinutesPerPageDraft(DEFAULT_MINUTES_PER_PAGE);
         return;
       }

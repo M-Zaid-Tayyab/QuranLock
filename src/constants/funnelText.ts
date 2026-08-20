@@ -58,7 +58,7 @@ export const FUNNEL_TEXT_BY_VARIANT: Record<FunnelVariant, FunnelText> = {
       ],
       stepSubtitles: {
         7: "We use Screen Time to protect your focus window and pause distracting apps.",
-        8: "Choose the apps that tend to pull your attention away.",
+        8: "Pick what pauses while you read.",
         9: "Pick prayer times and set a Quran completion goal.",
         10: "Read real reviews from Muslims building Quran consistency, then share your own.",
       },
@@ -113,7 +113,7 @@ export const FUNNEL_TEXT_BY_VARIANT: Record<FunnelVariant, FunnelText> = {
       ],
       stepSubtitles: {
         7: "We use Screen Time to protect your Ramadan focus window and pause apps.",
-        8: "Choose the apps that pull your attention away in Ramadan.",
+        8: "Pick what pauses while you read this Ramadan.",
         9: "Pick prayer times and set a Ramadan Quran goal.",
         10: "Read real Ramadan reviews from Muslims building consistency, then share yours.",
       },

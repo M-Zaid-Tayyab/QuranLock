@@ -39,6 +39,8 @@ interface FeedbackContactCardProps {
   source: FeedbackContactSource;
 }
 
+type ContactVariant = "compact" | "offer" | "onboarding";
+
 interface ContactChannelButtonProps {
   activeChannel: FeedbackContactChannel | null;
   channel: FeedbackContactChannel;
@@ -46,7 +48,7 @@ interface ContactChannelButtonProps {
   icon: ComponentProps<typeof Ionicons>["name"];
   label: string;
   onPress: () => Promise<void>;
-  variant: "compact" | "onboarding";
+  variant: ContactVariant;
 }
 
 interface ContactChoicesProps {
@@ -55,8 +57,12 @@ interface ContactChoicesProps {
   onTikTok: () => Promise<void>;
   onTwitter: () => Promise<void>;
   onWhatsApp: () => Promise<void>;
-  variant: "compact" | "onboarding";
+  variant: ContactVariant;
 }
+
+const PAYWALL_OFFER_TITLE = "Want a free trial?";
+const PAYWALL_OFFER_BODY =
+  "Message me for 7 days free — no card or payment needed.";
 
 const WHATSAPP_COLOR = "#25D366";
 const INSTAGRAM_COLOR = "#E1306C";
@@ -80,6 +86,7 @@ const ContactChannelButton = ({
   const isActive = activeChannel === channel;
   const isDisabled = activeChannel !== null;
   const isOnboarding = variant === "onboarding";
+  const isOffer = variant === "offer";
 
   return (
     <Pressable
@@ -89,7 +96,9 @@ const ContactChannelButton = ({
       className={
         isOnboarding
           ? "min-h-16 w-full flex-row items-center justify-center rounded-2xl border px-4 py-3"
-          : "h-10 w-10 items-center justify-center rounded-full border"
+          : isOffer
+            ? "flex-1 flex-row items-center justify-center gap-2 rounded-xl border px-2 py-3"
+            : "h-10 w-10 items-center justify-center rounded-full border"
       }
       style={({ pressed }) => ({
         borderColor: rgba(color, pressed ? 0.72 : 0.42),
@@ -114,6 +123,14 @@ const ContactChannelButton = ({
           <Ionicons name={icon} size={isOnboarding ? 22 : 20} color={color} />
         )}
       </View>
+      {isOffer ? (
+        <Text
+          className="font-sfPro-semibold text-sm text-foreground"
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+      ) : null}
       {isOnboarding ? (
         <>
           <View className="ml-3 flex-1">
@@ -166,7 +183,15 @@ const ContactChoices = ({
   };
 
   return (
-    <View className={isOnboarding ? "mt-8 gap-3" : "flex-row gap-2"}>
+    <View
+      className={
+        isOnboarding
+          ? "mt-8 gap-3"
+          : variant === "offer"
+            ? "mt-3 flex-row gap-2"
+            : "flex-row gap-2"
+      }
+    >
       {animatedButton(
         <ContactChannelButton
           activeChannel={activeChannel}
@@ -323,7 +348,13 @@ export const FeedbackContactCard = ({ source }: FeedbackContactCardProps) => {
       onTikTok={handleTikTok}
       onTwitter={handleTwitter}
       onWhatsApp={handleWhatsApp}
-      variant={source === "onboarding" ? "onboarding" : "compact"}
+      variant={
+        source === "onboarding"
+          ? "onboarding"
+          : source === "paywall"
+            ? "offer"
+            : "compact"
+      }
     />
   );
 
@@ -382,6 +413,30 @@ export const FeedbackContactCard = ({ source }: FeedbackContactCardProps) => {
     );
   }
 
+  if (source === "paywall") {
+    return (
+      <View
+        className="rounded-2xl border px-4 py-4"
+        style={{
+          borderColor: rgba(colors.primaryVariant, 0.45),
+          backgroundColor: rgba(colors.primary, 0.1),
+        }}
+      >
+        <View className="flex-row items-center gap-2">
+          <Ionicons name="gift-outline" size={20} color={colors.accent} />
+          <Text className="text-lg font-sfPro-semibold text-foreground">
+            {PAYWALL_OFFER_TITLE}
+          </Text>
+        </View>
+        <Text className="mt-1 text-sm font-sfPro text-muted">
+          {PAYWALL_OFFER_BODY}
+        </Text>
+
+        {choices}
+      </View>
+    );
+  }
+
   return (
     <View
       className={`rounded-2xl border px-4 py-3 ${source === "home" ? "mb-6" : ""}`}
@@ -393,12 +448,10 @@ export const FeedbackContactCard = ({ source }: FeedbackContactCardProps) => {
       <View className="flex-row items-center gap-3">
         <View className="flex-1">
           <Text className="font-sfPro-semibold text-sm text-foreground">
-            {source === "home" ? "Something feel off?" : "Not sure yet?"}
+            Something feel off?
           </Text>
           <Text className="mt-0.5 font-sfPro text-xs text-muted">
-            {source === "home"
-              ? "Tell me what you’d change"
-              : "Shoot a DM to claim a free week"}
+            Tell me what you’d change
           </Text>
         </View>
         {choices}

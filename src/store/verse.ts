@@ -5,6 +5,8 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 export type ReadingMode = "mushaf" | "study";
 
+const TRANSLATION_READING_MODE: ReadingMode = "study";
+
 export interface VerseState {
   translationEnabled: boolean;
   readingMode: ReadingMode;
@@ -47,9 +49,22 @@ export const useVerseStore = create<VerseState & VerseActions>()(
           return { translationEnabled, hasMigratedFromUserStore: true };
         }),
       setTranslationEnabled: (translationEnabled) =>
-        set({ translationEnabled }),
+        set((state) => ({
+          translationEnabled,
+          readingMode: translationEnabled
+            ? TRANSLATION_READING_MODE
+            : state.readingMode,
+        })),
       toggleTranslationEnabled: () =>
-        set((state) => ({ translationEnabled: !state.translationEnabled })),
+        set((state) => {
+          const translationEnabled = !state.translationEnabled;
+          return {
+            translationEnabled,
+            readingMode: translationEnabled
+              ? TRANSLATION_READING_MODE
+              : state.readingMode,
+          };
+        }),
       setReadingMode: (readingMode) => set({ readingMode }),
       toggleReadingMode: () =>
         set((state) => ({

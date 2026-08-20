@@ -17,6 +17,7 @@ import {
 import { Platform } from "react-native";
 
 interface ApplyFocusSchedulesToDeviceArgs {
+  blockAllApps: boolean;
   schedules: FocusSchedule[];
   setQuranMinutesToUnblock: (minutes: number) => void;
   stopActivityNames?: string[];
@@ -29,6 +30,7 @@ export {
 };
 
 export const applyFocusSchedulesToDevice = async ({
+  blockAllApps,
   schedules,
   setQuranMinutesToUnblock,
   stopActivityNames = [],
@@ -47,6 +49,7 @@ export const applyFocusSchedulesToDevice = async ({
       activityName,
       SCREEN_TIME.SELECTION_ID,
       SCREEN_TIME.SHIELD_ID,
+      blockAllApps,
     );
     await startDailyBlockScheduleFor(activityName, schedule.hour, schedule.minute);
   }

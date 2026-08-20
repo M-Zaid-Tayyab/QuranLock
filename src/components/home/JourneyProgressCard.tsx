@@ -184,7 +184,7 @@ export function JourneyProgressCard({
           </View>
           <View className="mt-2 flex-row items-center justify-between">
             <Text className="text-xs font-sfPro text-muted">
-              Read {clampedReadPages}/{clampedTotalPages} pages
+              Page {clampedReadPages} of {clampedTotalPages}
             </Text>
             <Text className="text-xs font-sfPro text-muted">{pagesLeft} pages left</Text>
           </View>

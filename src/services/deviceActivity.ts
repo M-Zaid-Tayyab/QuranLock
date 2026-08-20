@@ -9,6 +9,8 @@ import type {
 import {
   blockSelection as libBlockSelection,
   configureActions,
+  disableBlockAllMode,
+  enableBlockAllMode,
   getActivities as libGetActivities,
   getAuthorizationStatus,
   isShieldActive as libIsShieldActive,
@@ -101,20 +103,25 @@ export function configureBlockUnblock(
   activityName: string,
   selectionId: string,
   shieldId: string,
+  blockAllApps: boolean,
 ): void {
-  const blockActions: Action[] = [
-    {
-      type: "blockSelection",
-      familyActivitySelectionId: selectionId,
-      shieldId,
-    },
-  ];
-  const unblockActions: Action[] = [
-    {
-      type: "unblockSelection",
-      familyActivitySelectionId: selectionId,
-    },
-  ];
+  const blockActions: Action[] = blockAllApps
+    ? [{ type: "enableBlockAllMode" }]
+    : [
+        {
+          type: "blockSelection",
+          familyActivitySelectionId: selectionId,
+          shieldId,
+        },
+      ];
+  const unblockActions: Action[] = blockAllApps
+    ? [{ type: "disableBlockAllMode" }]
+    : [
+        {
+          type: "unblockSelection",
+          familyActivitySelectionId: selectionId,
+        },
+      ];
 
   configureActions({
     activityName,
@@ -128,11 +135,20 @@ export function configureBlockUnblock(
   });
 }
 
-export function unblockSelection(): void {
+export function unblockApps(blockAllApps: boolean): void {
+  if (blockAllApps) {
+    disableBlockAllMode();
+    return;
+  }
   libUnblockSelection({ activitySelectionId: SCREEN_TIME.SELECTION_ID });
 }
 
-export function blockSelectionNow(): void {
+export function blockAppsNow(blockAllApps: boolean): void {
+  if (blockAllApps) {
+    enableBlockAllMode();
+    return;
+  }
+  disableBlockAllMode();
   libBlockSelection({ activitySelectionId: SCREEN_TIME.SELECTION_ID });
 }
 

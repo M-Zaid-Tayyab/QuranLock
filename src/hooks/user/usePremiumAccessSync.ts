@@ -1,13 +1,13 @@
 import { SCREEN_TIME } from "@/constants/screenTime";
 import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
 import {
-  blockSelectionNow,
+  blockAppsNow,
   clearSelection,
   getMonitoredActivities,
   isShieldEnabled,
   onMonitorEvent,
   setSelection,
-  unblockSelection,
+  unblockApps,
 } from "@/services/deviceActivity";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore, type FocusSchedule } from "@/store/user";
@@ -26,6 +26,7 @@ interface PremiumSyncState {
   isPremium: boolean;
   isBlockingPaused: boolean;
   focusSchedules: FocusSchedule[];
+  blockAllApps: boolean;
   familyActivitySelection: string | null;
 }
 
@@ -38,31 +39,51 @@ const useFamilyActivitySelectionSync = ({
   onboardingComplete,
   isPremium,
   isBlockingPaused,
+  blockAllApps,
   familyActivitySelection,
 }: Pick<
   PremiumSyncState,
-  "onboardingComplete" | "isPremium" | "isBlockingPaused" | "familyActivitySelection"
+  | "onboardingComplete"
+  | "isPremium"
+  | "isBlockingPaused"
+  | "blockAllApps"
+  | "familyActivitySelection"
 >) => {
-  const appliedSelectionRef = useRef<string | null | undefined>(undefined);
+  const appliedSelectionRef = useRef<
+    | { blockAllApps: boolean; familyActivitySelection: string | null }
+    | undefined
+  >(undefined);
 
   useEffect(() => {
     if (!onboardingComplete || !isPremium) return;
-    if (appliedSelectionRef.current === familyActivitySelection) return;
+    if (
+      appliedSelectionRef.current?.blockAllApps === blockAllApps &&
+      appliedSelectionRef.current.familyActivitySelection ===
+        familyActivitySelection
+    ) {
+      return;
+    }
 
-    if (familyActivitySelection) {
+    if (blockAllApps) {
+      clearSelection();
+      if (!isBlockingPaused && isShieldEnabled()) {
+        blockAppsNow(true);
+      }
+    } else if (familyActivitySelection) {
       setSelection(familyActivitySelection);
       if (!isBlockingPaused && isShieldEnabled()) {
-        blockSelectionNow();
+        blockAppsNow(false);
       }
     } else {
       if (isShieldEnabled()) {
-        unblockSelection();
+        unblockApps(appliedSelectionRef.current?.blockAllApps ?? false);
       }
       clearSelection();
     }
 
-    appliedSelectionRef.current = familyActivitySelection;
+    appliedSelectionRef.current = { blockAllApps, familyActivitySelection };
   }, [
+    blockAllApps,
     familyActivitySelection,
     isBlockingPaused,
     isPremium,
@@ -74,10 +95,15 @@ const useFocusMonitorRegistration = ({
   onboardingComplete,
   isPremium,
   isBlockingPaused,
+  blockAllApps,
   focusSchedules,
 }: Pick<
   PremiumSyncState,
-  "onboardingComplete" | "isPremium" | "isBlockingPaused" | "focusSchedules"
+  | "onboardingComplete"
+  | "isPremium"
+  | "isBlockingPaused"
+  | "blockAllApps"
+  | "focusSchedules"
 >) => {
   const {
     nativeScheduleFingerprint,
@@ -97,6 +123,7 @@ const useFocusMonitorRegistration = ({
       onboardingComplete,
       isPremium,
       isBlockingPaused,
+      blockAllApps,
       focusSchedules,
       nativeScheduleFingerprint,
       existingActivityNames,
@@ -112,6 +139,7 @@ const useFocusMonitorRegistration = ({
       if (plan.stopActivityNames.length > 0) {
         void applyFocusSchedulesToDevice({
           schedules: [],
+          blockAllApps,
           setQuranMinutesToUnblock,
           stopActivityNames: plan.stopActivityNames,
         });
@@ -132,6 +160,7 @@ const useFocusMonitorRegistration = ({
     let cancelled = false;
     void applyFocusSchedulesToDevice({
       schedules: plan.schedules,
+      blockAllApps,
       setQuranMinutesToUnblock,
       stopActivityNames: plan.stopActivityNames,
     }).then(() => {
@@ -146,6 +175,7 @@ const useFocusMonitorRegistration = ({
     focusSchedules,
     isBlockingPaused,
     isPremium,
+    blockAllApps,
     nativeScheduleFingerprint,
     onboardingComplete,
     setNativeScheduleFingerprint,
@@ -157,10 +187,15 @@ const useFocusScheduleCoordinator = ({
   onboardingComplete,
   isPremium,
   isBlockingPaused,
+  blockAllApps,
   familyActivitySelection,
 }: Pick<
   PremiumSyncState,
-  "onboardingComplete" | "isPremium" | "isBlockingPaused" | "familyActivitySelection"
+  | "onboardingComplete"
+  | "isPremium"
+  | "isBlockingPaused"
+  | "blockAllApps"
+  | "familyActivitySelection"
 >) => {
   const {
     activeScheduleDate,
@@ -189,7 +224,7 @@ const useFocusScheduleCoordinator = ({
     onboardingComplete &&
     isPremium &&
     !isBlockingPaused &&
-    familyActivitySelection != null;
+    (blockAllApps || familyActivitySelection != null);
 
   useEffect(() => {
     if (!onboardingComplete) return;
@@ -239,12 +274,12 @@ const useFocusScheduleCoordinator = ({
     });
 
     if (plan.action === "block") {
-      blockSelectionNow();
+      blockAppsNow(blockAllApps);
       return;
     }
 
     if (plan.action === "unblock") {
-      unblockSelection();
+      unblockApps(blockAllApps);
     }
 
     if (plan.shouldResetAfterUnblock) {
@@ -253,6 +288,7 @@ const useFocusScheduleCoordinator = ({
   }, [
     activeSchedule,
     activeScheduleId,
+    blockAllApps,
     completedScheduleDate,
     dateKey,
     lastBlockedAt,
@@ -291,6 +327,7 @@ export const usePremiumAccessSync = () => {
       isPremium: s.isPremium,
       isBlockingPaused: s.isBlockingPaused,
       focusSchedules: s.focusSchedules,
+      blockAllApps: s.blockAllApps,
       familyActivitySelection: s.familyActivitySelection,
     })),
   );

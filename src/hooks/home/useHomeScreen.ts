@@ -9,6 +9,10 @@ import {
 } from "@/services/entitlements";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
+import {
+  DEFAULT_MINUTES_PER_PAGE,
+  QURAN_TOTAL_PAGES,
+} from "@/utils/focusPlan";
 import { getDateKey, type ScheduleStatus } from "@/utils/scheduleEngine";
 import { useIsFocused } from "@react-navigation/native";
 import { useRouter } from "expo-router";
@@ -16,8 +20,6 @@ import * as StoreReview from "expo-store-review";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState } from "react-native";
 import { useShallow } from "zustand/react/shallow";
-
-const QURAN_TOTAL_PAGES = 604;
 
 export interface HomeTimelineItem {
   id: string;
@@ -113,6 +115,7 @@ export const useHomeScreen = () => {
     isPremium,
     isBlockingPaused,
     lastReadPage,
+    focusMinutesPerPage,
     hasSelectedApps,
     streakCompletedDates,
     hasRequestedFirstStreakReview,
@@ -125,6 +128,7 @@ export const useHomeScreen = () => {
       isPremium: s.isPremium,
       isBlockingPaused: s.isBlockingPaused,
       lastReadPage: s.lastReadPage,
+      focusMinutesPerPage: s.focusMinutesPerPage,
       hasSelectedApps: s.hasSelectedApps,
       streakCompletedDates: s.streakCompletedDates,
       hasRequestedFirstStreakReview: s.hasRequestedFirstStreakReview,
@@ -220,6 +224,23 @@ export const useHomeScreen = () => {
 
   const journeyProgressPercent =
     requiredMinutes > 0 ? progressPercent : scheduleCompletionPercent;
+
+  const minutesPerPage =
+    focusMinutesPerPage && focusMinutesPerPage > 0
+      ? focusMinutesPerPage
+      : DEFAULT_MINUTES_PER_PAGE;
+  const sessionPagesTarget =
+    requiredMinutes > 0
+      ? Math.max(1, Math.ceil(requiredMinutes / minutesPerPage))
+      : 0;
+  const sessionPagesCompleted =
+    sessionPagesTarget > 0
+      ? Math.min(sessionPagesTarget, Math.floor(progressRatio * sessionPagesTarget))
+      : 0;
+  const journeyProgressDetail =
+    sessionPagesTarget > 0
+      ? `${sessionPagesCompleted} of ${sessionPagesTarget} pages for this unlock`
+      : `${completedSchedulesCount} of ${Math.max(1, totalSchedules)} sessions today`;
 
   const pagesRead = Math.min(
     QURAN_TOTAL_PAGES,
@@ -363,6 +384,7 @@ export const useHomeScreen = () => {
       title: journeyTitle,
       subtitle: journeySubtitle,
       progressPercent: journeyProgressPercent,
+      progressDetail: journeyProgressDetail,
       pagesRead,
       pagesTotal: QURAN_TOTAL_PAGES,
       accumulatedMinutes: Math.max(0, Math.floor(accumulatedMinutes)),

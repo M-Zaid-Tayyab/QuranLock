@@ -2,8 +2,10 @@ import type { FocusSchedule } from "@/store/user";
 
 export const QURAN_TOTAL_PAGES = 604;
 export const DEFAULT_MINUTES_PER_PAGE = 3.0;
+export const DEFAULT_GOAL_DAYS = 90;
 export const GOAL_DAYS_MIN = 7;
-export const GOAL_DAYS_MAX = 120;
+export const GOAL_DAYS_MAX = 365;
+export const GOAL_DAYS_STEP = 5;
 export const GOAL_SESSION_CAP_MINUTES = 90;
 export const ROUND_STEP_MINUTES = 5;
 export const MANUAL_MIN_DURATION = 5;
@@ -37,7 +39,7 @@ const roundToStep = (value: number, step: number) => {
 };
 
 export const sanitizeGoalDays = (value: number) => {
-  if (!Number.isFinite(value)) return 30;
+  if (!Number.isFinite(value)) return DEFAULT_GOAL_DAYS;
   return clamp(Math.round(value), GOAL_DAYS_MIN, GOAL_DAYS_MAX);
 };
 

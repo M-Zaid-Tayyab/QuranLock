@@ -9,6 +9,7 @@ const ALLOW_SEARCH_SCOPE_FALLBACK =
 const SCOPE_VALIDATOR = v.union(v.literal("content"), v.literal("search"));
 type QuranFoundationScope = "content" | "search";
 type QfEnvironment = "prelive" | "production";
+type RequiredEnvironmentKey = "QF_CLIENT_ID" | "QF_CLIENT_SECRET";
 
 const tokenCache = new Map<
   QuranFoundationScope,
@@ -37,8 +38,11 @@ const ENV_CONFIG: Record<
 const trimTrailingSlashes = (value: string) => value.replace(/\/+$/, "");
 const trimLeadingSlashes = (value: string) => value.replace(/^\/+/, "");
 
-const getRequiredEnv = (key: string) => {
-  const value = process.env[key];
+const getRequiredEnv = (key: RequiredEnvironmentKey) => {
+  const value =
+    key === "QF_CLIENT_ID"
+      ? process.env.QF_CLIENT_ID
+      : process.env.QF_CLIENT_SECRET;
   if (!value) {
     throw new Error(`Missing required Convex env var: ${key}`);
   }
@@ -124,26 +128,36 @@ const parseJsonOrText = async (response: Response) => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-const normalizePath = (value: string) => (value.startsWith("/") ? value : `/${value}`);
+const normalizePath = (value: string) =>
+  value.startsWith("/") ? value : `/${value}`;
 
-const isVersionedPath = (path: string) => /^\/v\d+\//.test(path);
+const isVersionedPath = (path: string) => /^\/(?:api\/)?v\d+\//.test(path);
 
 const buildPathCandidates = (path: string) => {
   const normalized = normalizePath(path);
-  const candidates = [normalized];
   if (isVersionedPath(normalized)) {
-    return candidates;
+    return [normalized];
   }
 
+  let candidates: string[];
   if (/^\/content\/api\/v4(\/|$)/.test(normalized)) {
-    candidates.push(normalized.replace(/^\/content\/api\/v4/, "/api/v4"));
-    candidates.push(normalized.replace(/^\/content\/api\/v4/, ""));
+    candidates = [
+      normalized,
+      normalized.replace(/^\/content\/api\/v4/, "/api/v4"),
+      normalized.replace(/^\/content\/api\/v4/, ""),
+    ];
   } else if (/^\/api\/v4(\/|$)/.test(normalized)) {
-    candidates.push(`/content${normalized}`);
-    candidates.push(normalized.replace(/^\/api\/v4/, ""));
+    candidates = [
+      `/content${normalized}`,
+      normalized,
+      normalized.replace(/^\/api\/v4/, ""),
+    ];
   } else {
-    candidates.push(`/content/api/v4${normalized}`);
-    candidates.push(`/api/v4${normalized}`);
+    candidates = [
+      `/content/api/v4${normalized}`,
+      `/api/v4${normalized}`,
+      normalized,
+    ];
   }
 
   const dedup = new Set<string>();
@@ -154,8 +168,12 @@ const buildPathCandidates = (path: string) => {
   });
 };
 
-const isInvalidPathPayload = (data: unknown) =>
-  isRecord(data) && typeof data.type === "string" && data.type === "invalid_path";
+const RETRYABLE_PATH_ERROR_TYPES = new Set(["invalid_path", "not_found"]);
+
+const isRetryablePathPayload = (data: unknown) =>
+  isRecord(data) &&
+  typeof data.type === "string" &&
+  RETRYABLE_PATH_ERROR_TYPES.has(data.type);
 
 const toErrorPayload = (data: unknown) => {
   if (typeof data === "string") return data.slice(0, 300);
@@ -249,7 +267,8 @@ const getAccessToken = async (scope: QuranFoundationScope): Promise<string> => {
       typeof tokenPayload.expires_in === "number"
         ? tokenPayload.expires_in
         : TOKEN_DEFAULT_TTL_MS / 1000;
-    const expiresAt = Date.now() + Math.max(expiresInSeconds * 1000, TOKEN_REFRESH_BUFFER_MS);
+    const expiresAt =
+      Date.now() + Math.max(expiresInSeconds * 1000, TOKEN_REFRESH_BUFFER_MS);
     unsupportedScopeCache.delete(scope);
     tokenCache.set(scope, { accessToken, expiresAt });
     return accessToken;
@@ -269,14 +288,14 @@ export const proxyGet = action({
     path: v.string(),
     query: v.optional(v.record(v.string(), v.string())),
   },
+  returns: v.any(),
   handler: async (_ctx, args) => {
     const clientId = getRequiredEnv("QF_CLIENT_ID");
     const accessToken = await getAccessToken(args.scope);
     const baseUrl = getApiBaseUrl(args.scope);
     const pathCandidates = buildPathCandidates(args.path);
-    let lastFailure:
-      | { status: number; path: string; payload: unknown }
-      | null = null;
+    let lastFailure: { status: number; path: string; payload: unknown } | null =
+      null;
 
     for (const path of pathCandidates) {
       const url = buildUrl(baseUrl, path, args.query);
@@ -295,7 +314,7 @@ export const proxyGet = action({
       }
 
       lastFailure = { status: response.status, path, payload: data };
-      if (!isInvalidPathPayload(data)) {
+      if (!isRetryablePathPayload(data)) {
         throw new Error(
           `QF API request failed (${response.status}) [scope=${args.scope} path=${path}]: ${toErrorPayload(data)}`,
         );

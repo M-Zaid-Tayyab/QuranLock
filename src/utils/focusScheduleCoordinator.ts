@@ -9,9 +9,13 @@ export const getFocusScheduleActivityNames = (
   schedules: Pick<FocusSchedule, "id">[],
 ) => schedules.map((schedule) => getFocusScheduleActivityName(schedule.id));
 
-export const getFocusScheduleFingerprint = (schedules: FocusSchedule[]) =>
-  JSON.stringify(
-    [...schedules]
+export const getFocusScheduleFingerprint = (
+  schedules: FocusSchedule[],
+  blockAllApps: boolean,
+) =>
+  JSON.stringify({
+    blockAllApps,
+    schedules: [...schedules]
       .map((schedule) => ({
         durationMinutes: schedule.durationMinutes,
         hour: schedule.hour,
@@ -19,7 +23,7 @@ export const getFocusScheduleFingerprint = (schedules: FocusSchedule[]) =>
         minute: schedule.minute,
       }))
       .sort((a, b) => a.id.localeCompare(b.id)),
-  );
+  });
 
 export const areActivitySetsEqual = (left: string[], right: string[]) => {
   if (left.length !== right.length) return false;
@@ -41,6 +45,7 @@ interface FocusMonitorRegistrationPlanArgs {
   onboardingComplete: boolean;
   isPremium: boolean;
   isBlockingPaused: boolean;
+  blockAllApps: boolean;
   focusSchedules: FocusSchedule[];
   nativeScheduleFingerprint: string | null;
   existingActivityNames: string[];
@@ -79,6 +84,7 @@ export const getFocusMonitorRegistrationPlan = ({
   onboardingComplete,
   isPremium,
   isBlockingPaused,
+  blockAllApps,
   focusSchedules,
   nativeScheduleFingerprint,
   existingActivityNames,
@@ -94,7 +100,9 @@ export const getFocusMonitorRegistrationPlan = ({
   }
 
   const desiredFingerprint =
-    schedules.length > 0 ? getFocusScheduleFingerprint(schedules) : null;
+    schedules.length > 0
+      ? getFocusScheduleFingerprint(schedules, blockAllApps)
+      : null;
   const desiredActivityNames = getFocusScheduleActivityNames(schedules);
   const nativeActivitiesMatch = areActivitySetsEqual(
     existingActivityNames,

@@ -13,6 +13,7 @@ import {
   canOpenQuran,
   openPaywallForBlockedDecision,
 } from "@/services/entitlements";
+import { openFeedbackContactFromNotification } from "@/services/feedbackContact";
 import { ensureQuranPack } from "@/services/quranPack";
 import { startGlobalRecitationOfflineDownload } from "@/services/recitationPack";
 import { configureRevenueCat } from "@/services/revenueCat";
@@ -45,13 +46,68 @@ SplashScreen.setOptions({
   duration: 2000,
 });
 
-function useDeepLinkToVerse() {
+const SETTINGS_FEEDBACK_NOTIFICATION_ACTION = "open_feedback_contact";
+const FREE_WEEK_NOTIFICATION_ACTION = "open_free_week_contact";
+const FEEDBACK_NOTIFICATION_SOURCE = "subscription_feedback_nudge";
+
+type NotificationDestination =
+  | { type: "feedback"; source: "paywall" | "settings" }
+  | { type: "url"; url: string };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const getFirstString = (records: Record<string, unknown>[], key: string) => {
+  for (const record of records) {
+    const value = record[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return null;
+};
+
+const getNotificationDestination = (
+  response: Notifications.NotificationResponse,
+): NotificationDestination | null => {
+  const content = response.notification.request.content;
+  const trigger = response.notification.request.trigger;
+  const contentRecord: Record<string, unknown> = isRecord(content)
+    ? content
+    : {};
+  const triggerRecord: Record<string, unknown> = isRecord(trigger)
+    ? trigger
+    : {};
+  const triggerPayload = triggerRecord.payload;
+  const records = [
+    content.data,
+    contentRecord.userInfo,
+    triggerPayload,
+    isRecord(triggerPayload) ? triggerPayload.userInfo : undefined,
+  ].filter(isRecord);
+  const action = getFirstString(records, "action");
+  const source = getFirstString(records, "source");
+
+  if (action === FREE_WEEK_NOTIFICATION_ACTION) {
+    return { type: "feedback", source: "paywall" };
+  }
+
+  if (
+    action === SETTINGS_FEEDBACK_NOTIFICATION_ACTION ||
+    source === FEEDBACK_NOTIFICATION_SOURCE
+  ) {
+    return { type: "feedback", source: "settings" };
+  }
+
+  const url = getFirstString(records, "url");
+  return url ? { type: "url", url } : null;
+};
+
+const useNotificationResponseRouting = () => {
   const router = useRouter();
   const pathname = usePathname();
   const rootNavigationState = useRootNavigationState();
   const isPremium = useUserStore((s) => s.isPremium);
   const handledNotificationIdRef = useRef<string | null>(null);
-  const pendingUrlRef = useRef<string | null>(null);
+  const pendingDestinationRef = useRef<NotificationDestination | null>(null);
 
   const routeFromUrl = useCallback(
     (url: string | null) => {
@@ -84,6 +140,21 @@ function useDeepLinkToVerse() {
     [isPremium, pathname, router],
   );
 
+  const openDestination = useCallback(
+    (destination: NotificationDestination) => {
+      if (destination.type === "feedback") {
+        openFeedbackContactFromNotification(
+          useUserStore.getState().appUserId,
+          destination.source,
+        ).catch(() => undefined);
+        return;
+      }
+
+      routeFromUrl(destination.url);
+    },
+    [routeFromUrl],
+  );
+
   const queueNotificationResponse = useCallback(
     (response: Notifications.NotificationResponse | null) => {
       if (!response) return;
@@ -91,39 +162,34 @@ function useDeepLinkToVerse() {
       if (handledNotificationIdRef.current === notificationId) {
         return;
       }
-      handledNotificationIdRef.current = notificationId;
-      const content = response.notification.request.content;
-      const triggerPayload =
-        response.notification.request.trigger &&
-        "payload" in response.notification.request.trigger
-          ? response.notification.request.trigger.payload
-          : undefined;
-      const url =
-        (content.data?.url as string | undefined) ??
-        (content as { userInfo?: { url?: string } }).userInfo?.url ??
-        (triggerPayload as { url?: string } | undefined)?.url ??
-        ((triggerPayload as { userInfo?: { url?: string } } | undefined)
-          ?.userInfo?.url as string | undefined);
-      if (!url) {
+      const destination = getNotificationDestination(response);
+      if (!destination) {
         return;
       }
-      pendingUrlRef.current = url;
+      handledNotificationIdRef.current = notificationId;
       Notifications.clearLastNotificationResponse();
+
+      if (rootNavigationState?.key) {
+        openDestination(destination);
+        return;
+      }
+
+      pendingDestinationRef.current = destination;
     },
-    [],
+    [openDestination, rootNavigationState?.key],
   );
 
   useEffect(() => {
     if (!rootNavigationState?.key) {
       return;
     }
-    const pendingUrl = pendingUrlRef.current;
-    if (!pendingUrl) {
+    const pendingDestination = pendingDestinationRef.current;
+    if (!pendingDestination) {
       return;
     }
-    pendingUrlRef.current = null;
-    routeFromUrl(pendingUrl);
-  }, [rootNavigationState?.key, routeFromUrl]);
+    pendingDestinationRef.current = null;
+    openDestination(pendingDestination);
+  }, [openDestination, rootNavigationState?.key]);
 
   useEffect(() => {
     queueNotificationResponse(Notifications.getLastNotificationResponse());
@@ -136,10 +202,10 @@ function useDeepLinkToVerse() {
       notificationSub.remove();
     };
   }, [queueNotificationResponse]);
-}
+};
 
 function RootLayoutContent() {
-  useDeepLinkToVerse();
+  useNotificationResponseRouting();
   useRemoteAppConfig();
   useUserSync();
   usePushNotificationSync();

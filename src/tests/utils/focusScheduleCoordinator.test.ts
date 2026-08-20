@@ -68,6 +68,7 @@ describe("focusScheduleCoordinator", () => {
       onboardingComplete: true,
       isPremium: true,
       isBlockingPaused: false,
+      blockAllApps: true,
       focusSchedules: schedules,
       nativeScheduleFingerprint: null,
       existingActivityNames: getFocusScheduleActivityNames(schedules),
@@ -88,6 +89,7 @@ describe("focusScheduleCoordinator", () => {
       onboardingComplete: false,
       isPremium: true,
       isBlockingPaused: false,
+      blockAllApps: true,
       focusSchedules: schedules,
       nativeScheduleFingerprint: null,
       existingActivityNames: [],
@@ -107,6 +109,7 @@ describe("focusScheduleCoordinator", () => {
       onboardingComplete: true,
       isPremium: true,
       isBlockingPaused: false,
+      blockAllApps: true,
       focusSchedules: schedules,
       nativeScheduleFingerprint: null,
       existingActivityNames: getFocusScheduleActivityNames(schedules),
@@ -117,6 +120,7 @@ describe("focusScheduleCoordinator", () => {
       onboardingComplete: true,
       isPremium: true,
       isBlockingPaused: false,
+      blockAllApps: true,
       focusSchedules: schedules,
       nativeScheduleFingerprint: adoptedPlan.nextFingerprint,
       existingActivityNames: getFocusScheduleActivityNames(schedules),
@@ -138,6 +142,7 @@ describe("focusScheduleCoordinator", () => {
       onboardingComplete: true,
       isPremium: true,
       isBlockingPaused: false,
+      blockAllApps: true,
       focusSchedules: schedules,
       nativeScheduleFingerprint: "stale",
       existingActivityNames,
@@ -154,6 +159,35 @@ describe("focusScheduleCoordinator", () => {
     );
   });
 
+  it("re-applies native monitors when the blocking scope changes", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-03-04T14:00:00"));
+
+    const existingActivityNames = getFocusScheduleActivityNames(schedules);
+    const blockAllPlan = getFocusMonitorRegistrationPlan({
+      onboardingComplete: true,
+      isPremium: true,
+      isBlockingPaused: false,
+      blockAllApps: true,
+      focusSchedules: schedules,
+      nativeScheduleFingerprint: null,
+      existingActivityNames,
+    });
+    if (blockAllPlan.kind !== "adopt") throw new Error("Expected adopt plan");
+
+    const customPlan = getFocusMonitorRegistrationPlan({
+      onboardingComplete: true,
+      isPremium: true,
+      isBlockingPaused: false,
+      blockAllApps: false,
+      focusSchedules: schedules,
+      nativeScheduleFingerprint: blockAllPlan.nextFingerprint,
+      existingActivityNames,
+    });
+
+    expect(customPlan.kind).toBe("apply");
+  });
+
   it("clears native monitors when the schedule system is paused", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-03-04T14:00:00"));
@@ -162,6 +196,7 @@ describe("focusScheduleCoordinator", () => {
       onboardingComplete: true,
       isPremium: true,
       isBlockingPaused: true,
+      blockAllApps: true,
       focusSchedules: schedules,
       nativeScheduleFingerprint: "existing",
       existingActivityNames: getFocusScheduleActivityNames(schedules),

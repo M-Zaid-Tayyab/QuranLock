@@ -141,7 +141,9 @@ export function OnboardingStepContent({
   if (onboarding.activeStep === 8) {
     return (
       <SelectAppsStep
+        blockAllApps={onboarding.blockAllApps}
         familyActivitySelection={onboarding.familyActivitySelection}
+        onBlockAllAppsChange={onboarding.onBlockAllAppsChange}
         onSelectionChange={onboarding.onSetFamilyActivitySelection}
         onSelectionDone={onboarding.onNext}
       />

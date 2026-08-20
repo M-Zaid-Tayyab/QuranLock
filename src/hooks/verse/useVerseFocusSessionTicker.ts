@@ -1,5 +1,5 @@
 import { useFocusScheduleStatus } from "@/hooks/useFocusScheduleStatus";
-import { unblockSelection } from "@/services/deviceActivity";
+import { unblockApps } from "@/services/deviceActivity";
 import { useBlockingStore } from "@/store/blocking";
 import { useUserStore } from "@/store/user";
 import { useIsFocused } from "@react-navigation/native";
@@ -35,12 +35,14 @@ export const useVerseFocusSessionTicker = () => {
   const {
     incrementCompletedUnlockSessions,
     focusSchedules,
+    blockAllApps,
     isBlockingPaused,
     markStreakDayCompleted,
   } = useUserStore(
     useShallow((s) => ({
       incrementCompletedUnlockSessions: s.incrementCompletedUnlockSessions,
       focusSchedules: s.focusSchedules,
+      blockAllApps: s.blockAllApps,
       isBlockingPaused: s.isBlockingPaused,
       markStreakDayCompleted: s.markStreakDayCompleted,
     })),
@@ -86,7 +88,7 @@ export const useVerseFocusSessionTicker = () => {
         markStreakDayCompleted(dateKey);
       }
       markScheduleCompleted(activeSchedule.schedule.id, dateKey);
-      unblockSelection();
+      unblockApps(blockAllApps);
       resetAfterUnblock();
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -94,7 +96,7 @@ export const useVerseFocusSessionTicker = () => {
       }
       return;
     }
-    unblockSelection();
+    unblockApps(blockAllApps);
     resetAfterUnblock();
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -102,6 +104,7 @@ export const useVerseFocusSessionTicker = () => {
     }
   }, [
     activeSchedule,
+    blockAllApps,
     completedScheduleIds,
     dateKey,
     focusSchedules,

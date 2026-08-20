@@ -1,4 +1,3 @@
-import { FeedbackContactCard } from "@/components/feedback";
 import {
   HomeHeader,
   JourneyHeroCard,
@@ -41,8 +40,7 @@ const HomeScreen = () => {
           title={vm.journey.title}
           subtitle={vm.journey.subtitle}
           progressPercent={vm.journey.progressPercent}
-          pagesRead={vm.journey.pagesRead}
-          pagesTotal={vm.journey.pagesTotal}
+          progressDetail={vm.journey.progressDetail}
           requiredMinutes={vm.journey.requiredMinutes}
           onPressRead={vm.actions.openQuran}
         />
@@ -78,8 +76,6 @@ const HomeScreen = () => {
             onPress={vm.actions.openFocusTimes}
           />
         )}
-
-        <FeedbackContactCard source="home" />
 
         {vm.flags.showTimeline && (
           <JourneyTimelineCard

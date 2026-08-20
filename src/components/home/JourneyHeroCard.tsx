@@ -7,8 +7,7 @@ interface JourneyHeroCardProps {
   title: string;
   subtitle: string;
   progressPercent: number;
-  pagesRead: number;
-  pagesTotal: number;
+  progressDetail: string;
   requiredMinutes: number;
   onPressRead: () => void;
 }
@@ -16,16 +15,14 @@ interface JourneyHeroCardProps {
 interface JourneyHeroSubtitleProps {
   subtitle: string;
   progressPercent: number;
-  pagesRead: number;
-  pagesTotal: number;
+  progressDetail: string;
 }
 
-function JourneyHeroSessionMetrics({
+const JourneyHeroSessionMetrics = ({
   subtitle,
   progressPercent,
-  pagesRead,
-  pagesTotal,
-}: JourneyHeroSubtitleProps) {
+  progressDetail,
+}: JourneyHeroSubtitleProps) => {
   return (
     <>
       <Text className="mt-1 text-sm font-sfPro text-muted">{subtitle}</Text>
@@ -41,7 +38,7 @@ function JourneyHeroSessionMetrics({
           <View className="flex-row items-center gap-1.5">
             <Ionicons name="book-outline" size={13} color={colors.muted} />
             <Text className="text-xs font-sfPro text-muted">
-              {pagesRead}/{pagesTotal} pages
+              {progressDetail}
             </Text>
           </View>
           <View className="flex-row items-center gap-1.5">
@@ -58,17 +55,16 @@ function JourneyHeroSessionMetrics({
       </View>
     </>
   );
-}
+};
 
-export function JourneyHeroCard({
+export const JourneyHeroCard = ({
   title,
   subtitle,
   progressPercent,
-  pagesRead,
-  pagesTotal,
+  progressDetail,
   requiredMinutes,
   onPressRead,
-}: JourneyHeroCardProps) {
+}: JourneyHeroCardProps) => {
   return (
     <View className="mb-6 rounded-3xl border border-outline bg-surface px-6 py-6">
       <View className="items-center">
@@ -84,8 +80,7 @@ export function JourneyHeroCard({
         <JourneyHeroSessionMetrics
           subtitle={subtitle}
           progressPercent={progressPercent}
-          pagesRead={pagesRead}
-          pagesTotal={pagesTotal}
+          progressDetail={progressDetail}
         />
       </View>
 
@@ -100,4 +95,4 @@ export function JourneyHeroCard({
       />
     </View>
   );
-}
+};

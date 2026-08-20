@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { createFeedbackSupportCode } from "./feedbackSupportCode";
 
 const focusDurationMode = v.union(v.literal("manual"), v.literal("goal"));
+const DEFAULT_FOCUS_COMPLETION_DAYS = 90;
 
 const focusSchedule = v.object({
   id: v.string(),
@@ -124,7 +125,8 @@ export const upsertUser = mutation({
       }
 
       if (normalizedMode === "goal") {
-        normalized.focusCompletionDays = input.focusCompletionDays ?? 30;
+        normalized.focusCompletionDays =
+          input.focusCompletionDays ?? DEFAULT_FOCUS_COMPLETION_DAYS;
         normalized.focusMinutesPerPage = input.focusMinutesPerPage ?? 3;
       }
 

@@ -1,6 +1,10 @@
 import { PrimaryButton } from "@/components/common/PrimaryButton";
 import { FeedbackContactCard } from "@/components/feedback";
 import { colors } from "@/constants/colors";
+import {
+  PAYWALL_COMPACT_VIEWPORT_HEIGHT,
+  PAYWALL_SPACING,
+} from "@/constants/paywall";
 import { useFunnelText } from "@/hooks/app";
 import {
   getCurrentOffering,
@@ -18,6 +22,7 @@ import {
   Pressable,
   ScrollView,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Purchases, {
@@ -87,6 +92,7 @@ const getOfferDebugSnapshot = (pkg: PurchasesPackage | null) => {
 export default function PaywallScreen() {
   const router = useRouter();
   const funnelText = useFunnelText();
+  const { height: windowHeight } = useWindowDimensions();
   const params = useLocalSearchParams<{ entry?: string | string[] }>();
   const setIsPremium = useUserStore((s) => s.setIsPremium);
   const paywallEntry =
@@ -291,7 +297,7 @@ export default function PaywallScreen() {
     return (
       <Pressable
         onPress={() => setSelectedPlan(id)}
-        className={`flex-1 rounded-2xl border px-4 py-4 ${
+        className={`flex-1 rounded-2xl border px-4 py-3.5 ${
           isSelected
             ? "border-accent bg-accent/10"
             : "border-outline bg-surface"
@@ -317,11 +323,11 @@ export default function PaywallScreen() {
             {perWeek} per week
           </Text>
         ) : null}
-        <Text className="mt-3 text-sm font-sfPro text-muted">
+        <Text className="mt-2 text-sm font-sfPro text-muted">
           {description}
         </Text>
         {badge ? (
-          <View className="mt-3 self-start rounded-full bg-accent/20 px-3 py-1">
+          <View className="mt-2.5 self-start rounded-full bg-accent/20 px-3 py-1">
             <Text className="text-[10px] font-sfPro-semibold text-accent">
               {badge}
             </Text>
@@ -331,17 +337,24 @@ export default function PaywallScreen() {
     );
   };
 
+  const spacing =
+    windowHeight < PAYWALL_COMPACT_VIEWPORT_HEIGHT
+      ? PAYWALL_SPACING.compact
+      : PAYWALL_SPACING.regular;
+
   return (
     <>
       <Stack.Screen options={{ animation: "fade", gestureEnabled: false }} />
       <View className="flex-1 bg-background pt-safe pb-safe">
         <ScrollView
           className="flex-1"
-          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 24 }}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingBottom: 12 }}
           showsVerticalScrollIndicator={false}
         >
-          <View className=" items-center">
-            <View className="mt-3 flex-row flex-wrap justify-center px-4">
+          <View className="items-center">
+            <View
+              className={`flex-row flex-wrap justify-center px-4 ${spacing.hero}`}
+            >
               {funnelText.paywall.headlineWords.map((word, index) => (
                 <Text
                   key={`${word}-${index}`}
@@ -363,7 +376,7 @@ export default function PaywallScreen() {
             </View>
           </View>
 
-          <View className="mt-10 gap-3">
+          <View className={spacing.features}>
             <View className="flex-row items-center gap-3">
               <Ionicons
                 name="shield-checkmark-outline"
@@ -398,7 +411,7 @@ export default function PaywallScreen() {
             </View>
           </View>
 
-          <View className="mt-6">
+          <View className={spacing.planSection}>
             <View className="flex-row items-center justify-between">
               <Text className="mt-1 text-2xl font-sfPro-bold text-foreground">
                 Choose your plan
@@ -408,7 +421,7 @@ export default function PaywallScreen() {
               </Text>
             </View>
 
-            <View className="mt-7 gap-3">
+            <View className={spacing.planCards}>
               {!loading && !weeklyPackage && !annualPackage ? (
                 <Text className="text-sm font-sfPro text-muted">
                   Subscription plans are not available right now.
@@ -433,7 +446,7 @@ export default function PaywallScreen() {
             </View>
           </View>
 
-          <View className="mt-5 gap-3">
+          <View className={spacing.checkout}>
             {offeringError && (
               <Text className="text-center text-sm font-sfPro text-error">
                 {offeringError}
@@ -445,38 +458,37 @@ export default function PaywallScreen() {
               isLoading={loading || purchasing}
               disabled={!selectedPackage}
               onPress={handlePurchase}
-              className="w-full mt-4"
+              className={spacing.cta}
             />
 
-            <Pressable
-              onPress={handleRestore}
-              className="self-center rounded-full border border-outline bg-surface px-4 py-2 my-2"
-            >
-              <Text className="text-sm font-sfPro-semibold text-foreground">
-                Restore purchases
-              </Text>
-            </Pressable>
+            <View className={spacing.footer}>
+              <FeedbackContactCard source="paywall" />
 
-            <FeedbackContactCard source="paywall" />
-
-            <View className="flex-row items-center justify-center gap-2">
-              <Pressable
-                onPress={() => openLink(privacyUrl, "Privacy Policy")}
-                hitSlop={8}
-              >
-                <Text className="text-xs font-sfPro-semibold text-foreground">
-                  Privacy Policy
+              <Pressable onPress={handleRestore} className={spacing.restore}>
+                <Text className="text-sm font-sfPro-semibold text-foreground">
+                  Restore purchases
                 </Text>
               </Pressable>
-              <Text className="text-xs font-sfPro text-muted">•</Text>
-              <Pressable
-                onPress={() => openLink(termsUrl, "Terms")}
-                hitSlop={8}
-              >
-                <Text className="text-xs font-sfPro-semibold text-foreground">
-                  Terms
-                </Text>
-              </Pressable>
+
+              <View className="flex-row items-center justify-center gap-2">
+                <Pressable
+                  onPress={() => openLink(privacyUrl, "Privacy Policy")}
+                  hitSlop={8}
+                >
+                  <Text className="text-xs font-sfPro-semibold text-foreground">
+                    Privacy Policy
+                  </Text>
+                </Pressable>
+                <Text className="text-xs font-sfPro text-muted">•</Text>
+                <Pressable
+                  onPress={() => openLink(termsUrl, "Terms")}
+                  hitSlop={8}
+                >
+                  <Text className="text-xs font-sfPro-semibold text-foreground">
+                    Terms
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </ScrollView>

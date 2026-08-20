@@ -6,7 +6,12 @@ import {
   FOCUS_LABEL_MAX_LENGTH,
   type UseFocusTimesResult,
 } from "@/hooks/focus";
-import { GOAL_DAYS_MAX, GOAL_DAYS_MIN } from "@/utils/focusPlan";
+import {
+  DEFAULT_GOAL_DAYS,
+  GOAL_DAYS_MAX,
+  GOAL_DAYS_MIN,
+  GOAL_DAYS_STEP,
+} from "@/utils/focusPlan";
 import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import DatePicker from "react-native-date-picker";
@@ -160,7 +165,7 @@ export function FocusTimesStep({
               </Text>
               <View className="mt-2 flex-row items-center gap-2">
                 <Pressable
-                  onPress={() => onStepGoalDays(-1)}
+                  onPress={() => onStepGoalDays(-GOAL_DAYS_STEP)}
                   className="h-10 w-10 items-center justify-center rounded-full border border-outline"
                 >
                   <Ionicons name="remove" size={18} color={colors.muted} />
@@ -175,12 +180,12 @@ export function FocusTimesStep({
                     onSubmitEditing={onCommitGoalDays}
                     keyboardType="number-pad"
                     className="text-center font-sfPro-semibold text-foreground"
-                    placeholder="30"
+                    placeholder={String(DEFAULT_GOAL_DAYS)}
                     placeholderTextColor={colors.muted}
                   />
                 </View>
                 <Pressable
-                  onPress={() => onStepGoalDays(1)}
+                  onPress={() => onStepGoalDays(GOAL_DAYS_STEP)}
                   className="h-10 w-10 items-center justify-center rounded-full border border-outline"
                 >
                   <Ionicons name="add" size={18} color={colors.muted} />
