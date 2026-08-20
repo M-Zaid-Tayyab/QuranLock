@@ -25,6 +25,7 @@ const stripHtml = (value: string) =>
     .trim();
 const SEARCH_ARABIC_FONT_SIZE = 22;
 const SEARCH_ARABIC_LINE_HEIGHT = getArabicLineHeight(SEARCH_ARABIC_FONT_SIZE);
+const SEARCH_ERROR_MESSAGE = "Something went wrong. Please try again.";
 
 interface VerseSearchModalProps {
   visible: boolean;
@@ -42,6 +43,8 @@ export function VerseSearchModal({
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<QuranSearchResult[]>([]);
   const searchRequestIdRef = useRef(0);
+  const trimmedQuery = query.trim();
+  const hasSearchQuery = trimmedQuery.length >= 2;
 
   const executeSearch = useCallback(async (value: string) => {
     const trimmed = value.trim();
@@ -59,13 +62,9 @@ export function VerseSearchModal({
       const nextResults = await searchQuranVerses(trimmed, { page: 1, size: 15 });
       if (requestId !== searchRequestIdRef.current) return;
       setResults(nextResults);
-    } catch (searchError) {
+    } catch {
       if (requestId !== searchRequestIdRef.current) return;
-      setError(
-        searchError instanceof Error
-          ? searchError.message
-          : "Unable to search right now. Please try again.",
-      );
+      setError(SEARCH_ERROR_MESSAGE);
       setResults([]);
     } finally {
       if (requestId !== searchRequestIdRef.current) return;
@@ -152,7 +151,9 @@ export function VerseSearchModal({
 
           {!searching && !error && results.length === 0 ? (
             <Text className="mt-6 text-sm font-sfPro text-muted">
-              Enter at least two characters to search verses.
+              {hasSearchQuery
+                ? `No verses found for “${trimmedQuery}”. Try another word or phrase.`
+                : "Enter at least two characters to search verses."}
             </Text>
           ) : null}
 

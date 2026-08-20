@@ -3,11 +3,9 @@ import { action } from "./_generated/server";
 
 const TOKEN_REFRESH_BUFFER_MS = 60_000;
 const TOKEN_DEFAULT_TTL_MS = 3_600_000;
-const ALLOW_SEARCH_SCOPE_FALLBACK =
-  (process.env.QF_SEARCH_SCOPE_FALLBACK_TO_CONTENT ?? "true") !== "false";
 
-const SCOPE_VALIDATOR = v.union(v.literal("content"), v.literal("search"));
-type QuranFoundationScope = "content" | "search";
+const SCOPE_VALIDATOR = v.literal("content");
+type QuranFoundationScope = "content";
 type QfEnvironment = "prelive" | "production";
 type RequiredEnvironmentKey = "QF_CLIENT_ID" | "QF_CLIENT_SECRET";
 
@@ -19,7 +17,6 @@ const tokenCache = new Map<
   }
 >();
 const tokenRequestCache = new Map<QuranFoundationScope, Promise<string>>();
-const unsupportedScopeCache = new Set<QuranFoundationScope>();
 
 const ENV_CONFIG: Record<
   QfEnvironment,
@@ -77,20 +74,15 @@ const getTokenUrl = () => {
   return `${base}/${path}`;
 };
 
-const getApiBaseUrl = (scope: QuranFoundationScope) => {
-  const envConfig = getConfiguredEnvironment();
+const getApiBaseUrl = () => {
+  const environment = getConfiguredEnvironment();
+  const envConfig = environment ? ENV_CONFIG[environment] : null;
+  const scoped = process.env.QF_CONTENT_API_BASE_URL;
   const fallback = process.env.QF_API_BASE_URL;
-  const scoped =
-    scope === "content"
-      ? process.env.QF_CONTENT_API_BASE_URL
-      : process.env.QF_SEARCH_API_BASE_URL;
-  const value =
-    scoped ??
-    fallback ??
-    (envConfig ? ENV_CONFIG[envConfig].apiBaseUrl : undefined);
+  const value = scoped ?? fallback ?? envConfig?.apiBaseUrl;
   if (!value) {
     throw new Error(
-      "Missing QF API base URL. Set QF_CONTENT_API_BASE_URL / QF_SEARCH_API_BASE_URL, QF_API_BASE_URL, or QF_ENV.",
+      "Missing Quran Foundation content API base URL. Set QF_CONTENT_API_BASE_URL, QF_API_BASE_URL, or QF_ENV.",
     );
   }
   return trimTrailingSlashes(value);
@@ -127,6 +119,12 @@ const parseJsonOrText = async (response: Response) => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const normalizeErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error ?? "");
+
+const isInvalidPathError = (error: unknown) =>
+  normalizeErrorMessage(error).toLowerCase().includes("invalid_path");
 
 const normalizePath = (value: string) =>
   value.startsWith("/") ? value : `/${value}`;
@@ -186,14 +184,6 @@ const toErrorPayload = (data: unknown) => {
 };
 
 const getAccessToken = async (scope: QuranFoundationScope): Promise<string> => {
-  if (
-    scope === "search" &&
-    ALLOW_SEARCH_SCOPE_FALLBACK &&
-    unsupportedScopeCache.has("search")
-  ) {
-    return getAccessToken("content");
-  }
-
   const cached = tokenCache.get(scope);
   const now = Date.now();
   if (cached && cached.expiresAt - TOKEN_REFRESH_BUFFER_MS > now) {
@@ -233,17 +223,6 @@ const getAccessToken = async (scope: QuranFoundationScope): Promise<string> => {
 
     const tokenPayload = await parseJsonOrText(response);
     if (!response.ok) {
-      if (
-        scope === "search" &&
-        ALLOW_SEARCH_SCOPE_FALLBACK &&
-        response.status === 400 &&
-        isRecord(tokenPayload) &&
-        typeof tokenPayload.error === "string" &&
-        tokenPayload.error === "invalid_scope"
-      ) {
-        unsupportedScopeCache.add("search");
-        return getAccessToken("content");
-      }
       throw new Error(
         `QF token request failed (${response.status}): ${toErrorPayload(tokenPayload)}`,
       );
@@ -269,7 +248,6 @@ const getAccessToken = async (scope: QuranFoundationScope): Promise<string> => {
         : TOKEN_DEFAULT_TTL_MS / 1000;
     const expiresAt =
       Date.now() + Math.max(expiresInSeconds * 1000, TOKEN_REFRESH_BUFFER_MS);
-    unsupportedScopeCache.delete(scope);
     tokenCache.set(scope, { accessToken, expiresAt });
     return accessToken;
   })();
@@ -292,7 +270,7 @@ export const proxyGet = action({
   handler: async (_ctx, args) => {
     const clientId = getRequiredEnv("QF_CLIENT_ID");
     const accessToken = await getAccessToken(args.scope);
-    const baseUrl = getApiBaseUrl(args.scope);
+    const baseUrl = getApiBaseUrl();
     const pathCandidates = buildPathCandidates(args.path);
     let lastFailure: { status: number; path: string; payload: unknown } | null =
       null;

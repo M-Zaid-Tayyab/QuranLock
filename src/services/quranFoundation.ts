@@ -1,11 +1,10 @@
 import { convexClient } from "@/services/convexClient";
 import {
   findVerseLocationByKey,
-  getArabicTextByVerseKeysFromLocalPack,
   searchVersesInLocalPack,
 } from "@/services/quranPack";
 
-export type QuranFoundationScope = "content" | "search";
+export type QuranFoundationScope = "content";
 
 interface QuranFoundationProxyGetArgs {
   scope: QuranFoundationScope;
@@ -49,15 +48,6 @@ export const quranFoundationProxyGet = async <TResponse = unknown>(
   }) as Promise<TResponse>;
 };
 
-const SEARCH_PATH = process.env.EXPO_PUBLIC_QF_SEARCH_PATH ?? "/api/v1/search";
-const SEARCH_MODE = process.env.EXPO_PUBLIC_QF_SEARCH_MODE ?? "advanced";
-const SEARCH_SCOPE = process.env.EXPO_PUBLIC_QF_SEARCH_SCOPE ?? "auto";
-const SEARCH_FALLBACK_PATHS = [
-  process.env.EXPO_PUBLIC_QF_SEARCH_FALLBACK_PATH ?? "/v1/search",
-] as const;
-const SEARCH_LOCAL_FALLBACK_ENABLED =
-  (process.env.EXPO_PUBLIC_QF_SEARCH_LOCAL_FALLBACK ?? "true") !== "false";
-const DEFAULT_VERSIONED_SEARCH_PATH = "/api/v1/search";
 const RECITATION_BY_VERSE_PATH_TEMPLATE =
   process.env.EXPO_PUBLIC_QF_RECITATION_BY_VERSE_PATH_TEMPLATE ??
   "/recitations/{recitation_id}/by_ayah/{ayah_key}";
@@ -157,51 +147,8 @@ const toNumberValue = (value: unknown) =>
 const normalizeErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error ?? "");
 
-const isInvalidScopeError = (error: unknown) => {
-  const message = normalizeErrorMessage(error).toLowerCase();
-  return message.includes("invalid_scope");
-};
-
-const isInvalidPathError = (error: unknown) => {
-  const message = normalizeErrorMessage(error).toLowerCase();
-  return message.includes("invalid_path");
-};
-
-const isSearchPermissionError = (error: unknown) => {
-  const message = normalizeErrorMessage(error).toLowerCase();
-  return (
-    message.includes("forbidden") ||
-    message.includes("permission") ||
-    message.includes("does not have the required \"search\" scope") ||
-    message.includes("does not have the required 'search' scope")
-  );
-};
-
-const toVerseKey = (record: Record<string, unknown>) => {
-  const direct =
-    toStringValue(record.verse_key) ??
-    toStringValue(record.verseKey) ??
-    toStringValue(record.key);
-  if (direct) return direct;
-
-  const chapterId =
-    toNumberValue(record.chapter_id) ??
-    toNumberValue(record.chapterId) ??
-    toNumberValue(record.surah);
-  const verseNumber =
-    toNumberValue(record.verse_number) ??
-    toNumberValue(record.verseNumber) ??
-    toNumberValue(record.ayah);
-  if (
-    chapterId != null &&
-    verseNumber != null &&
-    Number.isFinite(chapterId) &&
-    Number.isFinite(verseNumber)
-  ) {
-    return `${Math.trunc(chapterId)}:${Math.trunc(verseNumber)}`;
-  }
-  return null;
-};
+const isInvalidPathError = (error: unknown) =>
+  normalizeErrorMessage(error).toLowerCase().includes("invalid_path");
 
 const sanitizeProxyPath = (value: string) => {
   if (!value.includes("://")) return value;
@@ -214,9 +161,6 @@ const sanitizeProxyPath = (value: string) => {
 };
 
 const isVerseKeyQuery = (value: string) => /^\d{1,3}:\d{1,3}$/.test(value.trim());
-
-const isVersionedSearchPath = (path: string) =>
-  /^\/(?:api\/)?v\d+\//.test(path.trim());
 
 const resolveAudioBaseUrl = () => {
   const normalizeBase = (value: string | undefined | null) => {
@@ -421,134 +365,6 @@ const buildRecitationPath = (
   );
 };
 
-const normalizeSearchItem = (item: unknown): QuranSearchResult | null => {
-  if (!item || typeof item !== "object") return null;
-  const record = item as Record<string, unknown>;
-  const chapter =
-    record.chapter && typeof record.chapter === "object"
-      ? (record.chapter as Record<string, unknown>)
-      : null;
-
-  const verseKey = toVerseKey(record);
-  if (!verseKey) return null;
-
-  const highlightedText =
-    toStringValue(record.highlighted) ??
-    toStringValue(record.snippet) ??
-    toStringValue(record.matched_text) ??
-    toStringValue(record.matchedText) ??
-    toStringValue(record.name) ??
-    toStringValue(record.text) ??
-    "";
-
-  const arabicText =
-    toStringValue(record.text_uthmani) ??
-    toStringValue(record.text_imlaei) ??
-    toStringValue(record.uthmani_text) ??
-    toStringValue(record.imlaei_text) ??
-    toStringValue(record.text_arabic) ??
-    toStringValue(record.arabic);
-
-  const translation =
-    toStringValue(record.translation) ??
-    toStringValue(record.translated_text) ??
-    toStringValue(record.text_translation) ??
-    toStringValue(record.translation_text);
-
-  const surahName =
-    toStringValue(record.chapter_name) ??
-    toStringValue(record.surah_name) ??
-    toStringValue(chapter?.name_simple) ??
-    toStringValue(chapter?.name_arabic);
-
-  const pageNumber =
-    toNumberValue(record.page_number) ??
-    toNumberValue(record.page) ??
-    toNumberValue(record.pageNumber) ??
-    undefined;
-
-  return {
-    verseKey,
-    highlightedText,
-    arabicText: arabicText ?? undefined,
-    translation: translation ?? undefined,
-    surahName: surahName ?? undefined,
-    pageNumber: Number.isFinite(pageNumber) ? Number(pageNumber) : undefined,
-  };
-};
-
-const getArrayCandidate = (value: unknown): unknown[] => {
-  if (Array.isArray(value)) return value;
-  return [];
-};
-
-const normalizeSearchPayload = (payload: unknown): QuranSearchResult[] => {
-  if (Array.isArray(payload)) {
-    return payload
-      .map((entry) => normalizeSearchItem(entry))
-      .filter((entry): entry is QuranSearchResult => Boolean(entry));
-  }
-  if (!payload || typeof payload !== "object") return [];
-  const record = payload as Record<string, unknown>;
-  const candidates = [
-    ...getArrayCandidate(record.results),
-    ...getArrayCandidate(record.hits),
-    ...getArrayCandidate(record.matches),
-    ...getArrayCandidate(record.data),
-    ...getArrayCandidate(record.verses),
-  ];
-
-  if (record.search && typeof record.search === "object") {
-    const nested = record.search as Record<string, unknown>;
-    candidates.push(...getArrayCandidate(nested.results));
-    candidates.push(...getArrayCandidate(nested.hits));
-    candidates.push(...getArrayCandidate(nested.verses));
-  }
-
-  if (record.result && typeof record.result === "object") {
-    const nested = record.result as Record<string, unknown>;
-    candidates.push(...getArrayCandidate(nested.results));
-    candidates.push(...getArrayCandidate(nested.hits));
-    candidates.push(...getArrayCandidate(nested.matches));
-    candidates.push(...getArrayCandidate(nested.data));
-    candidates.push(...getArrayCandidate(nested.verses));
-  }
-
-  if (candidates.length === 0) {
-    candidates.push(record);
-  }
-
-  const dedup = new Map<string, QuranSearchResult>();
-  candidates.forEach((entry) => {
-    const normalized = normalizeSearchItem(entry);
-    if (!normalized) return;
-    dedup.set(normalized.verseKey, normalized);
-  });
-  return [...dedup.values()];
-};
-
-const hydrateArabicSearchResults = async (results: QuranSearchResult[]) => {
-  const missingArabic = results
-    .filter((item) => !item.arabicText)
-    .map((item) => item.verseKey);
-  if (!missingArabic.length) {
-    return results;
-  }
-
-  try {
-    const arabicByKey = await getArabicTextByVerseKeysFromLocalPack(missingArabic);
-    if (!arabicByKey.size) {
-      return results;
-    }
-    return results.map((item) => ({
-      ...item,
-      arabicText: item.arabicText ?? arabicByKey.get(item.verseKey),
-    }));
-  } catch {
-    return results;
-  }
-};
-
 const searchLocalQuranVerses = async (query: string, limit: number) => {
   try {
     if (isVerseKeyQuery(query)) {
@@ -583,108 +399,7 @@ export const searchQuranVerses = async (
   const trimmed = query.trim();
   if (!trimmed) return [] as QuranSearchResult[];
   const resultLimit = Math.min(20, Math.max(1, options?.size ?? 10));
-  if (SEARCH_LOCAL_FALLBACK_ENABLED) {
-    const localResults = await searchLocalQuranVerses(trimmed, resultLimit);
-    if (localResults.length) {
-      return localResults;
-    }
-  }
-
-  const normalizedMode =
-    SEARCH_MODE.toLowerCase() === "quick" ? "quick" : "advanced";
-  const commonQuery: Record<string, string> =
-    normalizedMode === "quick"
-      ? {
-          mode: normalizedMode,
-          query: trimmed,
-          versesResultsNumber: String(resultLimit),
-        }
-      : {
-          mode: normalizedMode,
-          query: trimmed,
-          page: String(Math.max(1, options?.page ?? 1)),
-          size: String(resultLimit),
-        };
-  const verseKeyQuery = isVerseKeyQuery(trimmed);
-  const normalizedScope = SEARCH_SCOPE.toLowerCase();
-  const scopeOrder: QuranFoundationScope[] = verseKeyQuery
-    ? normalizedScope === "content"
-      ? ["content", "search"]
-      : normalizedScope === "search"
-        ? ["search", "content"]
-        : ["search", "content"]
-    : normalizedScope === "content"
-      ? ["content", "search"]
-      : ["search"];
-  const pathCandidatesBase = [
-    SEARCH_PATH,
-    ...SEARCH_FALLBACK_PATHS.filter((path) => path !== SEARCH_PATH),
-  ];
-  const pathCandidates = verseKeyQuery
-    ? pathCandidatesBase
-    : (() => {
-        const versionedOnly = pathCandidatesBase.filter(isVersionedSearchPath);
-        if (versionedOnly.length) {
-          return versionedOnly;
-        }
-        return [DEFAULT_VERSIONED_SEARCH_PATH];
-      })();
-  const attempts: QuranFoundationProxyGetArgs[] = [];
-  const pushAttempt = (scope: QuranFoundationScope, path: string) => {
-    if (!path) return;
-    if (
-      attempts.some(
-        (attempt) => attempt.scope === scope && attempt.path === path,
-      )
-    ) {
-      return;
-    }
-    attempts.push({
-      scope,
-      path,
-      query: commonQuery,
-    });
-  };
-
-  scopeOrder.forEach((scope) => {
-    pathCandidates.forEach((path) => {
-      pushAttempt(scope, path);
-    });
-  });
-
-  let lastError: unknown = null;
-  let sawScopeOrPermissionError = false;
-  let receivedSearchResponse = false;
-  for (const attempt of attempts) {
-    try {
-      const payload = await quranFoundationProxyGet<unknown>(attempt);
-      receivedSearchResponse = true;
-      const normalized = normalizeSearchPayload(payload);
-      if (normalized.length) {
-        return await hydrateArabicSearchResults(normalized);
-      }
-    } catch (error) {
-      lastError = error;
-      if (isInvalidScopeError(error) || isSearchPermissionError(error)) {
-        sawScopeOrPermissionError = true;
-      }
-      continue;
-    }
-  }
-
-  if (receivedSearchResponse) {
-    return [];
-  }
-
-  if (sawScopeOrPermissionError || isInvalidScopeError(lastError)) {
-    throw new Error(
-      "Search API is not enabled for this OAuth client. Ask Quran Foundation to grant the `search` scope for your client ID.",
-    );
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("Unable to search right now. Please try again.");
+  return await searchLocalQuranVerses(trimmed, resultLimit);
 };
 
 const resolveVerseRecitationAudio = async (
