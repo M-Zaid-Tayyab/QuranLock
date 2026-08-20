@@ -61,8 +61,7 @@ interface ContactChoicesProps {
 }
 
 const PAYWALL_OFFER_TITLE = "Want a free trial?";
-const PAYWALL_OFFER_BODY =
-  "Message me for 7 days free — no card or payment needed.";
+const PAYWALL_OFFER_BODY = "Send a message to claim your free week!";
 
 const WHATSAPP_COLOR = "#25D366";
 const INSTAGRAM_COLOR = "#E1306C";
