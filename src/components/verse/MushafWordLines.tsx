@@ -9,7 +9,12 @@ interface MushafWordLinesProps {
   arabicFontSize: number;
   arabicLineHeight: number;
   onSelectVerse: (verseKey: string) => void;
-  onVerseLayout?: (verseKey: string, y: number, height: number) => void;
+  onVerseLayout?: (
+    verseKey: string,
+    fragmentKey: string,
+    y: number,
+    height: number,
+  ) => void;
 }
 
 export function MushafWordLines({
@@ -29,7 +34,9 @@ export function MushafWordLines({
             const y = event.nativeEvent.layout.y;
             const height = event.nativeEvent.layout.height;
             const verseKeys = [...new Set(words.map((word) => word.verseKey))];
-            verseKeys.forEach((verseKey) => onVerseLayout?.(verseKey, y, height));
+            verseKeys.forEach((verseKey) =>
+              onVerseLayout?.(verseKey, `line-${lineNumber}`, y, height),
+            );
           }}
           className="flex-row flex-wrap"
           style={{
@@ -50,7 +57,9 @@ export function MushafWordLines({
               >
                 <Text
                   allowFontScaling={false}
-                  className={clsx(isSelected ? "text-accent" : "text-foreground")}
+                  className={clsx(
+                    isSelected ? "text-accent" : "text-foreground",
+                  )}
                   style={getArabicTextStyle(arabicFontSize, arabicLineHeight)}
                 >
                   {word.text}

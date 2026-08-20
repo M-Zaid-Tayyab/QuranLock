@@ -7,4 +7,4 @@ export * from "./routes";
 export * from "./screenTime";
 export * from "./storageKeys";
 export * from "./storeKeys";
-
+export * from "./verse";

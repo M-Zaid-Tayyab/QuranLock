@@ -10,6 +10,5 @@ export { VerseRecitationPane } from "./VerseRecitationPane";
 export { VerseSettingsSheet } from "./VerseSettingsSheet";
 export { VerseSearchModal } from "./VerseSearchModal";
 export { VerseContentPane } from "./VerseContentPane";
-export type { VerseScrollableRef } from "./VerseContentPane";
 export { VerseBottomBarPane } from "./VerseBottomBarPane";
 export type { DisplayVerse, PackState, ReadingMode } from "./types";

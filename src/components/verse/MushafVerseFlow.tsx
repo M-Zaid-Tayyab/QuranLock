@@ -8,7 +8,12 @@ interface MushafVerseFlowProps {
   arabicFontSize: number;
   arabicLineHeight: number;
   onSelectVerse: (verseKey: string) => void;
-  onVerseLayout?: (verseKey: string, y: number, height: number) => void;
+  onVerseLayout?: (
+    verseKey: string,
+    fragmentKey: string,
+    y: number,
+    height: number,
+  ) => void;
 }
 
 const toArabicIndicDigits = (value: number) =>
@@ -45,6 +50,7 @@ export function MushafVerseFlow({
             onPress={() => onSelectVerse(verse.key)}
             onLayout={(event) => {
               onVerseLayout?.(
+                verse.key,
                 verse.key,
                 event.nativeEvent.layout.y,
                 event.nativeEvent.layout.height,

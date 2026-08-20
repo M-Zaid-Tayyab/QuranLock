@@ -34,7 +34,7 @@ export function VerseNavigationBar({
 }: VerseNavigationBarProps) {
   return (
     <View
-      className="absolute bottom-6 left-6 right-6"
+      className="absolute bottom-0 left-6 right-6 pb-6"
       onLayout={(event) => {
         onMeasuredHeight?.(event.nativeEvent.layout.height);
       }}

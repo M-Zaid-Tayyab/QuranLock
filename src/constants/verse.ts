@@ -1,0 +1,2 @@
+export const VERSE_SCROLL_EDGE_PADDING = 24;
+export const VERSE_MIN_BOTTOM_PADDING_PERCENT = 9;
