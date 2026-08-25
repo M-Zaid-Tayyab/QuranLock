@@ -40,10 +40,8 @@ const createNudgeMessage = (expoPushToken: string, name: string) => {
   return {
     to: expoPushToken,
     sound: "default",
-    title: firstName
-      ? `${firstName}, what would support your Quran journey?`
-      : "What would support your Quran journey?",
-    body: "I’m Zaid, and I built QuranLock. If Premium doesn’t feel right yet, I’d value knowing why. Tap to message me directly.",
+    title: firstName ? `Assalamu alaikum ${firstName}` : "Assalamu alaikum",
+    body: "Claim your free week trial by tapping on this notification",
     data: {
       action: "open_free_week_contact",
       source: "subscription_feedback_nudge",
