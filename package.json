@@ -15,6 +15,7 @@
     "lint": "expo lint",
     "build:quran-pack-lite": "node src/scripts/build-quran-pack-lite.mjs",
     "build:ios": "eas build --profile production --platform ios",
+    "update:ios": "eas update --channel production --environment production --platform ios --clear-cache",
     "submit:ios": "eas submit --profile production --platform ios",
     "release:ios": "yarn build:ios && yarn submit:ios"
   },
