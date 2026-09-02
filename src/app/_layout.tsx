@@ -3,6 +3,7 @@ import { colors } from "@/constants/colors";
 import { PAYWALL_SOURCES } from "@/constants/entitlements";
 import { useRemoteAppConfig } from "@/hooks/app";
 import {
+  useFocusLockStatusSync,
   usePremiumAccessSync,
   usePushNotificationSync,
   useUserSync,
@@ -210,6 +211,7 @@ function RootLayoutContent() {
   useUserSync();
   usePushNotificationSync();
   usePremiumAccessSync();
+  useFocusLockStatusSync();
 
   const {
     appUserId,

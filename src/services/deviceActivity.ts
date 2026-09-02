@@ -8,6 +8,7 @@ import type {
 } from "react-native-device-activity";
 import {
   blockSelection as libBlockSelection,
+  activitySelectionMetadata,
   configureActions,
   disableBlockAllMode,
   enableBlockAllMode,
@@ -34,6 +35,40 @@ const AuthorizationStatus = {
 } as const;
 export type AuthorizationStatusType =
   (typeof AuthorizationStatus)[keyof typeof AuthorizationStatus];
+
+export interface AppSelectionSummary {
+  mode: "recommended" | "manual";
+  applicationCount: number;
+  categoryCount: number;
+  includesEntireCategory: boolean;
+}
+
+export const getAppSelectionSummary = (
+  blockAllApps: boolean,
+  familyActivitySelection: string | null,
+): AppSelectionSummary => {
+  if (blockAllApps) {
+    return {
+      mode: "recommended",
+      applicationCount: 0,
+      categoryCount: 0,
+      includesEntireCategory: true,
+    };
+  }
+
+  const metadata = familyActivitySelection
+    ? activitySelectionMetadata({
+        activitySelectionToken: familyActivitySelection,
+      })
+    : undefined;
+
+  return {
+    mode: "manual",
+    applicationCount: metadata?.applicationCount ?? 0,
+    categoryCount: metadata?.categoryCount ?? 0,
+    includesEntireCategory: metadata?.includeEntireCategory ?? false,
+  };
+};
 
 export async function requestAuthorization(): Promise<void> {
   await libRequestAuthorization("individual");

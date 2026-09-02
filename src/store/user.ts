@@ -1,5 +1,6 @@
 import { STORE_KEYS } from "@/constants/storeKeys";
 import { zustandStorage } from "@/storage";
+import type { AcquisitionSource } from "@/types";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -9,6 +10,7 @@ export interface UserState {
   age: number | null;
   quranFrequency: string;
   reasonsDisconnect: string[];
+  acquisitionSource: AcquisitionSource | null;
   focusSchedules: FocusSchedule[];
   focusDurationMode: FocusDurationMode;
   focusCompletionDays?: number;
@@ -44,6 +46,7 @@ interface UserActions {
   setAge: (age: number | null) => void;
   setQuranFrequency: (value: string) => void;
   setReasonsDisconnect: (value: string[]) => void;
+  setAcquisitionSource: (value: AcquisitionSource) => void;
   setFocusSchedules: (value: FocusSchedule[]) => void;
   setFocusDurationMode: (value: FocusDurationMode) => void;
   setFocusCompletionDays: (value?: number) => void;
@@ -76,6 +79,7 @@ const createInitialUserState = (): UserState => ({
   age: null,
   quranFrequency: "",
   reasonsDisconnect: [],
+  acquisitionSource: null,
   focusSchedules: [],
   focusDurationMode: "goal",
   onboardingComplete: false,
@@ -102,6 +106,7 @@ export const useUserStore = create<UserState & UserActions>()(
       setAge: (age) => set({ age }),
       setQuranFrequency: (quranFrequency) => set({ quranFrequency }),
       setReasonsDisconnect: (reasonsDisconnect) => set({ reasonsDisconnect }),
+      setAcquisitionSource: (acquisitionSource) => set({ acquisitionSource }),
       setFocusSchedules: (focusSchedules) => set({ focusSchedules }),
       setFocusDurationMode: (focusDurationMode) => set({ focusDurationMode }),
       setFocusCompletionDays: (focusCompletionDays) =>

@@ -1,9 +1,11 @@
+import { getAppSelectionSummary } from "@/services/deviceActivity";
 import { syncUserProfile } from "@/services/userSync";
 import { useUserStore } from "@/store/user";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 export const useUserSync = () => {
+  const onboardingComplete = useUserStore((state) => state.onboardingComplete);
   const payload = useUserStore(
     useShallow((s) => ({
       appUserId: s.appUserId,
@@ -11,13 +13,14 @@ export const useUserSync = () => {
       age: s.age,
       quranFrequency: s.quranFrequency,
       reasonsDisconnect: s.reasonsDisconnect,
+      acquisitionSource: s.acquisitionSource,
       focusSchedules: s.focusSchedules,
       focusDurationMode: s.focusDurationMode,
       focusCompletionDays: s.focusCompletionDays,
       focusMinutesPerPage: s.focusMinutesPerPage,
-      onboardingComplete: s.onboardingComplete,
-      hasSelectedApps: s.hasSelectedApps,
+      blockAllApps: s.blockAllApps,
       familyActivitySelection: s.familyActivitySelection,
+      isBlockingPaused: s.isBlockingPaused,
       lastReadPage: s.lastReadPage,
       translationEnabled: s.translationEnabled,
       quranFontScale: s.quranFontScale,
@@ -26,35 +29,41 @@ export const useUserSync = () => {
       streakCompletedDates: s.streakCompletedDates,
     })),
   );
-  const syncPayload = useMemo(
-    () => {
-      const {
-        focusCompletionDays,
-        focusMinutesPerPage,
-        ...basePayload
-      } = payload;
-      if (payload.focusDurationMode !== "goal") {
-        return basePayload;
-      }
-      return {
-        ...basePayload,
-        focusCompletionDays,
-        focusMinutesPerPage,
-      };
-    },
-    [payload],
-  );
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastPayloadRef = useRef<string>("");
   const previousOnboardingCompleteRef = useRef<boolean>(
-    syncPayload.onboardingComplete,
+    onboardingComplete,
   );
 
   useEffect(() => {
-    if (!syncPayload.appUserId || !syncPayload.onboardingComplete) {
+    const {
+      blockAllApps,
+      familyActivitySelection,
+      focusCompletionDays,
+      focusMinutesPerPage,
+      ...basePayload
+    } = payload;
+    const appSelection = getAppSelectionSummary(
+      blockAllApps,
+      familyActivitySelection,
+    );
+    const syncPayload =
+      payload.focusDurationMode === "goal"
+        ? {
+            ...basePayload,
+            focusCompletionDays,
+            focusMinutesPerPage,
+            appSelection,
+          }
+        : {
+            ...basePayload,
+            appSelection,
+          };
+
+    if (!syncPayload.appUserId || !onboardingComplete) {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      previousOnboardingCompleteRef.current = syncPayload.onboardingComplete;
+      previousOnboardingCompleteRef.current = onboardingComplete;
       return;
     }
 
@@ -63,8 +72,8 @@ export const useUserSync = () => {
     lastPayloadRef.current = serialized;
 
     const becameOnboardingComplete =
-      !previousOnboardingCompleteRef.current && syncPayload.onboardingComplete;
-    previousOnboardingCompleteRef.current = syncPayload.onboardingComplete;
+      !previousOnboardingCompleteRef.current && onboardingComplete;
+    previousOnboardingCompleteRef.current = onboardingComplete;
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (becameOnboardingComplete) {
@@ -78,5 +87,5 @@ export const useUserSync = () => {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [syncPayload]);
+  }, [onboardingComplete, payload]);
 };

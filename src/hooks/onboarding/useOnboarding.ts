@@ -1,6 +1,8 @@
 import { getTypingAnimationDuration } from "@/components/common";
 import {
+  ACQUISITION_SOURCE_STEP,
   CONTACT_STEP,
+  FOCUS_TIMES_STEP,
   INTRO_STEPS,
   ONBOARDING_CONTACT_BUTTON_COUNT,
   ONBOARDING_CONTACT_BUTTON_ENTER_DURATION_MS,
@@ -9,6 +11,8 @@ import {
   ONBOARDING_CONTACT_MESSAGE,
   ONBOARDING_CONTACT_TYPING_OPTIONS,
   REVIEW_STEP,
+  SCREEN_TIME_STEP,
+  SELECT_APPS_STEP,
   STEP_ICONS,
   STEP_SUBTITLES,
   STEP_TITLES,
@@ -94,6 +98,7 @@ export function useOnboarding(): UseOnboardingResult {
     setAge,
     quranFrequency,
     reasonsDisconnect,
+    acquisitionSource,
     blockAllApps,
     familyActivitySelection,
     isPremium,
@@ -106,6 +111,7 @@ export function useOnboarding(): UseOnboardingResult {
       setAge: s.setAge,
       quranFrequency: s.quranFrequency,
       reasonsDisconnect: s.reasonsDisconnect,
+      acquisitionSource: s.acquisitionSource,
       blockAllApps: s.blockAllApps,
       familyActivitySelection: s.familyActivitySelection,
       isPremium: s.isPremium,
@@ -142,7 +148,7 @@ export function useOnboarding(): UseOnboardingResult {
 
   const modeParam = Array.isArray(params.mode) ? params.mode[0] : params.mode;
   const isEditTimes = modeParam === "edit-times";
-  const activeStep = isEditTimes ? 9 : stepIndex;
+  const activeStep = isEditTimes ? FOCUS_TIMES_STEP : stepIndex;
 
   useEffect(() => {
     setNameInput(name);
@@ -198,7 +204,7 @@ export function useOnboarding(): UseOnboardingResult {
 
   const focusTimes = useFocusTimes({
     isEditTimes,
-    isActive: activeStep === 9,
+    isActive: activeStep === FOCUS_TIMES_STEP,
     onNotificationPermissionChange,
     onNotificationPermissionStatusChange,
   });
@@ -221,14 +227,24 @@ export function useOnboarding(): UseOnboardingResult {
   }, [isEditTimes, isPremium, router]);
 
   useEffect(() => {
-    if (isEditTimes || activeStep !== 7 || !screenTimeApproved) return;
+    if (
+      isEditTimes ||
+      activeStep !== SCREEN_TIME_STEP ||
+      !screenTimeApproved
+    ) {
+      return;
+    }
     setStepError(null);
-    setStepIndex((current) => (current === 7 ? 8 : current));
+    setStepIndex((current) =>
+      current === SCREEN_TIME_STEP ? SELECT_APPS_STEP : current,
+    );
   }, [activeStep, isEditTimes, screenTimeApproved]);
 
   const onNext = useCallback(async () => {
     setStepError(null);
-    if (activeStep !== 9) setHasAttemptedScheduleSubmit(false);
+    if (activeStep !== FOCUS_TIMES_STEP) {
+      setHasAttemptedScheduleSubmit(false);
+    }
 
     if (!isEditTimes && activeStep === 3) {
       const trimmedInput = nameInput.trim();
@@ -254,7 +270,11 @@ export function useOnboarding(): UseOnboardingResult {
       setAge(parsedAge);
     }
 
-    if (!isEditTimes && activeStep === 7 && Platform.OS === "ios") {
+    if (
+      !isEditTimes &&
+      activeStep === SCREEN_TIME_STEP &&
+      Platform.OS === "ios"
+    ) {
       if (!screenTimeApproved) {
         setScreenTimeResolving(true);
         try {
@@ -276,14 +296,14 @@ export function useOnboarding(): UseOnboardingResult {
 
     if (
       !isEditTimes &&
-      activeStep === 8 &&
+      activeStep === SELECT_APPS_STEP &&
       Platform.OS === "ios" &&
       !commitSelectApps(familyActivitySelectionDraft, blockAllAppsDraft)
     ) {
       return;
     }
 
-    if (activeStep === 9) {
+    if (activeStep === FOCUS_TIMES_STEP) {
       if (!isEditTimes && Platform.OS === "ios" && !notificationApproved) {
         setNotificationResolving(true);
         try {
@@ -376,9 +396,10 @@ export function useOnboarding(): UseOnboardingResult {
     if (activeStep === 4) return !isAgeValid;
     if (activeStep === 5) return !quranFrequency;
     if (activeStep === 6) return reasonsDisconnect.length === 0;
-    if (activeStep === 7) return screenTimeResolving;
-    if (activeStep === 8) return !hasSelectedApps;
-    if (activeStep === 9) {
+    if (activeStep === ACQUISITION_SOURCE_STEP) return !acquisitionSource;
+    if (activeStep === SCREEN_TIME_STEP) return screenTimeResolving;
+    if (activeStep === SELECT_APPS_STEP) return !hasSelectedApps;
+    if (activeStep === FOCUS_TIMES_STEP) {
       return notificationResolving;
     }
     return false;
@@ -387,16 +408,24 @@ export function useOnboarding(): UseOnboardingResult {
   const nextLabel = (() => {
     if (isEditTimes) return "Save";
     if (
-      activeStep === 7 &&
+      activeStep === SCREEN_TIME_STEP &&
       Platform.OS === "ios" &&
       screenTimeStatus === AuthorizationStatus.notDetermined
     ) {
       return "Checking...";
     }
-    if (activeStep === 7 && Platform.OS === "ios" && !screenTimeApproved) {
+    if (
+      activeStep === SCREEN_TIME_STEP &&
+      Platform.OS === "ios" &&
+      !screenTimeApproved
+    ) {
       return screenTimeResolving ? "Checking..." : "Give Access";
     }
-    if (activeStep === 9 && Platform.OS === "ios" && !notificationApproved) {
+    if (
+      activeStep === FOCUS_TIMES_STEP &&
+      Platform.OS === "ios" &&
+      !notificationApproved
+    ) {
       if (notificationResolving) return "Checking...";
       return notificationStatus === "denied" ? "Open Settings" : "Give Access";
     }

@@ -1,9 +1,14 @@
 import { colors } from "@/constants/colors";
 import {
+  ACQUISITION_SOURCE_OPTIONS,
+  ACQUISITION_SOURCE_STEP,
   CONTACT_STEP,
+  FOCUS_TIMES_STEP,
   QURAN_FREQUENCY_OPTIONS,
   REASONS_OPTIONS,
   REVIEW_STEP,
+  SCREEN_TIME_STEP,
+  SELECT_APPS_STEP,
 } from "@/configs/onboarding";
 import { FeedbackContactCard } from "@/components/feedback";
 import { useFunnelText } from "@/hooks/app";
@@ -75,6 +80,34 @@ function ReasonsQuestion() {
   );
 }
 
+const AcquisitionSourceQuestion = () => {
+  const { acquisitionSource, setAcquisitionSource } = useUserStore(
+    useShallow((state) => ({
+      acquisitionSource: state.acquisitionSource,
+      setAcquisitionSource: state.setAcquisitionSource,
+    })),
+  );
+
+  const onSelect = (value: string) => {
+    const selectedSource = ACQUISITION_SOURCE_OPTIONS.find(
+      (option) => option.value === value,
+    )?.value;
+    if (selectedSource) setAcquisitionSource(selectedSource);
+  };
+
+  return (
+    <QuestionCard
+      question="How did you hear about QuranLock?"
+      subtitle="Choose one"
+      icon="megaphone-outline"
+      iconColor={colors.primary}
+      options={ACQUISITION_SOURCE_OPTIONS}
+      selectedValue={acquisitionSource}
+      onSelect={onSelect}
+    />
+  );
+};
+
 export function OnboardingStepContent({
   onboarding,
 }: OnboardingStepContentProps) {
@@ -127,7 +160,11 @@ export function OnboardingStepContent({
     return <ReasonsQuestion />;
   }
 
-  if (onboarding.activeStep === 7) {
+  if (onboarding.activeStep === ACQUISITION_SOURCE_STEP) {
+    return <AcquisitionSourceQuestion />;
+  }
+
+  if (onboarding.activeStep === SCREEN_TIME_STEP) {
     return (
       <ScreenTimeStep
         onAuthorizationChange={onboarding.onScreenTimeAuthorizationChange}
@@ -138,7 +175,7 @@ export function OnboardingStepContent({
     );
   }
 
-  if (onboarding.activeStep === 8) {
+  if (onboarding.activeStep === SELECT_APPS_STEP) {
     return (
       <SelectAppsStep
         blockAllApps={onboarding.blockAllApps}
@@ -150,7 +187,7 @@ export function OnboardingStepContent({
     );
   }
 
-  if (onboarding.activeStep === 9) {
+  if (onboarding.activeStep === FOCUS_TIMES_STEP) {
     return (
       <FocusTimesStep
         focusTimes={onboarding.focusTimes}

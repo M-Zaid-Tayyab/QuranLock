@@ -1,5 +1,6 @@
 import { colors } from "@/constants/colors";
 import type { FocusSchedule } from "@/store/user";
+import type { AcquisitionSource } from "@/types";
 
 export interface OnboardingOption {
   label: string;
@@ -16,9 +17,13 @@ export interface IntroStepData {
   accent: string;
 }
 
-export const TOTAL_STEPS = 12;
-export const CONTACT_STEP = 10;
-export const REVIEW_STEP = 11;
+export const ACQUISITION_SOURCE_STEP = 7;
+export const SCREEN_TIME_STEP = 8;
+export const SELECT_APPS_STEP = 9;
+export const FOCUS_TIMES_STEP = 10;
+export const CONTACT_STEP = 11;
+export const REVIEW_STEP = 12;
+export const TOTAL_STEPS = 13;
 
 export const ONBOARDING_CONTACT_MESSAGE =
   "Have an idea, criticism, or something you want changed in QuranLock? Tell me honestly. I read every message myself.";
@@ -46,11 +51,12 @@ export const STEP_TITLES: Record<number, string> = {
   4: "",
   5: "",
   6: "",
-  7: "Enable Screen Time",
-  8: "Protect your focus",
-  9: "Set your daily focus times",
-  10: "",
-  11: "Help the Ummah complete the Quran",
+  7: "",
+  8: "Enable Screen Time",
+  9: "Protect your focus",
+  10: "Set your daily focus times",
+  11: "",
+  12: "Help the Ummah complete the Quran",
 };
 
 export const STEP_SUBTITLES: Record<number, string> = {
@@ -61,11 +67,12 @@ export const STEP_SUBTITLES: Record<number, string> = {
   4: "",
   5: "",
   6: "",
-  7: "We use Screen Time to protect your focus window and pause distracting apps.",
-  8: "Pick what pauses while you read.",
-  9: "Pick prayer times and set a Quran completion goal.",
-  10: "",
-  11: "Read community stories and share your own review.",
+  7: "",
+  8: "We use Screen Time to protect your focus window and pause distracting apps.",
+  9: "Pick what pauses while you read.",
+  10: "Pick prayer times and set a Quran completion goal.",
+  11: "",
+  12: "Read community stories and share your own review.",
 };
 
 export const STEP_ICONS: Partial<Record<number, string>> = {};
@@ -136,6 +143,47 @@ export const REASONS_OPTIONS: OnboardingOption[] = [
     description: "Something else",
     icon: "ellipsis-horizontal",
     color: colors.secondary,
+  },
+];
+
+export const ACQUISITION_SOURCE_OPTIONS: (OnboardingOption & {
+  value: AcquisitionSource;
+})[] = [
+  {
+    value: "tiktok",
+    label: "TikTok",
+    icon: "logo-tiktok",
+    color: colors.foreground,
+  },
+  {
+    value: "instagram",
+    label: "Instagram",
+    icon: "logo-instagram",
+    color: colors.accent,
+  },
+  {
+    value: "youtube",
+    label: "YouTube",
+    icon: "logo-youtube",
+    color: colors.error,
+  },
+  {
+    value: "app_store_search",
+    label: "App Store Search",
+    icon: "search-outline",
+    color: colors.primary,
+  },
+  {
+    value: "referral",
+    label: "Friend or Family",
+    icon: "people-outline",
+    color: colors.secondary,
+  },
+  {
+    value: "other",
+    label: "Other",
+    icon: "ellipsis-horizontal",
+    color: colors.muted,
   },
 ];
 

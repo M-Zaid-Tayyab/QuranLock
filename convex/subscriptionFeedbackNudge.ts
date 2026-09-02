@@ -13,6 +13,7 @@ export const getEligibleUsers = internalQuery({
       userId: v.id("users"),
       name: v.string(),
       expoPushToken: v.string(),
+      freeWeekTrialGrantedAt: v.optional(v.number()),
     }),
   ),
   handler: async (ctx, args) => {
@@ -32,7 +33,6 @@ export const getEligibleUsers = internalQuery({
     return candidates
       .filter(
         (user) =>
-          user.onboardingComplete &&
           Boolean(user.expoPushToken) &&
           user._creationTime <= args.now - args.minimumUserAgeMs,
       )
@@ -41,6 +41,7 @@ export const getEligibleUsers = internalQuery({
         userId: user._id,
         name: user.name,
         expoPushToken: user.expoPushToken ?? "",
+        freeWeekTrialGrantedAt: user.freeWeekTrialGrantedAt,
       }));
   },
 });
@@ -63,7 +64,6 @@ export const recordSendResults = internalMutation({
     for (const userId of args.invalidTokenUserIds) {
       await ctx.db.patch(userId, {
         expoPushToken: undefined,
-        pushTokenUpdatedAt: args.now,
         updatedAt: args.now,
       });
     }

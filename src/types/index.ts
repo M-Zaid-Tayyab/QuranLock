@@ -1,5 +1,1 @@
-/**
- * Shared TypeScript types and interfaces.
- */
-
-export type {};
+export type { AcquisitionSource } from "./onboarding";

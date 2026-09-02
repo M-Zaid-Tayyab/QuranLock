@@ -150,11 +150,10 @@ Add `--prod` when looking up a production message.
 
 `crons.ts` checks once every six hours for users who:
 
-- completed onboarding;
 - are not premium;
 - granted notification permission and have an Expo push token;
 - have been users for at least 24 hours; and
-- have not received this feedback request in the previous seven days.
+- have not received this feedback request in the previous day.
 
 The job sends at most 50 reminders per run to users who signed up at least 24
 hours ago. `EXPO_ACCESS_TOKEN` is required only when enhanced Expo push security is
@@ -162,5 +161,9 @@ enabled for the project.
 The cron runs automatically after the Convex functions are deployed.
 
 Successful sends update `subscriptionFeedbackNudgeSentAt`, making the user
-eligible again after seven days unless they purchase Premium. Failed sends
+eligible again after one day unless they purchase Premium. Failed sends
 remain eligible for a later run, and invalid Expo tokens are removed.
+
+Set `freeWeekTrialGrantedAt` to the trial-grant timestamp when manually
+granting a user a free week. Future nudges then use a general return-to-app
+message instead of the free-week claim message.

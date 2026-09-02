@@ -3,6 +3,15 @@ import { v } from "convex/values";
 
 const focusDurationMode = v.union(v.literal("manual"), v.literal("goal"));
 
+const acquisitionSource = v.union(
+  v.literal("tiktok"),
+  v.literal("instagram"),
+  v.literal("youtube"),
+  v.literal("app_store_search"),
+  v.literal("referral"),
+  v.literal("other"),
+);
+
 const focusSchedule = v.object({
   id: v.string(),
   label: v.string(),
@@ -18,6 +27,30 @@ const notificationPermissionStatus = v.union(
   v.literal("undetermined"),
 );
 
+const appSelection = v.object({
+  mode: v.union(v.literal("recommended"), v.literal("manual")),
+  applicationCount: v.number(),
+  categoryCount: v.number(),
+  includesEntireCategory: v.boolean(),
+});
+
+const focusLockSession = v.object({
+  id: v.string(),
+  label: v.string(),
+  kind: v.union(v.literal("prayer"), v.literal("custom")),
+  hour: v.number(),
+  minute: v.number(),
+  durationMinutes: v.number(),
+});
+
+const focusLockStatus = v.object({
+  dateKey: v.string(),
+  isAppsLocked: v.boolean(),
+  activeSession: v.optional(focusLockSession),
+  pendingSessions: v.array(focusLockSession),
+  updatedAt: v.number(),
+});
+
 export default defineSchema({
   users: defineTable({
     appUserId: v.string(),
@@ -25,25 +58,24 @@ export default defineSchema({
     age: v.optional(v.number()),
     quranFrequency: v.optional(v.string()),
     reasonsDisconnect: v.array(v.string()),
+    acquisitionSource: v.optional(acquisitionSource),
     focusSchedules: v.array(focusSchedule),
-    deferredFocusSchedules: v.optional(v.array(focusSchedule)),
     focusDurationMode: v.optional(focusDurationMode),
     focusCompletionDays: v.optional(v.number()),
     focusMinutesPerPage: v.optional(v.number()),
-    onboardingComplete: v.boolean(),
-    hasSelectedApps: v.boolean(),
-    familyActivitySelection: v.optional(v.string()),
+    appSelection: v.optional(appSelection),
+    isBlockingPaused: v.optional(v.boolean()),
+    focusLockStatus: v.optional(focusLockStatus),
     lastReadPage: v.number(),
     translationEnabled: v.boolean(),
     quranFontScale: v.optional(v.number()),
     isPremium: v.boolean(),
-    subscriptionTier: v.optional(v.union(v.literal("free"), v.literal("pro"))),
     completedUnlockSessions: v.number(),
     streakCompletedDates: v.array(v.string()),
     expoPushToken: v.optional(v.string()),
     notificationPermissionStatus: v.optional(notificationPermissionStatus),
-    pushTokenUpdatedAt: v.optional(v.number()),
     subscriptionFeedbackNudgeSentAt: v.optional(v.number()),
+    freeWeekTrialGrantedAt: v.optional(v.number()),
     feedbackSupportCode: v.optional(v.string()),
     updatedAt: v.number(),
   })

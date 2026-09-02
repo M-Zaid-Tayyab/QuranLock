@@ -4,7 +4,7 @@ import { internalAction } from "./_generated/server";
 
 const EXPO_PUSH_SEND_URL = "https://exp.host/--/api/v2/push/send";
 const MINIMUM_USER_AGE_MS = 24 * 60 * 60 * 1000;
-const NUDGE_REPEAT_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+const NUDGE_REPEAT_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const BATCH_SIZE = 50;
 
 type ExpoPushTicket =
@@ -21,6 +21,12 @@ interface NudgeResult {
   failed: number;
 }
 
+interface NudgeRecipient {
+  expoPushToken: string;
+  name: string;
+  freeWeekTrialGrantedAt?: number;
+}
+
 const getExpoHeaders = () => {
   const headers: Record<string, string> = {
     accept: "application/json",
@@ -35,12 +41,31 @@ const getExpoHeaders = () => {
 const getFirstName = (name: string) =>
   name.trim().split(/\s+/)[0]?.slice(0, 30) ?? "";
 
-const createNudgeMessage = (expoPushToken: string, name: string) => {
+const createNudgeMessage = ({
+  expoPushToken,
+  name,
+  freeWeekTrialGrantedAt,
+}: NudgeRecipient) => {
   const firstName = getFirstName(name);
+  const title = firstName
+    ? `Assalamu alaikum ${firstName}`
+    : "Assalamu alaikum";
+
+  if (freeWeekTrialGrantedAt !== undefined) {
+    return {
+      to: expoPushToken,
+      sound: "default",
+      title: firstName
+        ? `${firstName}, Your Quran journey is waiting`
+        : "Your Quran journey is waiting",
+      body: "Open QuranLock and continue your next reading session.",
+    };
+  }
+
   return {
     to: expoPushToken,
     sound: "default",
-    title: firstName ? `Assalamu alaikum ${firstName}` : "Assalamu alaikum",
+    title,
     body: "Claim your free week trial by tapping on this notification",
     data: {
       action: "open_free_week_contact",
@@ -86,9 +111,7 @@ export const sendDueSubscriptionFeedbackNudges = internalAction({
       return { selected: 0, accepted: 0, failed: 0 };
     }
 
-    const messages = users.map((user) =>
-      createNudgeMessage(user.expoPushToken, user.name),
-    );
+    const messages = users.map(createNudgeMessage);
 
     let tickets: ExpoPushTicket[] = [];
     try {
